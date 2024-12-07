@@ -12,21 +12,15 @@ class Actions(Enum):
     down = 3
 
 
-class GridWorldEnv(gym.Env):
+class CarlaBEV(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
     def __init__(self, render_mode=None, size=5):
         self.size = size  # The size of the square grid
         self.window_size = 512  # The size of the PyGame window
 
-        # Observations are dictionaries with the agent's and the target's location.
-        # Each location is encoded as an element of {0, ..., `size`}^2,
-        # i.e. MultiDiscrete([size, size]).
-        self.observation_space = spaces.Dict(
-            {
-                "agent": spaces.Box(0, size - 1, shape=(2,), dtype=int),
-                "target": spaces.Box(0, size - 1, shape=(2,), dtype=int),
-            }
+        self.observation_space = spaces.Box(
+            low=0, high=255, shape=(size, size, 3), dtype=np.uint8
         )
 
         # We have 4 actions, corresponding to "right", "up", "left", "down", "right"
@@ -58,7 +52,7 @@ class GridWorldEnv(gym.Env):
         self.clock = None
 
     def _get_obs(self):
-        return {"agent": self._agent_location, "target": self._target_location}
+        return self._render_frame()
 
     def _get_info(self):
         return {
@@ -159,7 +153,6 @@ class GridWorldEnv(gym.Env):
                 (pix_square_size * x, self.window_size),
                 width=3,
             )
-
         if self.render_mode == "human":
             # The following line copies our drawings from `canvas` to the visible window
             self.window.blit(canvas, canvas.get_rect())
@@ -170,10 +163,12 @@ class GridWorldEnv(gym.Env):
             # The following line will automatically add a delay to
             # keep the framerate stable.
             self.clock.tick(self.metadata["render_fps"])
+
         else:  # rgb_array
-            return np.transpose(
+            rgb_array = np.transpose(
                 np.array(pygame.surfarray.pixels3d(canvas)), axes=(1, 0, 2)
             )
+            return rgb_array
 
     def close(self):
         if self.window is not None:

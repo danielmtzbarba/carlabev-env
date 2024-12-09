@@ -1,1 +1,1 @@
-from CarlaBEV.envs.grid_world import CarlaBEV 
+from CarlaBEV.envs.carlabev import CarlaBEV 

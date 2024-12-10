@@ -6,6 +6,7 @@ import pygame
 import numpy as np
 import cv2
 from PIL import Image
+from scipy.ndimage import shift
 
 map_path = "/home/danielmtz/Data/datasets/CarlaBEV/maps/Town01/Town01-1024-RGB.jpg"
 
@@ -38,21 +39,42 @@ class Map(object):
         self._map_arr = np.array(Image.open(map_path))
         self._X, self._Y, _ = self._map_arr.shape
         self._win_size = 1024
-        self._xmin = self._X - self._win_size
+        # 
         self._ymin = 0
+        self._xmin = self._X - self._win_size
+        self._outx, self._outy = 0, 0
+        self.move_sliding_window([0, 0])
+
     
     def move_sliding_window(self, direction):
+        aux = self._xmin + direction[0]
+        auy = self._xmin + direction[1]        
+
         self._xmin = np.clip(
-            self._xmin + direction[0], 0, self._X - self._win_size - 1
+            aux, 0, self._X - self._win_size - 1
         )
         self._ymin = np.clip(
-            self._ymin + direction[1], 0, self._Y - self._win_size - 1
+            auy, 0, self._Y - self._win_size - 1
         )
+        # 
+        fov  = deepcopy(self._map_arr)
+        self._fov  = fov[self._xmin:self._xmin + self._win_size,
+                              self._ymin: self._ymin + self._win_size] 
+        #
+        if aux < 0:
+            self._fov = shift(self._fov, shift=(aux, 0, 0), mode='constant', cval=0)
+        elif aux >= self._win_size:
+            self._fov = shift(self._fov, shift=(aux-self._win_size, 0, 0), mode='constant', cval=0)
+
+        if auy < 0:
+            self._fov = shift(self._fov, shift=(0, auy, 0), mode='constant', cval=0)
+        elif auy >= self._win_size:
+            self._fov = shift(self._fov, shift=(0, auy-self._win_size, 0), mode='constant', cval=0)
+
 
     def _get_fov(self):
-        return self._map_arr[self._xmin:self._xmin + self._win_size,
-                              self._ymin: self._ymin + self._win_size] 
-        
+        return self._fov
+
     def _preprocess(self, arr):
         return pygame.surfarray.make_surface(np.swapaxes(arr, 0, 1))
 
@@ -194,15 +216,7 @@ class CarlaBEV(gym.Env):
         pygame.draw.circle(
             canvas,
             (0, 0, 255),
-            (self.hero.agent_location) * pix_square_size,
-            8,
-        )
-
-        #  center 
-        pygame.draw.circle(
-            canvas,
-            (255, 0, 0),
-            (512, 512),
+            self.window_center,
             8,
         )
 

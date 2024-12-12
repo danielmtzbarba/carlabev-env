@@ -14,6 +14,42 @@ map_path = "/home/danielmtz/Data/datasets/CarlaBEV/maps/Town01/Town01-1024-RGB.j
 # map_path = "/home/dan/Data/datasets/CarlaBEV/Town01-1024-RGB.jpg"
 
 
+class Town01(object):
+    _img = pygame.image.load(map_path)
+
+    def __init__(self) -> None:
+        self._map_size = (6144, 8192)
+        self._origin = (int(self._map_size[0] / 2), int(self._map_size[1] / 2))
+        self._theta = 0
+
+    def draw(self, display, pos=(512, 512), originPos=(0, 0)):
+        # offset from pivot to center
+        image_rect = self._img.get_rect(
+            topleft=(pos[0] - originPos[0], pos[1] - originPos[1])
+        )
+        offset_center_to_pivot = pygame.math.Vector2(pos) - image_rect.center
+
+        # roatated offset from pivot to center
+        rotated_offset = offset_center_to_pivot.rotate(-self._theta)
+
+        # roatetd image center
+        rotated_image_center = (pos[0] - rotated_offset.x, pos[1] - rotated_offset.y)
+
+        # get a rotated image
+        rotated_image = pygame.transform.rotate(self._img, self._theta)
+        rotated_image_rect = rotated_image.get_rect(center=rotated_image_center)
+
+        # rotate and blit the image
+        display.blit(rotated_image, rotated_image_rect)
+
+    def set_theta(self, theta):
+        self._theta = theta
+
+    @property
+    def origin(self):
+        return self._origin
+
+
 class Map(object):
     def __init__(self) -> None:
         self.reset()

@@ -3,28 +3,63 @@ from copy import deepcopy
 import pygame
 
 from PIL import Image
-from scipy.ndimage import shift
+from scipy.ndimage import shift, rotate
 
 from skimage import draw
 
 # home
-map_path = "/home/danielmtz/Data/datasets/CarlaBEV/maps/Town01/Town01-1024-RGB.jpg"
+# map_path = "/home/danielmtz/Data/datasets/CarlaBEV/maps/Town01/Town01-1024-RGB.jpg"
 
 # msi
-# map_path = "/home/dan/Data/datasets/CarlaBEV/Town01-1024-RGB.jpg"
+map_path = "/home/dan/Data/datasets/CarlaBEV/Town01-1024-RGB.jpg"
 
 
 class Town01(object):
     _img = pygame.image.load(map_path)
 
-    def __init__(self) -> None:
-        self._map_size = (6144, 8192)
-        self._origin = (int(self._map_size[0] / 2), int(self._map_size[1] / 2))
+    def __init__(self, window_size) -> None:
+        self._map_arr = np.array(Image.open(map_path))
+        self._win_size = window_size[0]
+        self._Y, self._X, _ = self._map_arr.shape
+        self._origin = ((self._Y / 2), int(self._X / 2))
         self._theta = 0
 
-    def draw(self, display, pos=(512, 512), originPos=(0, 0)):
+    def blit_fov(self, display, agent_pos, rotate_fov=False):
+        padding = 500
+        self._xmin = int(
+            np.clip(
+                abs(agent_pos[0]) - int(padding / 2), 0, self._X - self._win_size - 1
+            )
+        )
+        self._ymin = int(
+            np.clip(
+                abs(agent_pos[1]) - int(padding / 2), 0, self._Y - self._win_size - 1
+            )
+        )
+        print(self._xmin, self._ymin)
+
+        fov = deepcopy(self._map_arr)
+        fov = fov[
+            self._xmin - int(padding / 2) : self._xmin
+            + self._win_size
+            + int(padding / 2),
+            self._ymin - int(padding / 2) : self._ymin
+            + self._win_size
+            + int(padding / 2),
+        ]
+        self._fov = rotate(fov, self._theta)
+        self._fov = pygame.surfarray.make_surface(np.swapaxes(fov, 1, 0))
+        if rotate_fov:
+            self.blitRotate(display)
+        else:
+            display.blit(self._fov, (0, 0))
+
+    def blit(self, display, agent_pos):
+        display.blit(pygame.surfarray.make_surface(self._img), agent_pos)
+
+    def blitRotate(self, display, pos=(0, 0), originPos=(0, 0)):
         # offset from pivot to center
-        image_rect = self._img.get_rect(
+        image_rect = self._fov.get_rect(
             topleft=(pos[0] - originPos[0], pos[1] - originPos[1])
         )
         offset_center_to_pivot = pygame.math.Vector2(pos) - image_rect.center
@@ -36,7 +71,7 @@ class Town01(object):
         rotated_image_center = (pos[0] - rotated_offset.x, pos[1] - rotated_offset.y)
 
         # get a rotated image
-        rotated_image = pygame.transform.rotate(self._img, self._theta)
+        rotated_image = pygame.transform.rotate(self._fov, self._theta)
         rotated_image_rect = rotated_image.get_rect(center=rotated_image_center)
 
         # rotate and blit the image

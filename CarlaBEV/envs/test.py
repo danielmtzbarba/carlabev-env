@@ -5,11 +5,14 @@ from vehicle import Car
 from map import Town01
 
 robot_img_path = (
-    "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/envs/robot-gr.png"
+    "/home/dan/Data/projects/reinforcement/carla-bev-env/CarlaBEV/envs/robot-gr.png"
 )
 
-map_path = "/home/danielmtz/Data/datasets/CarlaBEV/maps/Town01/Town01-1024-RGB.jpg"
+# msi
+map_path = "/home/dan/Data/datasets/CarlaBEV/Town01-1024-RGB.jpg"
 
+# home
+# map_path = "/home/danielmtz/Data/datasets/CarlaBEV/maps/Town01/Town01-1024-RGB.jpg"
 theta = 0
 
 
@@ -19,15 +22,15 @@ class Player(pygame.sprite.Sprite):
         self.img = pygame.image.load(robot_img_path)
         self.rect = self.img.get_rect()
 
-        self.LEFT_KEY, self.RIGHT_KEY, self.FACING_LEFT = False, False, False
-        self.UP_KEY, self.DOWN_KEY = False, False
-        self.last_updated = 0
-        self.vx, self.vy = 0, 0
-        self.theta = 0
-        self.state = "idle"
         self.box = pygame.Rect(self.rect.x, self.rect.y, self.rect.w * 2, self.rect.h)
         self.box.center = self.rect.center
-        self.passed = False
+
+        # controls
+        self.LEFT_KEY, self.RIGHT_KEY = False, False
+        self.UP_KEY, self.DOWN_KEY = False, False
+        #
+        self.vx, self.vy = 0, 0
+        self.theta = 0
 
     def update(self):
         self.vx, self.vy = 0, 0
@@ -41,6 +44,7 @@ class Player(pygame.sprite.Sprite):
             self.vx = -5
         self.rect.x += self.vx
         self.rect.y += self.vy
+        print(self.rect.x, self.rect.y)
 
     def draw(self, display, pos=(512, 512), originPos=(0, 0)):
         # offset from pivot to center
@@ -66,12 +70,12 @@ class Player(pygame.sprite.Sprite):
 ################################# LOAD UP A BASIC WINDOW AND CLOCK #################################
 pygame.init()
 DISPLAY_W, DISPLAY_H = 1024, 1024
-canvas = pygame.Surface((8192, 6144))
+canvas = pygame.Surface((6144, 8192))
 window = pygame.display.set_mode(((DISPLAY_W, DISPLAY_H)))
 running = True
 clock = pygame.time.Clock()
 # map = pygame.image.load(map_path).convert()
-map = Town01()
+map = Town01(window_size=(DISPLAY_H, DISPLAY_W))
 
 ################################# LOAD PLAYER AND CAMERA###################################
 # car = Car(spawn_position=[500, 500, 0], length=1)
@@ -89,9 +93,9 @@ while running:
             running = False
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
-                car.LEFT_KEY, car.FACING_LEFT = True, True
+                car.LEFT_KEY = True
             elif event.key == pygame.K_RIGHT:
-                car.RIGHT_KEY, car.FACING_LEFT = True, False
+                car.RIGHT_KEY = True
             elif event.key == pygame.K_UP:
                 car.UP_KEY = True
             elif event.key == pygame.K_DOWN:
@@ -118,7 +122,10 @@ while running:
     car.update()
     camera.scroll()
     ################################# UPDATE WINDOW AND DISPLAY #################################
-    map.draw(canvas, (camera.offset.x, camera.offset.y), originPos=map.origin)
+
+    # map.blitRotate(canvas, (camera.offset.x, camera.offset.y), originPos=map.origin)
+    map.blit_fov(canvas, (camera.offset.x, camera.offset.y))
     car.draw(canvas, pos=(512, 512))
+
     window.blit(canvas, (0, 0))
     pygame.display.update()

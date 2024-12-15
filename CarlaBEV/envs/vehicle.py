@@ -16,6 +16,64 @@ class Actions(Enum):
     brake = 4
 
 
+class Player(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self)
+        self.img = pygame.image.load(robot_img_path)
+        self.rect = self.img.get_rect()
+        self.rect.x = 512 + 512
+        self.rect.y = 7679 + 512
+        self.pixel_x = 0
+        self.pixel_y = 0
+
+        self.box = pygame.Rect(self.rect.x, self.rect.y, self.rect.w * 2, self.rect.h)
+        self.box.center = self.rect.center
+
+        # controls
+        self.LEFT_KEY, self.RIGHT_KEY = False, False
+        self.UP_KEY, self.DOWN_KEY = False, False
+        #
+        self.mx, self.my = 0, 0
+        self.v = 0
+        self.theta = 0
+
+    def update(self):
+        self.mx, self.my = 0, 0
+        if self.UP_KEY:
+            self.theta -= 1
+        elif self.DOWN_KEY:
+            self.theta += 1
+        if self.LEFT_KEY:
+            self.v = -2
+        elif self.RIGHT_KEY:
+            self.v = 2
+        self.mx = self.v * math.cos(math.radians(self.theta))
+        self.my = self.v * math.sin(math.radians(self.theta))
+        self.rect.x += int(self.my)
+        self.rect.y += int(self.mx)
+        print(self.rect.x, self.rect.y)
+
+    def draw(self, display, pos=(512, 512), originPos=(0, 0)):
+        # offset from pivot to center
+        image_rect = self.img.get_rect(
+            topleft=(pos[0] - originPos[0], pos[1] - originPos[1])
+        )
+        offset_center_to_pivot = pygame.math.Vector2(pos) - image_rect.center
+
+        # roatated offset from pivot to center
+        rotated_offset = offset_center_to_pivot.rotate(-self.theta)
+
+        # roatetd image center
+        rotated_image_center = (pos[0] - rotated_offset.x, pos[1] - rotated_offset.y)
+
+        # get a rotated image
+        rotated_image = pygame.transform.rotate(self.img, 90)
+        rotated_image_rect = rotated_image.get_rect(center=(512, 512))
+
+        # rotate and blit the image
+        display.blit(rotated_image, rotated_image_rect)
+
+
 class Car(pygame.sprite.Sprite):
     _action_to_direction = {
         Actions.nothing.value: np.array([0, 0, 0]),

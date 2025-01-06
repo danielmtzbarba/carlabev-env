@@ -11,13 +11,12 @@ robot_img_path = (
 ################################# LOAD UP A BASIC WINDOW AND CLOCK #################################
 pygame.init()
 DISPLAY_W, DISPLAY_H = 1024, 1024
-canvas = pygame.Surface((7168, 9216))
 window = pygame.display.set_mode(((DISPLAY_W, DISPLAY_H)))
 clock = pygame.time.Clock()
 
 ################################# LOAD PLAYER AND CAMERA###################################
-x = 500
-y = 7680
+x = 2000
+y = 8200
 target_location = (x, y)
 map = Town01(window_size=(DISPLAY_H, DISPLAY_W), target_location=target_location)
 car = Car()
@@ -49,11 +48,9 @@ while running:
     camera.scroll()
     ################################# UPDATE WINDOW AND DISPLAY #################################
 
-    map.blitRotate(canvas, topleft=camera.offset, pos=(0, 0))
-    #    map.get_tile(camera.offset)
-    car.draw(canvas, pos=(512, 512))
-    map.draw_target(canvas, camera.offset)
+    map.blitRotate(window, topleft=camera.offset, pos=(0, 0))
+    print(map.agent_tile)
+    car.draw(window, pos=(512, 512))
 
-    window.blit(canvas, (0, 0))
     window.blit(pygame.transform.rotate(window, 90), (0, 0))
     pygame.display.update()

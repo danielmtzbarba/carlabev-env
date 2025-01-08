@@ -1,18 +1,13 @@
 import numpy as np
-import math
 import pygame
 
 from PIL import Image
 
-# home
-map_path = "/home/danielmtz/Data/datasets/CarlaBEV/maps/Town01/Town01-padded.jpg"
-
-# msi
-# map_path = "/home/dan/Data/datasets/CarlaBEV/Town01-1024-RGB.jpg"
+from .utils import target_path, map_path
 
 
 class Target(pygame.sprite.Sprite):
-    _target_img = pygame.image.load("rectangle-16.png")
+    _target_img = pygame.image.load(target_path)
 
     def __init__(self, target_location):
         pygame.sprite.Sprite.__init__(self)
@@ -22,7 +17,6 @@ class Target(pygame.sprite.Sprite):
         self.position = pygame.math.Vector2(x, y)
 
     def draw(self, map):
-        print(self.position)
         map.blit(self._target_img, self.rect)
 
 
@@ -32,8 +26,9 @@ class Town01(object):
     _Y, _X, _ = _map_arr.shape
 
     def __init__(self, window_size, target_location) -> None:
-        self._map_surface = pygame.Surface((self._X, self._Y))
         self._win_size = window_size[0]
+        self._map_surface = pygame.Surface((self._X, self._Y))
+        self._fov_surface = pygame.Surface(window_size)
 
         self.target_on_map = False
         self._target = Target(target_location)
@@ -71,23 +66,30 @@ class Town01(object):
         if np.math.degrees(self._theta) > 90:
             pass
 
-        rotated_image = pygame.transform.rotate(self._fov, np.math.degrees(self._theta))
+        rotated_image = pygame.transform.rotate(
+            self._fov, np.math.degrees(self._theta) + 90
+        )
         rotated_image_rect = rotated_image.get_rect(center=(512, 512))
 
         return rotated_image, rotated_image_rect
 
-    def blitRotate(self, display, topleft, pos=(0, 0), originPos=(0, 0)):
+    def step(self, topleft, pos=(0, 0), originPos=(0, 0)):
         self.crop_fov(topleft)
         rotated_image, rotated_image_rect = self.rotate_fov(pos, originPos)
-
-        display.blit(rotated_image, rotated_image_rect)
-        self._agent_tile = display.get_at((512, 512))
-
-        return display
+        self._fov_surface.blit(rotated_image, rotated_image_rect)
+        self._agent_tile = self._fov_surface.get_at((512, 512))
 
     def set_theta(self, theta):
         self._theta = theta
 
     @property
+    def canvas(self):
+        return self._fov_surface
+
+    @property
     def agent_tile(self):
         return self._agent_tile
+
+    @property
+    def target_position(self):
+        return self._target.position

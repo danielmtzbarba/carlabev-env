@@ -1,10 +1,12 @@
 from enum import Enum
+from collections import deque
 import gymnasium as gym
 from gymnasium import spaces
 import pygame
 import numpy as np
 
 from .vehicle import Car
+from .utils import get_spawn_locations
 from .map import Town01
 from .camera import Camera, Follow
 
@@ -28,12 +30,12 @@ class Tiles(Enum):
 
 
 class CarlaBEV(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 1000}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
 
-    def __init__(self, render_mode=None, size=1024):
+    def __init__(self, size, render_mode=None):
         self.size = size  # The size of the square grid
 
-        self.window_center = (self.size / 2, self.size / 2)
+        self.window_center = (int(size / 2), int(size / 2))
 
         self.episode = 0
 
@@ -42,6 +44,10 @@ class CarlaBEV(gym.Env):
         )
 
         self.action_space = spaces.Discrete(5)
+        self._success_rate = 0.0
+        self._collision_rate = 0.0
+        self._last_hundo = deque([], maxlen=100)
+        self._termination_stats = {"success": 0, "collision": 0, "max_actions": 0}
 
         """
         The following dictionary maps abstract actions from `self.action_space` to 
@@ -97,16 +103,19 @@ class CarlaBEV(gym.Env):
         self.episode += 1
         self.episode_step = 0
         self.episode_rewards = []
+        self._agent_spawn_loc, self._target_spawn_loc = get_spawn_locations(self.size)
+        #
+        if self.episode % 100 == 0:
+            self._termination_stats = {"success": 0, "collision": 0, "max_actions": 0}
 
-        target_spawn_loc = np.array([2000, 8200, 0.0])
-        self.map = Town01(
-            window_size=(self.size, self.size),
-            target_location=target_spawn_loc,
+        self.map = Town01(target_location=self._target_spawn_loc, size=self.size)
+        #
+        self.hero = Car(
+            start=self._agent_spawn_loc,
+            window_center=self.window_center,
+            size=self.size,
+            length=1,
         )
-
-        # Choose the agent's location uniformly at random
-        agent_spawn_loc = np.array([1000, 8000, 0.0])
-        self.hero = Car(start=agent_spawn_loc, length=1)
 
         # Camera
         self.camera = Camera(self.hero, resolution=(self.size, self.size))
@@ -144,23 +153,30 @@ class CarlaBEV(gym.Env):
         return observation, reward, terminated, False, info
 
     def reward_fn(self, info):
+        reward = -0.1
         aux = np.clip(info["step"]["distance"] / info["step"]["distance_t0"], 0, 1.3)
+        # reward += 1
         terminated = False
-        reward = 1 - aux
 
         tile = np.array(self.map.agent_tile)[:-1]
 
         if self.episode_step >= 1000:
+            cause = "max_actions"
+            self._termination_stats[cause] += 1
             terminated = True
-            reward -= 10
+            reward -= 50
 
-        if np.array_equal(tile, self._tiles_to_color[5]):
+        if np.array_equal(tile, self._tiles_to_color[6]):
+            cause = "success"
+            self._termination_stats[cause] += 1
             terminated = True
             reward += 50
 
         if np.array_equal(tile, self._tiles_to_color[0]):
+            cause = "collision"
+            self._termination_stats[cause] += 1
             terminated = True
-            reward = -20
+            reward = -100
 
         if np.array_equal(tile, self._tiles_to_color[2]):
             reward -= 0.5
@@ -168,10 +184,20 @@ class CarlaBEV(gym.Env):
         self.episode_rewards.append(reward)
         info["step"]["reward"] = reward
         if terminated:
+            self._last_hundo.append(cause)
+            self._success_rate = self._last_hundo.count("success") / len(
+                self._last_hundo
+            )
+            self._collision_rate = self._last_hundo.count("collision") / len(
+                self._last_hundo
+            )
             info["stats_ep"] = {
                 "episode": self.episode,
                 "mean_reward": np.mean(self.episode_rewards),
                 "length": len(self.episode_rewards),
+                "stats": self._termination_stats,
+                "success_rate": self._success_rate,
+                "collision_rate": self._collision_rate,
             }
         return terminated, reward, info
 
@@ -188,8 +214,8 @@ class CarlaBEV(gym.Env):
         if self.clock is None and self.render_mode == "human":
             self.clock = pygame.time.Clock()
 
-        self.map.step(topleft=self.camera.offset, pos=(0, 0))
-        self.hero.draw(self.map.canvas, pos=(512, 512))
+        self.map.step(topleft=self.camera.offset)
+        self.hero.draw(self.map.canvas)
 
         if self.render_mode == "human":
             # The following line copies our drawings from `canvas` to the visible window

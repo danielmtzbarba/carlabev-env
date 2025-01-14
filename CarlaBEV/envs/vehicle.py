@@ -2,20 +2,22 @@ import numpy as np
 import pygame
 import math
 
-from .utils import car_path
+from .utils import load_car_sprite
 
 
 class Car(pygame.sprite.Sprite):
-    def __init__(self, start, length=1):
+    def __init__(self, start, window_center, size, length=1):
         pygame.sprite.Sprite.__init__(self)
+        self.size = size
         self._spawn_location = (start[0], start[1])
+        self._window_center = window_center
         self._lenght = length
         self._setup()
 
     def _setup(self, rotations=360):
-        car_image = pygame.transform.scale(pygame.image.load(car_path), (15, 35))
+        car_image = load_car_sprite(self.size)
         self.img = pygame.transform.rotozoom(car_image, 0, 1)
-        self._centered_rect = self.img.get_rect(center=(512, 512))
+        self._centered_rect = self.img.get_rect(center=self._window_center)
         self.rect = self.img.get_rect()
         self.rect.center = self._spawn_location
 
@@ -64,7 +66,7 @@ class Car(pygame.sprite.Sprite):
         self._u1 = 0
         self._reversing = not self._reversing
 
-    def draw(self, display, pos=(512, 512), originPos=(0, 0)):
+    def draw(self, display):
         display.blit(self.img, self._centered_rect)
 
     @property

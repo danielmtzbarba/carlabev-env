@@ -15,10 +15,8 @@ window = pygame.display.set_mode(((DISPLAY_W, DISPLAY_H)))
 clock = pygame.time.Clock()
 
 ################################# LOAD PLAYER AND CAMERA###################################
-x = 2000
-y = 8200
-target_location = (x, y)
-map = Town01(window_size=(DISPLAY_H, DISPLAY_W), target_location=target_location)
+id = 0
+map = Town01(window_size=(DISPLAY_H, DISPLAY_W), target_id=id, size=128)
 car = Car()
 camera = Camera(car, resolution=(DISPLAY_W, DISPLAY_H))
 follow = Follow(camera, car)

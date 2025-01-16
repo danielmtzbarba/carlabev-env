@@ -1,13 +1,17 @@
+from os import walk
 import numpy as np
 import pygame
 
 
-from .utils import load_map
+from .utils import load_map, scale_coords
+
+target_locations = [(8700, 3000), (8700, 6800), (7300, 6800), (7300, 4700)]
 
 
 class Target(pygame.sprite.Sprite):
-    def __init__(self, target_location, color=(255, 0, 0), size=16):
+    def __init__(self, target_id, color=(255, 0, 0), size=16):
         pygame.sprite.Sprite.__init__(self)
+        target_location = scale_coords(target_locations[target_id], 8, 16)
         x, y = target_location[0], target_location[1]
         self.position = pygame.math.Vector2(x, y)
         self.size = size
@@ -17,9 +21,13 @@ class Target(pygame.sprite.Sprite):
     def draw(self, map):
         self.rect = pygame.draw.rect(map, self.color, self.rect)
 
+    @property
+    def pose(self):
+        return pygame.math.Vector3(self.position.x, self.position.y, 0)
+
 
 class Town01(object):
-    def __init__(self, target_location, size) -> None:
+    def __init__(self, target_id, size) -> None:
         self._map_arr, self._map_img = load_map(size)
         self._Y, self._X, _ = self._map_arr.shape
         self.size = size  # The size of the square grid
@@ -27,8 +35,7 @@ class Town01(object):
         self._map_surface = pygame.Surface((self._X, self._Y))
         self._fov_surface = pygame.Surface((self.size, self.size))
 
-        self.target_on_map = False
-        self._target = Target(target_location)
+        self._target = Target(target_id)
 
         self.draw_map()
 
@@ -85,6 +92,10 @@ class Town01(object):
     @property
     def agent_tile(self):
         return self._agent_tile
+
+    @property
+    def target_pose(self):
+        return self._target.pose
 
     @property
     def target_position(self):

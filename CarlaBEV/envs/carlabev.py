@@ -1,5 +1,6 @@
 from enum import Enum
 from collections import deque
+from copy import deepcopy
 import gymnasium as gym
 from gymnasium import spaces
 import pygame
@@ -89,12 +90,17 @@ class CarlaBEV(gym.Env):
 
     def _get_info(self):
         return {
+            "model": {
+                "pose_data": np.concatenate(
+                    deepcopy((self.hero.pose, self.map.target_pose))
+                ).astype(np.float32)
+            },
             "step": {
                 "distance_t0": self._initial_distance,
                 "distance": np.linalg.norm(
                     self.hero.position - self.map.target_position, ord=1
                 ),
-            }
+            },
         }
 
     def reset(self, seed=None, options=None):
@@ -103,12 +109,13 @@ class CarlaBEV(gym.Env):
         self.episode += 1
         self.episode_step = 0
         self.episode_rewards = []
-        self._agent_spawn_loc, self._target_spawn_loc = get_spawn_locations(self.size)
+        self._agent_spawn_loc = get_spawn_locations(self.size)
+        self._target_id = 0
         #
         if self.episode % 100 == 0:
             self._termination_stats = {"success": 0, "collision": 0, "max_actions": 0}
 
-        self.map = Town01(target_location=self._target_spawn_loc, size=self.size)
+        self.map = Town01(target_id=self._target_id, size=self.size)
         #
         self.hero = Car(
             start=self._agent_spawn_loc,
@@ -152,6 +159,9 @@ class CarlaBEV(gym.Env):
 
         return observation, reward, terminated, False, info
 
+    def _change_target(self):
+        self.map = Town01(target_id=self._target_id, size=self.size)
+
     def reward_fn(self, info):
         reward = -0.1
         aux = np.clip(info["step"]["distance"] / info["step"]["distance_t0"], 0, 1.3)
@@ -167,10 +177,15 @@ class CarlaBEV(gym.Env):
             reward -= 50
 
         if np.array_equal(tile, self._tiles_to_color[6]):
-            cause = "success"
-            self._termination_stats[cause] += 1
-            terminated = True
-            reward += 50
+            self._target_id += 1
+            if self._target_id > 3:
+                cause = "success"
+                self._termination_stats[cause] += 1
+                terminated = True
+                reward = 100
+            else:
+                self._change_target()
+                reward = 50
 
         if np.array_equal(tile, self._tiles_to_color[0]):
             cause = "collision"
@@ -179,7 +194,7 @@ class CarlaBEV(gym.Env):
             reward = -100
 
         if np.array_equal(tile, self._tiles_to_color[2]):
-            reward -= 0.5
+            reward -= 10
 
         self.episode_rewards.append(reward)
         info["step"]["reward"] = reward

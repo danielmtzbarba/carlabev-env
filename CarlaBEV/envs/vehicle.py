@@ -76,3 +76,7 @@ class Car(pygame.sprite.Sprite):
     @property
     def position(self):
         return self._position
+
+    @property
+    def pose(self):
+        return pygame.math.Vector3(self._position.x, self._position.y, self.theta)

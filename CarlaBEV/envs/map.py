@@ -1,6 +1,7 @@
 from os import walk
 import numpy as np
 import pygame
+import pygame.surfarray as surfarray
 
 
 from .utils import load_map, scale_coords
@@ -11,7 +12,7 @@ target_locations = [(8700, 3000), (8700, 6800), (7300, 6800), (7300, 4700)]
 class Target(pygame.sprite.Sprite):
     def __init__(self, target_id, color=(255, 0, 0), size=16):
         pygame.sprite.Sprite.__init__(self)
-        target_location = scale_coords(target_locations[target_id], 8, 16)
+        target_location = scale_coords(target_locations[target_id], 8, 8)
         x, y = target_location[0], target_location[1]
         self.position = pygame.math.Vector2(x, y)
         self.size = size
@@ -81,6 +82,16 @@ class Town01(object):
         rotated_image, rotated_image_rect = self.rotate_fov()
         self._fov_surface.blit(rotated_image, rotated_image_rect)
         self._agent_tile = self._fov_surface.get_at(self.center)
+
+    def has_collided(self, vehicle_rect, class_color):
+        pixels = surfarray.pixels3d(
+            self._fov_surface.subsurface(
+                pygame.Rect(*self.center, vehicle_rect[2], vehicle_rect[3])
+            )
+        )
+        if class_color in pixels:
+            return True
+        return False
 
     def set_theta(self, theta):
         self._theta = theta

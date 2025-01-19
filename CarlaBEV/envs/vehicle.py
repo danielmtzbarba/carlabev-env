@@ -6,15 +6,16 @@ from .utils import load_car_sprite
 
 
 class Car(pygame.sprite.Sprite):
-    def __init__(self, start, window_center, size, length=1):
+    def __init__(self, start, window_center, size, color=(0, 7, 175), length=1):
         pygame.sprite.Sprite.__init__(self)
+        self.color = color
         self.size = size
         self._spawn_location = (start[0], start[1])
         self._window_center = window_center
         self._lenght = length
         self._setup()
 
-    def _setup(self, rotations=360):
+    def _setup(self):
         car_image = load_car_sprite(self.size)
         self.img = pygame.transform.rotozoom(car_image, 0, 1)
         self._centered_rect = self.img.get_rect(center=self._window_center)
@@ -33,7 +34,7 @@ class Car(pygame.sprite.Sprite):
         self.accelerate(action[0])
         self.turn(action[1])
 
-        if action[1] > 0:
+        if action[2] > 0:
             self.brake()
 
         self._velocity.x = self._u1 * math.cos(self._theta)
@@ -51,7 +52,7 @@ class Car(pygame.sprite.Sprite):
 
     def brake(self):
         """Slow the car by half"""
-        self._u1 /= 1.2
+        self._u1 /= 2
         if abs(self._u1) < 0.1:
             self._u1 = 0
 
@@ -67,7 +68,11 @@ class Car(pygame.sprite.Sprite):
         self._reversing = not self._reversing
 
     def draw(self, display):
-        display.blit(self.img, self._centered_rect)
+        pygame.draw.rect(
+            display,
+            self.color,
+            pygame.Rect(self._centered_rect[0], self._centered_rect[1], 4, 8),
+        )
 
     @property
     def theta(self):

@@ -4,15 +4,15 @@ import pygame
 import pygame.surfarray as surfarray
 
 
-from .utils import load_map, scale_coords
+from .utils import load_map, scale_coords, target_locations
 
-target_locations = [(8700, 3000), (8700, 6800), (7300, 6800), (7300, 4700)]
+
 
 
 class Target(pygame.sprite.Sprite):
     def __init__(self, target_id, color=(255, 0, 0), size=16):
         pygame.sprite.Sprite.__init__(self)
-        target_location = scale_coords(target_locations[target_id], 8, 8)
+        target_location = scale_coords(target_locations[target_id], 8, 4)
         x, y = target_location[0], target_location[1]
         self.position = pygame.math.Vector2(x, y)
         self.size = size
@@ -36,7 +36,7 @@ class Town01(object):
         self._map_surface = pygame.Surface((self._X, self._Y))
         self._fov_surface = pygame.Surface((self.size, self.size))
 
-        self._target = Target(target_id)
+        self._target = Target(target_id, size = 8)
 
         self.draw_map()
 

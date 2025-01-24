@@ -7,9 +7,10 @@ import pygame
 import numpy as np
 
 from .vehicle import Car
-from .utils import get_spawn_locations
+from .utils import get_spawn_locations, target_locations
 from .map import Town01
 from .camera import Camera, Follow
+
 
 
 class Actions(Enum):
@@ -174,24 +175,24 @@ class CarlaBEV(gym.Env):
             cause = "max_actions"
             self._termination_stats[cause] += 1
             terminated = True
-            reward -= 50
+            reward -= 500
 
         if np.array_equal(tile, self._tiles_to_color[6]):
             self._target_id += 1
-            if self._target_id > 3:
+            if self._target_id > len(target_locations)-1:
                 cause = "success"
                 self._termination_stats[cause] += 1
                 terminated = True
-                reward = 100
+                reward = 500
             else:
                 self._change_target()
-                reward = 50
+                reward = 250
 
         if np.array_equal(tile, self._tiles_to_color[0]):
             cause = "collision"
             self._termination_stats[cause] += 1
             terminated = True
-            reward = -100
+            reward -= 500
 
         if np.array_equal(tile, self._tiles_to_color[2]):
             reward -= 10
@@ -208,6 +209,8 @@ class CarlaBEV(gym.Env):
             )
             info["stats_ep"] = {
                 "episode": self.episode,
+                "termination": cause,
+                "return": np.sum(self.episode_rewards),
                 "mean_reward": np.mean(self.episode_rewards),
                 "length": len(self.episode_rewards),
                 "stats": self._termination_stats,

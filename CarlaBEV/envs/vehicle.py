@@ -2,9 +2,6 @@ import numpy as np
 import pygame
 import math
 
-from .utils import load_car_sprite
-
-
 class Car(pygame.sprite.Sprite):
     def __init__(self, start, window_center, size, color=(0, 7, 175), length=1):
         pygame.sprite.Sprite.__init__(self)
@@ -16,10 +13,8 @@ class Car(pygame.sprite.Sprite):
         self._setup()
 
     def _setup(self):
-        car_image = load_car_sprite(self.size)
-        self.img = pygame.transform.rotozoom(car_image, 0, 1)
-        self._centered_rect = self.img.get_rect(center=self._window_center)
-        self.rect = self.img.get_rect()
+        self._draw_rect = pygame.Rect(self._window_center[0] - 2, self._window_center[1] - 4, 4, 8) 
+        self.rect = pygame.Rect(self._window_center[0] - 2, self._window_center[1] - 4, 4, 8) 
         self.rect.center = self._spawn_location
 
         # movement
@@ -71,7 +66,7 @@ class Car(pygame.sprite.Sprite):
         pygame.draw.rect(
             display,
             self.color,
-            pygame.Rect(self._centered_rect[0], self._centered_rect[1], 4, 8),
+                self._draw_rect,
         )
 
     @property

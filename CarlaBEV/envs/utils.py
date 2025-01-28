@@ -13,11 +13,24 @@ from PIL import Image
 asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
 
 target_locations = [
-  #  (8700, 2500),
-  #  (8700, 3500),        
-  #  (8700, 4500),
-  #  (8700, 5500),
-    (8700, 6350),
+    (8700, 2000),
+    (8700, 2250),
+    (8700, 2500),
+    (8700, 2750),
+    (8700, 3000),
+    (8700, 3250),
+    (8700, 3500),
+    (8700, 3750),        
+    (8700, 4000),        
+    (8700, 4250),        
+    (8700, 4500),
+    (8700, 4750),        
+    (8700, 5000),        
+    (8700, 5250),        
+    (8700, 5500),
+    (8700, 5750),        
+    (8700, 6000),        
+    (8700, 6250),        
     (8700, 6500),
     (8700, 6650),
     (8650, 6800),
@@ -43,6 +56,8 @@ target_locations = [
     (7250, 4700)
 ]
 
+
+
 def load_map(size):
     map_path = os.path.join(asset_path, f"Town01/Town01-{size}.jpg")
     arr = np.array(Image.open(map_path))
@@ -50,16 +65,14 @@ def load_map(size):
     return arr, img
 
 
-def scale_coords(coord, factor, offset):
+def scale_coords(coord, factor):
     return np.array(
-        [int(coord[1] / factor) - offset, int(coord[0] / factor) - offset, 0]
+        [int(coord[1] / factor), int(coord[0] / factor)-30, 0]
     )
 
 
 def get_spawn_locations(size):
-    agent_loc = (8650, 1500)
-    agent_loc = (8750, 6200)
+    agent_loc = (8500, 1600)
     factor = int(1024 / size)
-    offset = 32
 
-    return scale_coords(agent_loc, factor, offset)
+    return scale_coords(agent_loc, factor)

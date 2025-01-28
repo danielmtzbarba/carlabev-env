@@ -3,19 +3,20 @@ import pygame
 import math
 
 class Car(pygame.sprite.Sprite):
-    def __init__(self, start, window_center, size, color=(0, 7, 175), length=1):
+    def __init__(self, start, window_center, size, color=(0, 7, 175), car_size=32):
         pygame.sprite.Sprite.__init__(self)
         self.color = color
         self.size = size
+        self.scale = int((1024/window_center[0])/2)
+        self._w = int(car_size/self.scale)
+        self._l = 2 * self._w
         self._spawn_location = (start[0], start[1])
         self._window_center = window_center
-        self._lenght = length
         self._setup()
 
     def _setup(self):
-        self._draw_rect = pygame.Rect(self._window_center[0] - 2, self._window_center[1] - 4, 4, 8) 
-        self.rect = pygame.Rect(self._window_center[0] - 2, self._window_center[1] - 4, 4, 8) 
-        self.rect.center = self._spawn_location
+        self._draw_rect = pygame.Rect(self._window_center[0] - int(self._l/2), self._window_center[1] - int(self._l/2), self._w, self._l) 
+        self.rect = pygame.Rect(self._spawn_location[0], self._spawn_location[1], self._w, self._l) 
 
         # movement
         self._phi, self._theta = 0, 0

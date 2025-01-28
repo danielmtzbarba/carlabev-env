@@ -1,3 +1,4 @@
+from copy import deepcopy
 from os import walk
 import numpy as np
 import pygame
@@ -10,12 +11,12 @@ from .utils import load_map, scale_coords, target_locations
 
 
 class Target(pygame.sprite.Sprite):
-    def __init__(self, target_id, color=(255, 0, 0), size=16):
+    def __init__(self, target_id, color=(255, 0, 0), scale=1):
         pygame.sprite.Sprite.__init__(self)
-        target_location = scale_coords(target_locations[target_id], 8, 4)
+        target_location = scale_coords(target_locations[target_id], scale)
         x, y = target_location[0], target_location[1]
         self.position = pygame.math.Vector2(x, y)
-        self.size = size
+        size = int(128/scale) 
         self.color = color
         self.rect = (x, y, size, size)
 
@@ -28,7 +29,7 @@ class Target(pygame.sprite.Sprite):
 
 
 class Town01(object):
-    def __init__(self, target_id, size) -> None:
+    def __init__(self, target_id, size=1024, scale=1) -> None:
         self._map_arr, self._map_img = load_map(size)
         self._Y, self._X, _ = self._map_arr.shape
         self.size = size  # The size of the square grid
@@ -36,7 +37,7 @@ class Town01(object):
         self._map_surface = pygame.Surface((self._X, self._Y))
         self._fov_surface = pygame.Surface((self.size, self.size))
 
-        self._target = Target(target_id, size = 8)
+        self._target = Target(target_id, scale = scale)
 
         self.draw_map()
 
@@ -82,6 +83,14 @@ class Town01(object):
         rotated_image, rotated_image_rect = self.rotate_fov()
         self._fov_surface.blit(rotated_image, rotated_image_rect)
         self._agent_tile = self._fov_surface.get_at(self.center)
+    
+    def got_target(self, hero):
+        const = self.size/ 4 
+        offsetx = const - hero.rect.w/2
+        offsety = const - hero.rect.w/2
+        dummy_rect = pygame.Rect(hero.rect.x + offsetx, hero.rect.y + offsety, hero.rect.w, hero.rect.w) 
+        result = dummy_rect.colliderect(self._target.rect)
+        return result 
 
     def has_collided(self, vehicle_rect, class_color):
         pixels = surfarray.pixels3d(

@@ -2,21 +2,29 @@ import numpy as np
 import pygame
 import math
 
+
 class Car(pygame.sprite.Sprite):
     def __init__(self, start, window_center, size, color=(0, 7, 175), car_size=32):
         pygame.sprite.Sprite.__init__(self)
         self.color = color
         self.size = size
-        self.scale = int((1024/window_center[0])/2)
-        self._w = int(car_size/self.scale)
+        self.scale = int((1024 / window_center[0]) / 2)
+        self._w = int(car_size / self.scale)
         self._l = 2 * self._w
         self._spawn_location = (start[0], start[1])
         self._window_center = window_center
         self._setup()
 
     def _setup(self):
-        self._draw_rect = pygame.Rect(self._window_center[0] - int(self._l/2), self._window_center[1] - int(self._l/2), self._w, self._l) 
-        self.rect = pygame.Rect(self._spawn_location[0], self._spawn_location[1], self._w, self._l) 
+        self._draw_rect = pygame.Rect(
+            self._window_center[0] - int(self._l / 2),
+            self._window_center[1] - int(self._l / 2),
+            self._w,
+            self._l,
+        )
+        self.rect = pygame.Rect(
+            self._spawn_location[0], self._spawn_location[1], self._w, self._l
+        )
 
         # movement
         self._phi, self._theta = 0, 0
@@ -56,7 +64,7 @@ class Car(pygame.sprite.Sprite):
         """Adjust the angle the car is heading"""
         #    self._phi = np.math.radians(angle_degrees)
         #        self._theta += (1 / self._lenght) * math.tan(self._phi) * self._u1
-        self._theta += np.math.radians(angle_degrees)
+        self._theta += math.radians(angle_degrees)
 
     def reverse(self):
         """Change forward/reverse, reset any speed to 0"""
@@ -67,7 +75,7 @@ class Car(pygame.sprite.Sprite):
         pygame.draw.rect(
             display,
             self.color,
-                self._draw_rect,
+            self._draw_rect,
         )
 
     @property

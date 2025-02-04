@@ -1,13 +1,10 @@
-from copy import deepcopy
-from os import walk
 import numpy as np
+import math
 import pygame
 import pygame.surfarray as surfarray
 
 
 from .utils import load_map, scale_coords, target_locations
-
-
 
 
 class Target(pygame.sprite.Sprite):
@@ -16,7 +13,7 @@ class Target(pygame.sprite.Sprite):
         target_location = scale_coords(target_locations[target_id], scale)
         x, y = target_location[0], target_location[1]
         self.position = pygame.math.Vector2(x, y)
-        size = int(128/scale) 
+        size = int(128 / scale)
         self.color = color
         self.rect = (x, y, size, size)
 
@@ -37,7 +34,7 @@ class Town01(object):
         self._map_surface = pygame.Surface((self._X, self._Y))
         self._fov_surface = pygame.Surface((self.size, self.size))
 
-        self._target = Target(target_id, scale = scale)
+        self._target = Target(target_id, scale=scale)
 
         self.draw_map()
 
@@ -68,11 +65,11 @@ class Town01(object):
 
     def rotate_fov(self):
         # get a rotated image
-        if np.math.degrees(self._theta) > 90:
+        if math.degrees(self._theta) > 90:
             pass
 
         rotated_image = pygame.transform.rotate(
-            self._fov, np.math.degrees(self._theta) + 90
+            self._fov, math.degrees(self._theta) + 90
         )
         rotated_image_rect = rotated_image.get_rect(center=self.center)
 
@@ -83,14 +80,16 @@ class Town01(object):
         rotated_image, rotated_image_rect = self.rotate_fov()
         self._fov_surface.blit(rotated_image, rotated_image_rect)
         self._agent_tile = self._fov_surface.get_at(self.center)
-    
+
     def got_target(self, hero):
-        const = self.size/ 4 
-        offsetx = const - hero.rect.w/2
-        offsety = const - hero.rect.w/2
-        dummy_rect = pygame.Rect(hero.rect.x + offsetx, hero.rect.y + offsety, hero.rect.w, hero.rect.w) 
+        const = self.size / 4
+        offsetx = const - hero.rect.w / 2
+        offsety = const - hero.rect.w / 2
+        dummy_rect = pygame.Rect(
+            hero.rect.x + offsetx, hero.rect.y + offsety, hero.rect.w, hero.rect.w
+        )
         result = dummy_rect.colliderect(self._target.rect)
-        return result 
+        return result
 
     def has_collided(self, vehicle_rect, class_color):
         pixels = surfarray.pixels3d(

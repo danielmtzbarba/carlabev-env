@@ -64,7 +64,7 @@ class Car(pygame.sprite.Sprite):
         """Adjust the angle the car is heading"""
         #    self._phi = np.math.radians(angle_degrees)
         #        self._theta += (1 / self._lenght) * math.tan(self._phi) * self._u1
-        self._theta += math.radians(angle_degrees)
+        self._theta += math.radians(angle_degrees * 10)
 
     def reverse(self):
         """Change forward/reverse, reset any speed to 0"""

@@ -7,10 +7,10 @@ from PIL import Image
 # asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
 
 # msi
-asset_path = "/home/dan/Data/projects/reinforcement/carla-bev-env/CarlaBEV/assets"
+#asset_path = "/home/dan/Data/projects/reinforcement/carla-bev-env/CarlaBEV/assets"
 
 # aisys
-# asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
+asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
 
 target_locations = [
     (8700, 2000),
@@ -63,11 +63,11 @@ def load_map(size):
 
 
 def scale_coords(coord, factor):
-    return np.array([int(coord[1] / factor), int(coord[0] / factor), 0])
+    return np.array([int(coord[1] / factor), int(coord[0] / factor) - factor, 0])
 
 
 def get_spawn_locations(size):
-    agent_loc = (8500, 1600)
+    agent_loc = (8600, 1600)
     factor = int(1024 / size)
 
     return scale_coords(agent_loc, factor)

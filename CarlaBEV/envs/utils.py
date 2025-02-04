@@ -63,7 +63,7 @@ def load_map(size):
 
 
 def scale_coords(coord, factor):
-    return np.array([int(coord[1] / factor), int(coord[0] / factor) - 30, 0])
+    return np.array([int(coord[1] / factor), int(coord[0] / factor), 0])
 
 
 def get_spawn_locations(size):

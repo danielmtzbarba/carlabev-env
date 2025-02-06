@@ -7,7 +7,6 @@ sys.path.append("..")
 
 from RRT_Star import RRTGraph
 from RRT_Star import RRTMap
-from bicycle import Robot
 
 # --------------------------------------------------------------
 from utils import scale_coords, get_spawn_locations, target_locations
@@ -24,8 +23,6 @@ print(f"goal: {goal}")
 # --------------------------------------------------------------
 
 dimensions = (size, size)  # -y x
-obsdim = 35
-obsnum = 0
 number_iterations = 10000
 iteration = 0
 
@@ -37,15 +34,13 @@ Projectfolder_image = "../assets/"
 
 
 Background = os.path.join(Projectfolder_image, "Town01-64.jpg")
-Body_Robot = os.path.join(Projectfolder_image, "Body.png")
-Wheel_Robot = os.path.join(Projectfolder_image, "wheel.png")
 
 
 def main1():
     iteration = 0
     pygame.init()
-    map = RRTMap(start, goal, size, obsdim, obsnum)
-    graph = RRTGraph(start, goal, dimensions, obsdim, obsnum, RRT_STAR, map.surface)
+    map = RRTMap(start, goal, size)
+    graph = RRTGraph(start, goal, dimensions, RRT_STAR, map.surface)
 
     X = []
     t1 = time.time()
@@ -113,43 +108,5 @@ def main1():
     return path
 
 
-def main2(path):
-    lasttime = pygame.time.get_ticks()
-    pygame.init()
-    map = RRTMap(start, goal, size, obsdim, obsnum)
-    graph = RRTGraph(start, goal, dimensions, obsdim, obsnum, RRT_STAR, map.surface)
-
-    def robot_simulate(dt, event=None):
-        robot.move(dt, event=event)
-        robot.draw(map.map)
-
-    path = path
-    path.reverse()
-    x_path = []
-    y_path = []
-    for x in path:
-        x_path.append(x[0])
-        y_path.append(x[1])
-
-    map.drawPath(path, (255, 0, 0), 5)
-
-    robot = Robot(start, x_path, y_path, Body_Robot, Wheel_Robot, 80, Background)
-
-    running = True
-
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if running == False:
-                pygame.quit()
-        pygame.display.update()
-        dt = (pygame.time.get_ticks() - lasttime) / 1000
-        lasttime = pygame.time.get_ticks()
-        robot_simulate(dt)
-        running = robot.carfoundgoal()
-
-
 if __name__ == "__main__":
     path = main1()
-    main2(path)

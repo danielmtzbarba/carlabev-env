@@ -8,14 +8,22 @@ from .utils import load_map, scale_coords, target_locations
 
 
 class Target(pygame.sprite.Sprite):
-    def __init__(self, target_id, color=(255, 0, 0), scale=1):
+    lenght, width = 130, 1
+
+    def __init__(self, target_id, color=(0, 255, 0), scale=1):
         pygame.sprite.Sprite.__init__(self)
         target_location = scale_coords(target_locations[target_id], scale)
         x, y = target_location[0], target_location[1]
         self.position = pygame.math.Vector2(x, y)
         size = int(128 / scale)
+        self.lenght = int(self.lenght / scale)
         self.color = color
-        self.rect = (x, y, size, size)
+        self.rect = (
+            int(x - self.width / 2),
+            int(y - self.lenght / 2),
+            self.width,
+            self.lenght,
+        )
 
     def draw(self, map):
         self.rect = pygame.draw.rect(map, self.color, self.rect)

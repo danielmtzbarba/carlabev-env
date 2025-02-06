@@ -18,7 +18,13 @@ class Tiles(Enum):
 
 
 class RRTMap:  # methods for drawing map, obstacles and path
-    def __init__(self, start, goal, size, obsdim, obsnum):
+    def __init__(
+        self,
+        start,
+        goal,
+        size,
+    ):
+        self._scale = int(1024 / 128)
         self._map_arr, self._map_img = load_map(128)
         self._Y, self._X, _ = self._map_arr.shape
         self.size = size  # The size of the square grid
@@ -30,7 +36,6 @@ class RRTMap:  # methods for drawing map, obstacles and path
         self.MapWindowName = "RRT path planning"
         pygame.display.set_caption(self.MapWindowName)
         self.map = pygame.display.set_mode((self._X, self._Y))
-        self.map.blit(self._map_img, (0, 0))
 
         self.nodeRad = 1
         self.nodeThickness = 0
@@ -42,6 +47,9 @@ class RRTMap:  # methods for drawing map, obstacles and path
         self.Green = (0, 255, 0)
         self.Red = (255, 0, 0)
         self.white = (255, 255, 255)
+
+    def drawMap(self):
+        self.map.blit(self._map_img, (0, 0))
 
     def drawPath(self, path, color, size):
         for node in path:
@@ -84,13 +92,25 @@ class RRTMap:  # methods for drawing map, obstacles and path
             pygame.draw.circle(self.map, self.grey, (X[-i], Y[-i]), self.nodeRad + 2, 0)
 
     @property
+    def scale(self):
+        return self._scale
+
+    @property
     def surface(self):
         return self.map
+
+    @property
+    def start_position(self):
+        return self.start
+
+    @property
+    def goal_position(self):
+        return self.goal
 
 
 class RRTGraph:  # methods to make and remove nodes and edges, check the collisions and find the nearest neighbor to a sample
     def __init__(
-        self, start, goal, MapDimensions, obsdim, obsnum, RRTSTARFLAG, map
+        self, start, goal, MapDimensions, RRTSTARFLAG, map
     ):  # start and goal coordonates
         self.map = map
         (x, y) = start
@@ -111,9 +131,6 @@ class RRTGraph:  # methods to make and remove nodes and edges, check the collisi
         # the obstacles
         self.obstacle = []
         self.obstacleBbox = []
-        self.obsDim = obsdim
-        # self.obsBbox = 2*obsdim
-        self.obsNum = obsnum
         # path
         self.goalstate = None
         self.path = []

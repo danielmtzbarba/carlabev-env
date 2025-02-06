@@ -1,12 +1,32 @@
 import math
 import pygame
+import os
+
+Projectfolder_image = "assets/"
+
+Body_Robot = os.path.join(Projectfolder_image, "Body.png")
+Wheel_Robot = os.path.join(Projectfolder_image, "wheel.png")
 
 
-class Robot:
-    def __init__(self, startpos, xpath, ypath, robotImg, wheelimg, width, background):
-        self.m2p = 3779.52  # meters 2 pixels
-        self.W = width
+class Robot(pygame.sprite.Sprite):
+    m2p = 3779.52  # meters 2 pixels
+
+    def __init__(self, startpos, path, car_size=32, color=(0, 7, 175)):
+        pygame.sprite.Sprite.__init__(self)
+        # my stuff
+        size = 128
+        self.scale = int((1024 / size))
+        self._w = int(car_size / self.scale)
+        self._l = 2 * self._w
+        self._spawn_location = (
+            int(startpos[0] - self._l / 2),
+            int(startpos[1] - self._w / 2),
+        )
+        self.color = color
+        #
+        self.xpath, self.ypath = path
         self.x, self.y = startpos
+        #
         self.beta = 0
         self.r = 0
         self.u = 180  # pix/sec
@@ -15,30 +35,33 @@ class Robot:
         self.maxspeed = 0.02 * self.m2p
         self.minspeed = -0.02 * self.m2p
         # graphics
-        self.img = pygame.image.load(robotImg)
+        self.img = pygame.image.load(Body_Robot)
+        # Scale the image to your needed size
+        self.img = pygame.transform.scale(self.img, (self._l, self._w))
         self.rotated = self.img
         self.rect = self.rotated.get_rect(center=(self.x, self.y))
 
+        # kinematics
         self.w = 0  # rad/sec
         self.theta = 5
-        self.background = pygame.image.load(background)
         self.psi = 0  # rad/s
         self.a = 20
         self.lF = 30
         self.lR = 30
         self.beta = 0
         self.r = 0
+
         # wheels
         self.xF = self.x + self.lF * math.cos(self.psi)
         self.yF = self.y + self.lF * math.sin(self.psi)
         self.xR = self.x - self.lR * math.cos(self.psi)
         self.yR = self.y - self.lR * math.sin(self.psi)
 
-        self.wheelF = pygame.image.load(wheelimg)
+        self.wheelF = pygame.image.load(Wheel_Robot)
         self.rotated_wheelF = self.wheelF
         self.rect_wheelF = self.rotated.get_rect(center=(self.xF, self.yF))
 
-        self.wheelR = pygame.image.load(wheelimg)
+        self.wheelR = pygame.image.load(Wheel_Robot)
         self.rotated_wheelR = self.wheelR
         self.rect_wheelR = self.rotated.get_rect(center=(self.xR, self.yR))
 
@@ -52,9 +75,6 @@ class Robot:
         self.kaapa = 0
         self.desired = 0.1
         self.ld = 0
-        # path
-        self.xpath = xpath
-        self.ypath = ypath
 
         # path following
         self.error = 0
@@ -71,10 +91,7 @@ class Robot:
         self.index = 0
 
     def draw(self, map):
-        map.blit(self.background, (0, 0))  # erase
         map.blit(self.rotated, self.rect)
-        map.blit(self.rotated_wheelF, self.rect_wheelF)
-        map.blit(self.rotated_wheelR, self.rect_wheelR)
 
     def dist(self, point1, point2):
         (x1, y1) = point1

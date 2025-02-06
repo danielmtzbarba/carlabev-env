@@ -11,7 +11,10 @@ class Car(pygame.sprite.Sprite):
         self.scale = int((1024 / window_center[0]) / 2)
         self._w = int(car_size / self.scale)
         self._l = 2 * self._w
-        self._spawn_location = (start[0], start[1])
+        self._spawn_location = (
+            int(start[0] - self._l / 2),
+            int(start[1] - self._w / 2),
+        )
         self._window_center = window_center
         self._setup()
 

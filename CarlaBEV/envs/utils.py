@@ -12,6 +12,10 @@ asset_path = "/home/dan/Data/projects/reinforcement/carla-bev-env/CarlaBEV/asset
 # aisys
 # asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
 
+pedestrian_locations = [
+    (8600, 3300),
+]
+
 target_locations = [
     (8704, 2000),
     (8704, 2250),

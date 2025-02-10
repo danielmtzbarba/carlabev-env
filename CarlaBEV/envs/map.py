@@ -4,33 +4,8 @@ import pygame
 import pygame.surfarray as surfarray
 
 
-from .utils import load_map, scale_coords, target_locations
-
-
-class Target(pygame.sprite.Sprite):
-    lenght, width = 130, 1
-
-    def __init__(self, target_id, color=(0, 255, 0), scale=1):
-        pygame.sprite.Sprite.__init__(self)
-        target_location = scale_coords(target_locations[target_id], scale)
-        x, y = target_location[0], target_location[1]
-        self.position = pygame.math.Vector2(x, y)
-        size = int(128 / scale)
-        self.lenght = int(self.lenght / scale)
-        self.color = color
-        self.rect = (
-            int(x - self.width / 2),
-            int(y - self.lenght / 2),
-            self.width,
-            self.lenght,
-        )
-
-    def draw(self, map):
-        self.rect = pygame.draw.rect(map, self.color, self.rect)
-
-    @property
-    def pose(self):
-        return pygame.math.Vector3(self.position.x, self.position.y, 0)
+from .utils import load_map
+from .level import Scene
 
 
 class Town01(object):
@@ -42,16 +17,14 @@ class Town01(object):
         self._map_surface = pygame.Surface((self._X, self._Y))
         self._fov_surface = pygame.Surface((self.size, self.size))
 
-        self._target = Target(target_id, scale=scale)
-
-        self.draw_map()
-
         self._pad_rotation = self.center[0]
         self._theta = 0
 
+        self.draw_map()
+
     def draw_map(self):
         self._map_surface.blit(self._map_img, (0, 0))
-        self._target.draw(self._map_surface)
+        self._scene = Scene(map_surface=self._map_surface, size=self.size)
 
     def crop_fov(self, topleft):
         self._xmin = np.clip(
@@ -84,20 +57,11 @@ class Town01(object):
         return rotated_image, rotated_image_rect
 
     def step(self, topleft):
+        self._scene.step()
         self.crop_fov(topleft)
         rotated_image, rotated_image_rect = self.rotate_fov()
         self._fov_surface.blit(rotated_image, rotated_image_rect)
         self._agent_tile = self._fov_surface.get_at(self.center)
-
-    def got_target(self, hero):
-        const = self.size / 4
-        offsetx = const - hero.rect.w / 2
-        offsety = const - hero.rect.w / 2
-        dummy_rect = pygame.Rect(
-            hero.rect.x + offsetx, hero.rect.y + offsety, hero.rect.w, hero.rect.w
-        )
-        result = dummy_rect.colliderect(self._target.rect)
-        return result
 
     def has_collided(self, vehicle_rect, class_color):
         pixels = surfarray.pixels3d(
@@ -112,6 +76,15 @@ class Town01(object):
     def set_theta(self, theta):
         self._theta = theta
 
+    def got_target(self, hero):
+        return self._scene.got_target(hero)
+
+    def hit_pedestrian(self, hero):
+        return self._scene.hit_pedestrian(hero)
+
+    def next_target(self, target_id):
+        self._scene.next_target(target_id)
+
     @property
     def canvas(self):
         return self._fov_surface
@@ -122,8 +95,8 @@ class Town01(object):
 
     @property
     def target_pose(self):
-        return self._target.pose
+        return self._scene.target_pose
 
     @property
     def target_position(self):
-        return self._target.position
+        return self._scene.target_position

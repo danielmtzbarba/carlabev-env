@@ -12,7 +12,6 @@ from .map import Town01
 from .camera import Camera, Follow
 
 
-
 class Actions(Enum):
     nothing = 0
     left = 1
@@ -36,7 +35,7 @@ class CarlaBEV(gym.Env):
 
     def __init__(self, size, render_mode=None):
         self.size = size  # The size of the square grid
-        self._scale_factor = int(1024/size) 
+        self._scale_factor = int(1024 / size)
 
         self.window_center = (int(size / 2), int(size / 2))
 
@@ -117,7 +116,9 @@ class CarlaBEV(gym.Env):
         if self.episode % 100 == 0:
             self._termination_stats = {"success": 0, "collision": 0, "max_actions": 0}
 
-        self.map = Town01(target_id=self._target_id, size=self.size, scale=self._scale_factor)
+        self.map = Town01(
+            target_id=self._target_id, size=self.size, scale=self._scale_factor
+        )
         #
         self.hero = Car(
             start=self._agent_spawn_loc,
@@ -162,7 +163,7 @@ class CarlaBEV(gym.Env):
         return observation, reward, terminated, False, info
 
     def _change_target(self):
-        self.map = Town01(target_id=self._target_id, size=self.size, scale=self._scale_factor)
+        self.map.next_target(target_id=self._target_id)
 
     def reward_fn(self, info):
         reward = -0.1
@@ -178,10 +179,10 @@ class CarlaBEV(gym.Env):
             terminated = True
             reward -= 500
 
-#        if np.array_equal(tile, self._tiles_to_color[6]):
+        #        if np.array_equal(tile, self._tiles_to_color[6]):
         if self.map.got_target(self.hero):
             self._target_id += 1
-            if self._target_id > len(target_locations)-1:
+            if self._target_id > len(target_locations) - 1:
                 cause = "success"
                 self._termination_stats[cause] += 1
                 terminated = True
@@ -195,6 +196,12 @@ class CarlaBEV(gym.Env):
             self._termination_stats[cause] += 1
             terminated = True
             reward -= 500
+
+        if self.map.hit_pedestrian(self.hero):
+            cause = "collision"
+            self._termination_stats[cause] += 1
+            terminated = True
+            reward -= 1000
 
         if np.array_equal(tile, self._tiles_to_color[2]):
             reward -= 10

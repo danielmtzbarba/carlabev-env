@@ -56,6 +56,7 @@ class Car(pygame.sprite.Sprite):
             self._u1 += amount
         else:
             self._u1 -= amount
+        self._u1 = np.clip(self._u1, -10, 10)
 
     def brake(self):
         """Slow the car by half"""
@@ -67,7 +68,7 @@ class Car(pygame.sprite.Sprite):
         """Adjust the angle the car is heading"""
         #    self._phi = np.math.radians(angle_degrees)
         #        self._theta += (1 / self._lenght) * math.tan(self._phi) * self._u1
-        self._theta += math.radians(angle_degrees * 10)
+        self._theta += math.radians(angle_degrees * 15)
 
     def reverse(self):
         """Change forward/reverse, reset any speed to 0"""

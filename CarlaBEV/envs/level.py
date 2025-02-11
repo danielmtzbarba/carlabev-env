@@ -1,19 +1,23 @@
+from numpy import random
 import pygame
 
 from .utils import scale_coords, target_locations, load_map, pedestrian_locations
 
 
 class Pedestrian(pygame.sprite.Sprite):
-    def __init__(self, id, color=(255, 0, 0), scale=1):
+    def __init__(self, color=(255, 0, 0), scale=1):
         pygame.sprite.Sprite.__init__(self)
+        id = random.randint(0, 4)
         target_location = scale_coords(pedestrian_locations[id], scale)
         x, y = target_location[0], target_location[1]
         self._x0, self._y0 = x, y
         self.position = pygame.math.Vector2(x, y)
+        self._behavior = random.randint(0, 2)
         self._scale = scale
         self.size = int(16 / scale)
         self.color = color
         self.rect = pygame.Rect((x, y, self.size, self.size))
+        self.dir = 1
 
         self._running = False
         self._velocity = pygame.math.Vector2(0, 0)
@@ -30,13 +34,16 @@ class Pedestrian(pygame.sprite.Sprite):
             self.rect = pygame.draw.rect(map, self.color, self.rect)
 
     def move(self):
-        aux = 1
-        if self.position.y > int(8750 / self._scale):
-            aux = -1
+        if self.position.y > self._y0 + int(150 / self._scale):
+            self.dir = -1
+
+        if self._behavior == 1:
+            if self.position.y < self._y0:
+                self.dir = 1
 
         self._velocity.y = 1
         self._velocity.x = 0
-        self.position += aux * self._velocity
+        self.position += self.dir * self._velocity
         self.rect.center = (round(self.position[0]), round(self.position[1]))
 
     @property
@@ -77,15 +84,15 @@ class Scene(object):
         self._size = size
         self._scale = int(1024 / size)
         self._const = size / 4
-
+        self.trigger = random.randint(0, 5)
         self._scene_setup(target_id=self._curr_goal_id)
 
     def _scene_setup(self, target_id):
+        self._pedestrian = Pedestrian(scale=self._scale)
         self.next_target(target_id)
-        self._pedestrian = Pedestrian(id=0, scale=self._scale)
 
     def next_target(self, target_id):
-        if target_id == 3:
+        if target_id == self.trigger:
             self._pedestrian.trigger()
         self._target = Target(target_id, scale=self._scale)
 
@@ -101,7 +108,10 @@ class Scene(object):
         offsetx = self._const - hero.rect.w / 2
         offsety = self._const - hero.rect.w / 2
         dummy_rect = pygame.Rect(
-            hero.rect.x + offsetx, hero.rect.y + offsety, hero.rect.w + 1, hero.rect.w + 1
+            hero.rect.x + offsetx,
+            hero.rect.y + offsety,
+            hero.rect.w + 1,
+            hero.rect.w + 1,
         )
         result = dummy_rect.colliderect(self._target.rect)
         return result

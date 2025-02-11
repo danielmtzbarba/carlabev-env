@@ -7,13 +7,17 @@ from PIL import Image
 # asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
 
 # msi
-#asset_path = "/home/dan/Data/projects/reinforcement/carla-bev-env/CarlaBEV/assets"
+asset_path = "/home/dan/Data/projects/reinforcement/carla-bev-env/CarlaBEV/assets"
 
 # aisys
-asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
+# asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
 
 pedestrian_locations = [
+    (8600, 2300),
     (8600, 3300),
+    (8600, 4300),
+    (8600, 5300),
+    (8600, 6300),
 ]
 
 target_locations = [

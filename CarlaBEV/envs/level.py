@@ -45,7 +45,7 @@ class Pedestrian(pygame.sprite.Sprite):
 
 
 class Target(pygame.sprite.Sprite):
-    lenght, width = 130, 1
+    lenght, width = 130, 2
 
     def __init__(self, target_id, color=(0, 255, 0), scale=1):
         pygame.sprite.Sprite.__init__(self)
@@ -101,7 +101,7 @@ class Scene(object):
         offsetx = self._const - hero.rect.w / 2
         offsety = self._const - hero.rect.w / 2
         dummy_rect = pygame.Rect(
-            hero.rect.x + offsetx, hero.rect.y + offsety, hero.rect.w, hero.rect.w
+            hero.rect.x + offsetx, hero.rect.y + offsety, hero.rect.w + 1, hero.rect.w + 1
         )
         result = dummy_rect.colliderect(self._target.rect)
         return result

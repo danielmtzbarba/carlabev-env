@@ -166,45 +166,43 @@ class CarlaBEV(gym.Env):
         self.map.next_target(target_id=self._target_id)
 
     def reward_fn(self, info):
-        reward = -0.1
+        reward = 0.01
         aux = np.clip(info["step"]["distance"] / info["step"]["distance_t0"], 0, 1.3)
-        # reward += 1
         terminated = False
 
         tile = np.array(self.map.agent_tile)[:-1]
+
+        if np.array_equal(tile, self._tiles_to_color[2]):
+            reward = -0.5
+
+        if np.array_equal(tile, self._tiles_to_color[0]):
+            cause = "collision"
+            self._termination_stats[cause] += 1
+            terminated = True
+            reward = -2
 
         if self.episode_step >= 1000:
             cause = "max_actions"
             self._termination_stats[cause] += 1
             terminated = True
-            reward -= 500
+            reward = 0
 
-        #        if np.array_equal(tile, self._tiles_to_color[6]):
+        if self.map.hit_pedestrian(self.hero):
+            cause = "collision"
+            self._termination_stats[cause] += 1
+            terminated = True
+            reward = -10
+
         if self.map.got_target(self.hero):
             self._target_id += 1
             if self._target_id > len(target_locations) - 1:
                 cause = "success"
                 self._termination_stats[cause] += 1
                 terminated = True
-                reward = 500
+                reward = 3
             else:
                 self._change_target()
-                reward = 250
-
-        if np.array_equal(tile, self._tiles_to_color[0]):
-            cause = "collision"
-            self._termination_stats[cause] += 1
-            terminated = True
-            reward -= 500
-
-        if self.map.hit_pedestrian(self.hero):
-            cause = "collision"
-            self._termination_stats[cause] += 1
-            terminated = True
-            reward -= 1000
-
-        if np.array_equal(tile, self._tiles_to_color[2]):
-            reward -= 10
+                reward = 0.1
 
         self.episode_rewards.append(reward)
         info["step"]["reward"] = reward

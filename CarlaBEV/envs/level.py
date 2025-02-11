@@ -13,6 +13,7 @@ class Pedestrian(pygame.sprite.Sprite):
         self._x0, self._y0 = x, y
         self.position = pygame.math.Vector2(x, y)
         self._behavior = random.randint(0, 2)
+        print(f"Behavior: {self._behavior}")
         self._scale = scale
         self.size = int(16 / scale)
         self.color = color
@@ -34,12 +35,15 @@ class Pedestrian(pygame.sprite.Sprite):
             self.rect = pygame.draw.rect(map, self.color, self.rect)
 
     def move(self):
-        if self.position.y > self._y0 + int(150 / self._scale):
-            self.dir = -1
-
-        if self._behavior == 1:
+        if self._behavior == 0:
+            if self.position.y > self._y0 + int(150 / self._scale):
+                self.dir = -1
             if self.position.y < self._y0:
                 self.dir = 1
+
+        else:
+            if self.position.y > self._y0 + int(150 / self._scale):
+                self.dir = 0
 
         self._velocity.y = 1
         self._velocity.x = 0

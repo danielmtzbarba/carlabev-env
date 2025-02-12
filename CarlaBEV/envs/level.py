@@ -13,7 +13,6 @@ class Pedestrian(pygame.sprite.Sprite):
         self._x0, self._y0 = x, y
         self.position = pygame.math.Vector2(x, y)
         self._behavior = random.randint(0, 2)
-        print(f"Behavior: {self._behavior}")
         self._scale = scale
         self.size = int(16 / scale)
         self.color = color

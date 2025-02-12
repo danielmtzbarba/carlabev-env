@@ -171,6 +171,9 @@ class CarlaBEV(gym.Env):
         terminated = False
 
         tile = np.array(self.map.agent_tile)[:-1]
+        
+        if self.hero.speed < 1:
+            reward = -0.2
 
         if np.array_equal(tile, self._tiles_to_color[2]):
             reward = -0.5
@@ -202,7 +205,7 @@ class CarlaBEV(gym.Env):
                 reward = 3
             else:
                 self._change_target()
-                reward = 0.1
+                reward = 0.5
 
         self.episode_rewards.append(reward)
         info["step"]["reward"] = reward

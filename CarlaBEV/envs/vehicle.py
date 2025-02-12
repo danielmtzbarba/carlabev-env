@@ -56,7 +56,7 @@ class Car(pygame.sprite.Sprite):
             self._u1 += amount
         else:
             self._u1 -= amount
-        self._u1 = np.clip(self._u1, -10, 10)
+        self._u1 = np.clip(self._u1, -5, 5)
 
     def brake(self):
         """Slow the car by half"""
@@ -89,6 +89,10 @@ class Car(pygame.sprite.Sprite):
     @property
     def position(self):
         return self._position
+    
+    @property
+    def speed(self):
+        return self._u1
 
     @property
     def pose(self):

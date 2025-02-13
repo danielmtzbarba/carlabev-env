@@ -16,6 +16,7 @@ class Car(pygame.sprite.Sprite):
             int(start[1] - self._w / 2),
         )
         self._window_center = window_center
+        self._max_speed = 4 + int(10 / self.scale)
         self._setup()
 
     def _setup(self):
@@ -56,7 +57,7 @@ class Car(pygame.sprite.Sprite):
             self._u1 += amount
         else:
             self._u1 -= amount
-        self._u1 = np.clip(self._u1, -5, 5)
+        self._u1 = np.clip(self._u1, -1 * self._max_speed, self._max_speed)
 
     def brake(self):
         """Slow the car by half"""
@@ -89,7 +90,7 @@ class Car(pygame.sprite.Sprite):
     @property
     def position(self):
         return self._position
-    
+
     @property
     def speed(self):
         return self._u1

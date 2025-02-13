@@ -4,13 +4,13 @@ import numpy as np
 from PIL import Image
 
 # home
-# asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
+asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
 
 # msi
-asset_path = "/home/dan/Data/projects/reinforcement/carla-bev-env/CarlaBEV/assets"
+# asset_path = "/home/dan/Data/projects/reinforcement/carla-bev-env/CarlaBEV/assets"
 
 # aisys
-asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
+# asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
 
 pedestrian_locations = [
     (8600, 2300),
@@ -78,7 +78,7 @@ def scale_coords(coord, factor):
 
 
 def get_spawn_locations(size):
-    agent_loc = (8530, 1600)
+    agent_loc = (8730, 1600)
     factor = int(1024 / size)
 
     return scale_coords(agent_loc, factor)

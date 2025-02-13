@@ -50,6 +50,8 @@ class RRTMap:  # methods for drawing map, obstacles and path
 
     def drawMap(self):
         self.map.blit(self._map_img, (0, 0))
+        pygame.draw.circle(self.map, (255, 0, 0), self.goal, 5)
+        pygame.draw.circle(self.map, (0, 255, 0), self.start, 5)
 
     def drawPath(self, path, color, size):
         for node in path:

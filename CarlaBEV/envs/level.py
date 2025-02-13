@@ -21,6 +21,7 @@ class Pedestrian(pygame.sprite.Sprite):
 
         self._running = False
         self._velocity = pygame.math.Vector2(0, 0)
+        self._max_speed = 5 / self._scale
 
     def reset(self):
         self.rect = pygame.Rect((self._x0, self._y0, self.size, self.size))
@@ -44,7 +45,7 @@ class Pedestrian(pygame.sprite.Sprite):
             if self.position.y > self._y0 + int(150 / self._scale):
                 self.dir = 0
 
-        self._velocity.y = 1
+        self._velocity.y = self._max_speed
         self._velocity.x = 0
         self.position += self.dir * self._velocity
         self.rect.center = (round(self.position[0]), round(self.position[1]))

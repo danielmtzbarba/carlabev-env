@@ -1,4 +1,5 @@
 from enum import Enum
+from copy import deepcopy
 import numpy as np
 import random
 import math
@@ -31,6 +32,9 @@ class RRTMap:  # methods for drawing map, obstacles and path
         self.center = (int(self.size / 2), int(self.size / 2))
         self.start = start
         self.goal = goal
+
+        indices = np.where(np.all(self._map_arr == (255, 255, 255), axis=-1))
+        self._free_pix = list(zip(indices[0], indices[1]))
 
         # window settings
         self.MapWindowName = "RRT path planning"
@@ -94,6 +98,10 @@ class RRTMap:  # methods for drawing map, obstacles and path
             pygame.draw.circle(self.map, self.grey, (X[-i], Y[-i]), self.nodeRad + 2, 0)
 
     @property
+    def free_space(self):
+        return self._free_pix
+
+    @property
     def scale(self):
         return self._scale
 
@@ -112,9 +120,10 @@ class RRTMap:  # methods for drawing map, obstacles and path
 
 class RRTGraph:  # methods to make and remove nodes and edges, check the collisions and find the nearest neighbor to a sample
     def __init__(
-        self, start, goal, MapDimensions, RRTSTARFLAG, map
+        self, start, goal, MapDimensions, RRTSTARFLAG, map, free_space
     ):  # start and goal coordonates
         self.map = map
+        self._free_pix = deepcopy(free_space)
         (x, y) = start
         self.start = start
         self.goal = goal
@@ -186,8 +195,8 @@ class RRTGraph:  # methods to make and remove nodes and edges, check the collisi
         return (px + py) ** (0.5)
 
     def sample_envir(self):
-        x = int(random.uniform(0, self.mapw))
-        y = int(random.uniform(0, self.maph))
+        idx = random.uniform(0, len(self._free_pix) - 1)
+        x, y = self._free_pix.pop(int(idx))
         return x, y
 
     def nearest(self, n):
@@ -239,7 +248,7 @@ class RRTGraph:  # methods to make and remove nodes and edges, check the collisi
             return True
 
     def step(self, nnear, nrand):
-        dstep = 30
+        dstep = 10
         (xrand, yrand) = (self.x[nrand], self.y[nrand])
         (xnear, ynear) = (self.x[nnear], self.y[nnear])
         (px, py) = (xrand - xnear, yrand - ynear)
@@ -252,7 +261,7 @@ class RRTGraph:  # methods to make and remove nodes and edges, check the collisi
         self.check_for_candidates(nrand, xrand, yrand)
 
     def check_for_candidates(self, nrand, x, y):
-        dmax = 28
+        dmax = 5
         if math.sqrt(abs(x - self.goal[0]) ** 2 + (abs(y - self.goal[1]) ** 2)) < dmax:
             if self.firstFlag:
                 self.candidateFlag = True
@@ -280,14 +289,13 @@ class RRTGraph:  # methods to make and remove nodes and edges, check the collisi
         n = self.number_of_nodes()
         x, y = self.sample_envir()
         self.add_node(n, x, y)
-        if self.isFree():
-            xnearest = self.nearest(n)
-            self.step(xnearest, n)
-            if self.RRTSTARFLAG:
-                xnearest, nabours = self.reroute_newnode(n)
-            connect = self.connect(xnearest, n)
-            if connect and self.RRTSTARFLAG:
-                self.reroute_nabours(nabours, n, xnearest)
+        xnearest = self.nearest(n)
+        self.step(xnearest, n)
+        if self.RRTSTARFLAG:
+            xnearest, nabours = self.reroute_newnode(n)
+        connect = self.connect(xnearest, n)
+        if connect and self.RRTSTARFLAG:
+            self.reroute_nabours(nabours, n, xnearest)
         return self.x, self.y, self.parent
 
     def distance_to_node(self, node):

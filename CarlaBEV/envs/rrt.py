@@ -15,8 +15,8 @@ size = 1024
 map_size = 128
 factor = int(1024 / map_size)
 start = get_spawn_locations(map_size)
-start = (start[0] - 5, start[1])
-goal = scale_coords(target_locations[4], factor)
+start = (start[0], start[1])
+goal = scale_coords(target_locations[3], factor)
 goal = (goal[0], goal[1])
 print(f"start: {start}")
 print(f"goal: {goal}")
@@ -41,7 +41,7 @@ def main1():
     pygame.init()
     map = RRTMap(start, goal, size)
     map.drawMap()
-    graph = RRTGraph(start, goal, dimensions, RRT_STAR, map.surface)
+    graph = RRTGraph(start, goal, dimensions, RRT_STAR, map.surface, map.free_space)
 
     X = []
     t1 = time.time()

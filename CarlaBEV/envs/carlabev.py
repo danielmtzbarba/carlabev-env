@@ -7,10 +7,13 @@ import pygame
 import numpy as np
 
 from .vehicle import Car
-from .utils import get_spawn_locations, target_locations
+from .utils import get_spawn_locations, target_locations, scale_coords
 from .map import Town01
 from .camera import Camera, Follow
 
+
+from CarlaBEV.envs import utils 
+from CarlaBEV.envs.planning import dj 
 
 class Actions(Enum):
     nothing = 0
@@ -85,6 +88,11 @@ class CarlaBEV(gym.Env):
         """
         self.window = None
         self.clock = None
+        self._map_arr, _  = utils.load_map(size)
+
+        start = utils.get_spawn_locations(128)
+        goal = utils.scale_coords((8704, 6650), 8)
+        rx, ry = dj.find_path(start, goal, map)
 
     def _get_obs(self):
         return self._render_frame()

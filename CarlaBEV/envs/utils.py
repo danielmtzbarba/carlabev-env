@@ -4,10 +4,10 @@ import numpy as np
 from PIL import Image
 
 # home
-asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
+#asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
 
 # msi
-# asset_path = "/home/dan/Data/projects/reinforcement/carla-bev-env/CarlaBEV/assets"
+asset_path = "/home/danielmtz/Data/projects/carlabev/CarlaBEV/assets"
 
 # aisys
 # asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"

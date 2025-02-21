@@ -88,11 +88,11 @@ class CarlaBEV(gym.Env):
         """
         self.window = None
         self.clock = None
-        self._map_arr, _  = utils.load_map(size)
+        self._map_arr, _  = utils.load_map(128)
 
         start = utils.get_spawn_locations(128)
         goal = utils.scale_coords((8704, 6650), 8)
-        rx, ry = dj.find_path(start, goal, map)
+        rx, ry = dj.find_path(start, goal, self._map_arr)
 
     def _get_obs(self):
         return self._render_frame()

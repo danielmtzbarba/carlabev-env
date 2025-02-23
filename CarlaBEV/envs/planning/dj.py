@@ -12,8 +12,6 @@ import numpy as np
 from CarlaBEV.envs import utils
 
 
-
-
 class Dijkstra:
     def __init__(self, map, resolution, robot_radius):
         """
@@ -25,7 +23,7 @@ class Dijkstra:
         self.resolution = resolution
         self.robot_radius = robot_radius
         self._map = map
-        X, Y, _ = self._map.shape
+        X, Y = self._map.shape
         #
         self.min_x = 0
         self.min_y = 0
@@ -92,10 +90,10 @@ class Dijkstra:
             current = open_set[c_id]
 
             dist = np.linalg.norm(
-                    np.array([current.x, current.y]) - np.array([goal_node.x, goal_node.y]), ord=1
-                )
+                np.array([current.x, current.y]) - np.array([goal_node.x, goal_node.y]),
+                ord=1,
+            )
             if dist < 5:
-                print("Find goal")
                 goal_node.parent_index = current.parent_index
                 goal_node.cost = current.cost
                 break
@@ -171,9 +169,9 @@ class Dijkstra:
             return False
 
         tile = self._map[int(py), int(px)]
-        if np.array_equal(tile, [150, 150, 150]):
+        if np.array_equal(tile, 0):
             return False
-        if np.array_equal(tile, [255, 255, 255]):
+        if np.array_equal(tile, 127):
             return True
         return False
 
@@ -193,21 +191,22 @@ class Dijkstra:
 
         return motion
 
+
 def find_path(start, goal, map):
     # start and goal position
-    sx, sy = start[0], start[1]  
+    sx, sy = start[0], start[1]
     gx, gy = goal[0], goal[1]
 
-    grid_size = 1.0  
-    robot_radius = 1.0  
+    grid_size = 1.0
+    robot_radius = 1.0
     dijkstra = Dijkstra(map, grid_size, robot_radius)
-    rx, ry = dijkstra.planning(sx, sy, gx, gy)
+    rx, ry = dijkstra.planning(gx, gy, sx, sy)
 
     return rx, ry
 
 
 if __name__ == "__main__":
-    map, _ = utils.load_map(128)
+    map = utils.load_planning_map()
 
     start = utils.get_spawn_locations(128)
     goal = utils.scale_coords((8704, 6650), 8)

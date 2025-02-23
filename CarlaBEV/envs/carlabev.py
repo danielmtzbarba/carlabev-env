@@ -12,8 +12,9 @@ from .map import Town01
 from .camera import Camera, Follow
 
 
-from CarlaBEV.envs import utils 
-from CarlaBEV.envs.planning import dj 
+from CarlaBEV.envs import utils
+from CarlaBEV.envs.planning import dj
+
 
 class Actions(Enum):
     nothing = 0
@@ -88,7 +89,7 @@ class CarlaBEV(gym.Env):
         """
         self.window = None
         self.clock = None
-        self._map_arr, _  = utils.load_map(128)
+        self._planning_map = utils.load_planning_map()
 
         start = utils.get_spawn_locations(128)
         goal = utils.scale_coords((8704, 6650), 8)
@@ -179,7 +180,7 @@ class CarlaBEV(gym.Env):
         terminated = False
 
         tile = np.array(self.map.agent_tile)[:-1]
-        
+
         if self.hero.speed < 1:
             reward = -0.2
 

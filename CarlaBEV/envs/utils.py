@@ -4,10 +4,10 @@ import numpy as np
 from PIL import Image
 
 # home
-#asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
+# asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
 
 # msi
-asset_path = "/home/danielmtz/Data/projects/carlabev/CarlaBEV/assets"
+asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets"
 
 # aisys
 # asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
@@ -71,6 +71,14 @@ def load_map(size):
     arr = np.array(Image.open(map_path))
     img = pygame.image.load(map_path)
     return arr, img
+
+
+def load_planning_map():
+    map_path = os.path.join(asset_path, "Town01/Town01-1024-sem.png")
+    map = Image.open(map_path)
+    x, y = map.size
+    pmap = map.resize((int(x / 8), int(y / 8)))
+    return np.array(pmap, dtype=np.uint8)
 
 
 def scale_coords(coord, factor):

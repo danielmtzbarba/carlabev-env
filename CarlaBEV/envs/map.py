@@ -5,7 +5,7 @@ import pygame.surfarray as surfarray
 
 
 from .utils import load_map
-from .level import Scene
+from CarlaBEV.src.scenes.scene import Scene
 
 
 class Town01(object):

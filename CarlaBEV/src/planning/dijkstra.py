@@ -6,23 +6,27 @@ author: Atsushi Sakai(@Atsushi_twi)
 
 """
 
-import matplotlib.pyplot as plt
 import math
 import numpy as np
 from CarlaBEV.envs import utils
 
 
 class Dijkstra:
-    def __init__(self, map, resolution, robot_radius):
+    def __init__(self, id, resolution, robot_radius):
         """
         Initialize map for a star planning
 
         resolution: grid resolution [m]
         rr: robot radius[m]
         """
+        #
+        self._id = id
         self.resolution = resolution
         self.robot_radius = robot_radius
-        self._map = map
+        self._dist2goal = 5
+        #
+        self._tiles = utils.get_tile_dict(id)
+        self._map = utils.load_planning_map()
         X, Y = self._map.shape
         #
         self.min_x = 0
@@ -93,7 +97,7 @@ class Dijkstra:
                 np.array([current.x, current.y]) - np.array([goal_node.x, goal_node.y]),
                 ord=1,
             )
-            if dist < 5:
+            if dist < self._dist2goal:
                 goal_node.parent_index = current.parent_index
                 goal_node.cost = current.cost
                 break
@@ -169,10 +173,14 @@ class Dijkstra:
             return False
 
         tile = self._map[int(py), int(px)]
-        if np.array_equal(tile, 0):
-            return False
-        if np.array_equal(tile, 127):
-            return True
+        for free_tile in self._tiles["free"]:
+            if np.array_equal(tile, free_tile):
+                return True
+
+        for obs_tile in self._tiles["obs"]:
+            if np.array_equal(tile, obs_tile):
+                return False
+
         return False
 
     @staticmethod
@@ -199,7 +207,7 @@ def find_path(start, goal, map):
 
     grid_size = 1.0
     robot_radius = 1.0
-    dijkstra = Dijkstra(map, grid_size, robot_radius)
+    dijkstra = Dijkstra(0, grid_size, robot_radius)
     rx, ry = dijkstra.planning(gx, gy, sx, sy)
 
     return rx, ry

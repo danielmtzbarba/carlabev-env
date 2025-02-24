@@ -17,10 +17,10 @@ import pathlib
 sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
 
 from CarlaBEV.envs import utils
-from CarlaBEV.envs.control.utils import angle_mod
-from CarlaBEV.envs.planning import dj
+from CarlaBEV.src.control.utils import angle_mod
+from CarlaBEV.src.planning import dijkstra
 
-from CarlaBEV.envs.planning import cubic_spline_planner
+from CarlaBEV.src.planning import cubic_spline_planner
 
 NX = 4  # x = x, y, v, yaw
 NU = 2  # a = [accel, steer]
@@ -547,11 +547,15 @@ def control(map, cx, cy, cyaw, ck, dl):
 if __name__ == "__main__":
     dl = 1.0  # course tick
     #
-    start = utils.get_spawn_locations(128)
-    goal = utils.scale_coords((8704, 6650), 8)
+    start = (8704, 3650)
+    goal = (8704, 6650)
+    start = (8720, 6000)
+    goal = (8720, 2000)
+    start = utils.scale_coords(start, 8)
+    goal = utils.scale_coords(goal, 8)
     map = utils.load_planning_map()
     #
-    ax, ay = dj.find_path(start, goal, map)
+    ax, ay = dijkstra.find_path(start, goal, map)
     #
     cx, cy, cyaw, ck, s = cubic_spline_planner.calc_spline_course(ax, ay, ds=dl)
     control(map, cx, cy, cyaw, ck, dl)

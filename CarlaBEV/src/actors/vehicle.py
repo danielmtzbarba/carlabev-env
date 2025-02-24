@@ -1,0 +1,20 @@
+from CarlaBEV.src.actors.actor import Actor
+
+vehicle_locations = [
+    (8750, 2000),
+]
+
+
+class Vehicle(Actor):
+    def __init__(self, start, goal, map_size):
+        self._color = (0, 7, 175)
+        self._map_size = map_size
+        self._scale = int(1024 / self._map_size)
+        self._size = int(32 / self._scale)
+        super().__init__(
+            start,
+            goal,
+            id=0,
+            actor_size=2,
+            resolution=1.0,
+        )

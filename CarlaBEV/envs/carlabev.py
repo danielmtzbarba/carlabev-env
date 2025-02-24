@@ -7,13 +7,12 @@ import pygame
 import numpy as np
 
 from .vehicle import Car
-from .utils import get_spawn_locations, target_locations, scale_coords
+from .utils import get_spawn_locations
 from .map import Town01
 from .camera import Camera, Follow
 
-
 from CarlaBEV.envs import utils
-from CarlaBEV.envs.planning import dj
+from CarlaBEV.src.planning import dijkstra
 
 
 class Actions(Enum):
@@ -89,11 +88,6 @@ class CarlaBEV(gym.Env):
         """
         self.window = None
         self.clock = None
-        self._planning_map = utils.load_planning_map()
-
-        start = utils.get_spawn_locations(128)
-        goal = utils.scale_coords((8704, 6650), 8)
-        rx, ry = dj.find_path(start, goal, self._map_arr)
 
     def _get_obs(self):
         return self._render_frame()
@@ -207,7 +201,7 @@ class CarlaBEV(gym.Env):
 
         if self.map.got_target(self.hero):
             self._target_id += 1
-            if self._target_id > len(target_locations) - 1:
+            if self._target_id > 5:
                 cause = "success"
                 self._termination_stats[cause] += 1
                 terminated = True

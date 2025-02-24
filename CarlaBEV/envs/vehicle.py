@@ -32,7 +32,7 @@ class Car(pygame.sprite.Sprite):
 
         # movement
         self._phi, self._theta = 0, 0
-        self._u1, self._u2 = self._max_speed, 0
+        self._u1, self._u2 = 0, 0
         self._velocity = pygame.math.Vector2(0, 0)
         self._position = pygame.math.Vector2(self.rect.x, self.rect.y)
         self._reversing = False

@@ -1,10 +1,10 @@
-
 """
 Cubic spline planner
 
 Author: Atsushi Sakai(@Atsushi_twi)
 
 """
+
 import math
 import numpy as np
 import bisect
@@ -45,7 +45,6 @@ class CubicSpline1D:
     """
 
     def __init__(self, x, y):
-
         h = np.diff(x)
         if np.any(h < 0):
             raise ValueError("x coordinates must be sorted in ascending order")
@@ -66,8 +65,9 @@ class CubicSpline1D:
         # calc spline coefficient b and d
         for i in range(self.nx - 1):
             d = (self.c[i + 1] - self.c[i]) / (3.0 * h[i])
-            b = 1.0 / h[i] * (self.a[i + 1] - self.a[i]) \
-                - h[i] / 3.0 * (2.0 * self.c[i] + self.c[i + 1])
+            b = 1.0 / h[i] * (self.a[i + 1] - self.a[i]) - h[i] / 3.0 * (
+                2.0 * self.c[i] + self.c[i + 1]
+            )
             self.d.append(d)
             self.b.append(b)
 
@@ -94,8 +94,9 @@ class CubicSpline1D:
 
         i = self.__search_index(x)
         dx = x - self.x[i]
-        position = self.a[i] + self.b[i] * dx + \
-            self.c[i] * dx ** 2.0 + self.d[i] * dx ** 3.0
+        position = (
+            self.a[i] + self.b[i] * dx + self.c[i] * dx**2.0 + self.d[i] * dx**3.0
+        )
 
         return position
 
@@ -123,7 +124,7 @@ class CubicSpline1D:
 
         i = self.__search_index(x)
         dx = x - self.x[i]
-        dy = self.b[i] + 2.0 * self.c[i] * dx + 3.0 * self.d[i] * dx ** 2.0
+        dy = self.b[i] + 2.0 * self.c[i] * dx + 3.0 * self.d[i] * dx**2.0
         return dy
 
     def calc_second_derivative(self, x):
@@ -207,8 +208,9 @@ class CubicSpline1D:
         """
         B = np.zeros(self.nx)
         for i in range(self.nx - 2):
-            B[i + 1] = 3.0 * (a[i + 2] - a[i + 1]) / h[i + 1]\
-                - 3.0 * (a[i + 1] - a[i]) / h[i]
+            B[i + 1] = (
+                3.0 * (a[i + 2] - a[i + 1]) / h[i + 1] - 3.0 * (a[i + 1] - a[i]) / h[i]
+            )
         return B
 
 
@@ -325,7 +327,7 @@ class CubicSpline2D:
         ddx = self.sx.calc_second_derivative(s)
         dy = self.sy.calc_first_derivative(s)
         ddy = self.sy.calc_second_derivative(s)
-        k = (ddy * dx - ddx * dy) / ((dx ** 2 + dy ** 2)**(3 / 2))
+        k = (ddy * dx - ddx * dy) / ((dx**2 + dy**2) ** (3 / 2))
         return k
 
     def calc_curvature_rate(self, s):
@@ -389,68 +391,3 @@ def calc_spline_course(x, y, ds=0.1):
         rk.append(sp.calc_curvature(i_s))
 
     return rx, ry, ryaw, rk, s
-
-
-def main_1d():
-    print("CubicSpline1D test")
-    import matplotlib.pyplot as plt
-    x = np.arange(5)
-    y = [1.7, -6, 5, 6.5, 0.0]
-    sp = CubicSpline1D(x, y)
-    xi = np.linspace(0.0, 5.0)
-
-    plt.plot(x, y, "xb", label="Data points")
-    plt.plot(xi, [sp.calc_position(x) for x in xi], "r",
-             label="Cubic spline interpolation")
-    plt.grid(True)
-    plt.legend()
-    plt.show()
-
-
-def main_2d():  # pragma: no cover
-    print("CubicSpline1D 2D test")
-    import matplotlib.pyplot as plt
-    x = [-2.5, 0.0, 2.5, 5.0, 7.5, 3.0, -1.0]
-    y = [0.7, -6, 5, 6.5, 0.0, 5.0, -2.0]
-    ds = 0.1  # [m] distance of each interpolated points
-
-    sp = CubicSpline2D(x, y)
-    s = np.arange(0, sp.s[-1], ds)
-
-    rx, ry, ryaw, rk = [], [], [], []
-    for i_s in s:
-        ix, iy = sp.calc_position(i_s)
-        rx.append(ix)
-        ry.append(iy)
-        ryaw.append(sp.calc_yaw(i_s))
-        rk.append(sp.calc_curvature(i_s))
-
-    plt.subplots(1)
-    plt.plot(x, y, "xb", label="Data points")
-    plt.plot(rx, ry, "-r", label="Cubic spline path")
-    plt.grid(True)
-    plt.axis("equal")
-    plt.xlabel("x[m]")
-    plt.ylabel("y[m]")
-    plt.legend()
-
-    plt.subplots(1)
-    plt.plot(s, [np.rad2deg(iyaw) for iyaw in ryaw], "-r", label="yaw")
-    plt.grid(True)
-    plt.legend()
-    plt.xlabel("line length[m]")
-    plt.ylabel("yaw angle[deg]")
-
-    plt.subplots(1)
-    plt.plot(s, rk, "-r", label="curvature")
-    plt.grid(True)
-    plt.legend()
-    plt.xlabel("line length[m]")
-    plt.ylabel("curvature [1/m]")
-
-    plt.show()
-
-
-if __name__ == '__main__':
-    # main_1d()
-    main_2d()

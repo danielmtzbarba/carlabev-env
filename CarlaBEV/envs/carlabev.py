@@ -193,22 +193,30 @@ class CarlaBEV(gym.Env):
             terminated = True
             reward = 0
 
-        if self.map.hit_pedestrian(self.hero):
-            cause = "collision"
-            self._termination_stats[cause] += 1
-            terminated = True
-            reward = -10
-
-        if self.map.got_target(self.hero):
-            self._target_id += 1
-            if self._target_id > 5:
-                cause = "success"
+        result = self.map.check_collision(self.hero)
+        if result is not None:
+            if result == "ped":
+                cause = "collision"
                 self._termination_stats[cause] += 1
                 terminated = True
-                reward = 3
-            else:
-                self._change_target()
-                reward = 0.5
+                reward = -10
+
+            if result == "car":
+                cause = "collision"
+                self._termination_stats[cause] += 1
+                terminated = True
+                reward = -5
+
+            if result == "target":
+                self._target_id += 1
+                if self._target_id > self.map.num_targets:
+                    cause = "success"
+                    self._termination_stats[cause] += 1
+                    terminated = True
+                    reward = 3
+                else:
+                    self._change_target()
+                    reward = 1
 
         self.episode_rewards.append(reward)
         info["step"]["reward"] = reward

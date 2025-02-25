@@ -199,6 +199,10 @@ class Dijkstra:
 
         return motion
 
+    @property
+    def map(self):
+        return self._map
+
 
 def find_path(start, goal, map):
     # start and goal position

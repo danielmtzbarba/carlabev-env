@@ -39,10 +39,10 @@ MAX_TIME = 500.0  # max simulation time
 MAX_ITER = 3  # Max iteration
 DU_TH = 0.1  # iteration finish param
 
-TARGET_SPEED = 10.0 / 3.6  # [m/s] target speed
+TARGET_SPEED = 50.0 / 3.6  # [m/s] target speed
 N_IND_SEARCH = 10  # Search index number
 
-DT = 0.2  # [s] time tick
+DT = 0.1  # [s] time tick
 
 # Vehicle parameters
 LENGTH = 4.5  # [m]
@@ -59,7 +59,7 @@ MAX_SPEED = 55.0 / 3.6  # maximum speed [m/s]
 MIN_SPEED = -20.0 / 3.6  # minimum speed [m/s]
 MAX_ACCEL = 1.0  # maximum accel [m/ss]
 
-show_animation = True
+show_animation = False
 
 
 class State:
@@ -545,17 +545,15 @@ def control(map, cx, cy, cyaw, ck, dl):
 
 
 if __name__ == "__main__":
+    from CarlaBEV.src.planning.planner import Planner
+
+    planner = Planner(id=0, actor_size=1, resolution=1)
     dl = 1.0  # course tick
-    #
-    start = (8704, 3650)
-    goal = (8704, 6650)
-    start = (8720, 6000)
-    goal = (8720, 2000)
-    start = utils.scale_coords(start, 8)
-    goal = utils.scale_coords(goal, 8)
+    start_car_1 = (8730, 2000)
+    goal_car_1 = (8730, 6000)
     map = utils.load_planning_map()
+    map_size = 128
+    rx, ry = planner.find_global_path(start_car_1, goal_car_1, map_size)
     #
-    ax, ay = dijkstra.find_path(start, goal, map)
-    #
-    cx, cy, cyaw, ck, s = cubic_spline_planner.calc_spline_course(ax, ay, ds=dl)
+    cx, cy, cyaw, ck, s = cubic_spline_planner.calc_spline_course(rx, ry, ds=dl)
     control(map, cx, cy, cyaw, ck, dl)

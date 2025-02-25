@@ -1,9 +1,6 @@
-import random
-import pygame
-
 from CarlaBEV.envs import utils
 from CarlaBEV.src.actors.vehicle import Vehicle
-from CarlaBEV.src.scenes.target import Target
+from CarlaBEV.src.scenes.target import Target, target_locations
 from CarlaBEV.src.actors.pedestrian import Pedestrian
 
 
@@ -20,13 +17,9 @@ class Scene(object):
     def _scene_setup(self, target_id):
         start = (8704, 3650)
         goal = (8704, 6650)
-        start = utils.scale_coords(start, 8)
-        goal = utils.scale_coords(goal, 8)
         self._pedestrian = Pedestrian(start, goal, map_size=self._size)
-        start = (8720, 6000)
-        goal = (8720, 2000)
-        start = utils.scale_coords(start, 8)
-        goal = utils.scale_coords(goal, 8)
+        start = (8720, 2000)
+        goal = (8720, 6000)
         self._vehicle = Vehicle(start, goal, map_size=self._size)
         self.next_target(target_id)
 
@@ -44,26 +37,19 @@ class Scene(object):
         self._vehicle.step()
         self.draw()
 
-    def got_target(self, hero):
-        offsetx = self._const - hero.rect.w / 2
-        offsety = self._const - hero.rect.w / 2
-        dummy_rect = pygame.Rect(
-            hero.rect.x + offsetx,
-            hero.rect.y + offsety,
-            hero.rect.w + 1,
-            hero.rect.w + 1,
-        )
-        result = dummy_rect.colliderect(self._target.rect)
+    def collision_check(self, hero):
+        result = None
+        if self._pedestrian.isCollided(hero, self._const):
+            result = "ped"
+        if self._vehicle.isCollided(hero, self._const):
+            result = "car"
+        if self._target.isCollided(hero, self._const):
+            result = "target"
         return result
 
-    def hit_pedestrian(self, hero):
-        offsetx = self._const - hero.rect.w / 2
-        offsety = self._const - hero.rect.w / 2
-        dummy_rect = pygame.Rect(
-            hero.rect.x + offsetx, hero.rect.y + offsety, hero.rect.w, hero.rect.w
-        )
-        result = dummy_rect.colliderect(self._pedestrian.rect)
-        return result
+    @property
+    def num_targets(self):
+        return len(target_locations) - 1
 
     @property
     def target_position(self):

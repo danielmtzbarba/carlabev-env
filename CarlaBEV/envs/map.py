@@ -76,14 +76,15 @@ class Town01(object):
     def set_theta(self, theta):
         self._theta = theta
 
-    def got_target(self, hero):
-        return self._scene.got_target(hero)
-
-    def hit_pedestrian(self, hero):
-        return self._scene.hit_pedestrian(hero)
+    def check_collision(self, hero):
+        return self._scene.collision_check(hero)
 
     def next_target(self, target_id):
         self._scene.next_target(target_id)
+
+    @property
+    def num_targets(self):
+        return self._scene.num_targets
 
     @property
     def canvas(self):

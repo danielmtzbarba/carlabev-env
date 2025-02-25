@@ -19,12 +19,14 @@ class Town01(object):
 
         self._pad_rotation = self.center[0]
         self._theta = 0
-
-        self.draw_map()
-
-    def draw_map(self):
+        #
         self._map_surface.blit(self._map_img, (0, 0))
         self._scene = Scene(map_surface=self._map_surface, size=self.size)
+        #
+        self.reset()
+
+    def reset(self):
+        self._scene.reset()
 
     def crop_fov(self, topleft):
         self._xmin = np.clip(

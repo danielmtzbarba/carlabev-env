@@ -30,17 +30,24 @@ class Target(pygame.sprite.Sprite):
 
     def __init__(self, target_id, color=(0, 255, 0), scale=1):
         pygame.sprite.Sprite.__init__(self)
-        target_location = scale_coords(target_locations[target_id], scale)
+        self.color = color
+        self.scale = scale
+        self.lenght = int(self.lenght / scale)
+        self.reset(target_id)
+
+    def reset(self, target_id=0):
+        target_location = scale_coords(target_locations[target_id], self.scale)
         x, y = target_location[0], target_location[1]
         self.position = pygame.math.Vector2(x, y)
-        self.lenght = int(self.lenght / scale)
-        self.color = color
-        self.rect = (
+        self.rect = pygame.Rect(
             int(x - self.width / 2),
             int(y - self.lenght / 2),
             self.width,
             self.lenght,
         )
+
+    def step(self):
+        pass
 
     def isCollided(self, hero, offset):
         offsetx = offset - hero.rect.w / 2

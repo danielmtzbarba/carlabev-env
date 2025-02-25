@@ -76,18 +76,13 @@ class CarlaBEV(gym.Env):
             Tiles.roadlines.value: np.array([255, 209, 103]),
             Tiles.target.value: np.array([255, 0, 0]),
         }
+        # Render mode
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
-
-        """
-        If human-rendering is used, `self.window` will be a reference
-        to the window that we draw to. `self.clock` will be a clock that is used
-        to ensure that the environment is rendered at the correct framerate in
-        human-mode. They will remain `None` until human-mode is used for the
-        first time.
-        """
         self.window = None
         self.clock = None
+        #
+        self.map = Town01(target_id=0, size=self.size, scale=self._scale_factor)
 
     def _get_obs(self):
         return self._render_frame()
@@ -118,10 +113,7 @@ class CarlaBEV(gym.Env):
         #
         if self.episode % 100 == 0:
             self._termination_stats = {"success": 0, "collision": 0, "max_actions": 0}
-
-        self.map = Town01(
-            target_id=self._target_id, size=self.size, scale=self._scale_factor
-        )
+        self.map.reset()
         #
         self.hero = Car(
             start=self._agent_spawn_loc,
@@ -195,13 +187,13 @@ class CarlaBEV(gym.Env):
 
         result = self.map.check_collision(self.hero)
         if result is not None:
-            if result == "ped":
+            if result == "pedestrians":
                 cause = "collision"
                 self._termination_stats[cause] += 1
                 terminated = True
                 reward = -10
 
-            if result == "car":
+            if result == "vehicles":
                 cause = "collision"
                 self._termination_stats[cause] += 1
                 terminated = True

@@ -69,6 +69,7 @@ class Controller(State):
         cx, cy, cyaw, ck, s = cubic_spline_planner.calc_spline_course(ax, ay, ds=ds)
         self.x, self.y = cx[0], cy[0]
         self.cx, self.cy = cx, cy
+        self.v = 0.0
         self.cyaw = cyaw
         self.target_idx, _ = self.calc_target_index()
 

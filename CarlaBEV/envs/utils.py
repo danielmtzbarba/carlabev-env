@@ -14,18 +14,15 @@ asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets"
 
 
 def get_tile_dict(id):
-    # Base Dict
-    tiles = {"obs": [0], "free": [127]}
-
     # vehicle
     if id == 0:
+        tiles = {"obs": [0, 255], "free": [127]}
         return tiles
 
     # pedestrian
     else:
-        tiles["obs"].append(255)
-
-    return tiles
+        tiles = {"obs": [0], "free": [127, 255]}
+        return tiles
 
 
 def load_map(size):
@@ -51,6 +48,6 @@ def get_spawn_locations(size):
     factor = int(1024 / size)
     car_size = 32 / factor
     offset = -size / 4 * factor + 4 * car_size
-    agent_loc = (8730 + offset, 1750 + offset)
+    agent_loc = (8760 + offset, 1750 + offset)
 
     return scale_coords(agent_loc, factor)

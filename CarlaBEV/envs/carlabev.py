@@ -6,7 +6,6 @@ from gymnasium import spaces
 import pygame
 import numpy as np
 
-from .vehicle import Car
 from CarlaBEV.src.actors.hero import Hero
 from .utils import get_spawn_locations
 from .map import Town01

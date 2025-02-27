@@ -7,11 +7,11 @@ from PIL import Image
 # asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
 
 # msi
-asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets"
+asset_path = "/home/danielmtz/Data/projects/carlabev/CarlaBEV/assets"
 #asset_path = "/home/dan/Data/projects/reinforcement/carla-bev-env/CarlaBEV/assets
 
 # aisys
-asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
+#asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
 
 
 def get_tile_dict(id):

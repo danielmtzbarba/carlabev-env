@@ -1,1 +1,1 @@
-from CarlaBEV.envs.carlabev import CarlaBEV 
+from CarlaBEV.envs.carlabev import CarlaBEV

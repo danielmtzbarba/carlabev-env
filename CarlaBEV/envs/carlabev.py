@@ -7,10 +7,10 @@ import pygame
 import numpy as np
 
 from .vehicle import Car
-from .utils import get_spawn_locations, target_locations
+from CarlaBEV.src.actors.hero import Hero
+from .utils import get_spawn_locations
 from .map import Town01
 from .camera import Camera, Follow
-
 
 
 class Actions(Enum):
@@ -36,7 +36,7 @@ class CarlaBEV(gym.Env):
 
     def __init__(self, size, render_mode=None):
         self.size = size  # The size of the square grid
-        self._scale_factor = int(1024/size) 
+        self._scale_factor = int(1024 / size)
 
         self.window_center = (int(size / 2), int(size / 2))
 
@@ -74,18 +74,13 @@ class CarlaBEV(gym.Env):
             Tiles.roadlines.value: np.array([255, 209, 103]),
             Tiles.target.value: np.array([255, 0, 0]),
         }
+        # Render mode
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
-
-        """
-        If human-rendering is used, `self.window` will be a reference
-        to the window that we draw to. `self.clock` will be a clock that is used
-        to ensure that the environment is rendered at the correct framerate in
-        human-mode. They will remain `None` until human-mode is used for the
-        first time.
-        """
         self.window = None
         self.clock = None
+        #
+        self.map = Town01(target_id=0, size=self.size, scale=self._scale_factor)
 
     def _get_obs(self):
         return self._render_frame()
@@ -116,13 +111,11 @@ class CarlaBEV(gym.Env):
         #
         if self.episode % 100 == 0:
             self._termination_stats = {"success": 0, "collision": 0, "max_actions": 0}
-
-        self.map = Town01(target_id=self._target_id, size=self.size, scale=self._scale_factor)
+        self.map.reset()
         #
-        self.hero = Car(
+        self.hero = Hero(
             start=self._agent_spawn_loc,
-            window_center=self.window_center,
-            size=self.size,
+            window_size=self.size,
             car_size=32,
         )
 
@@ -146,7 +139,7 @@ class CarlaBEV(gym.Env):
     def step(self, action):
         action = self._action_to_direction[action]
         self.hero.step(action)
-        self.map.set_theta(self.hero.theta)
+        self.map.set_theta(self.hero.yaw)
         self.camera.scroll()
 
         self.episode_step += 1
@@ -162,42 +155,57 @@ class CarlaBEV(gym.Env):
         return observation, reward, terminated, False, info
 
     def _change_target(self):
-        self.map = Town01(target_id=self._target_id, size=self.size, scale=self._scale_factor)
+        self.map.next_target(target_id=self._target_id)
 
     def reward_fn(self, info):
-        reward = -0.1
+        reward = 0.01
         aux = np.clip(info["step"]["distance"] / info["step"]["distance_t0"], 0, 1.3)
-        # reward += 1
         terminated = False
 
         tile = np.array(self.map.agent_tile)[:-1]
 
-        if self.episode_step >= 1000:
-            cause = "max_actions"
-            self._termination_stats[cause] += 1
-            terminated = True
-            reward -= 500
+        if self.hero.v < 1:
+            reward = -0.2
 
-#        if np.array_equal(tile, self._tiles_to_color[6]):
-        if self.map.got_target(self.hero):
-            self._target_id += 1
-            if self._target_id > len(target_locations)-1:
-                cause = "success"
-                self._termination_stats[cause] += 1
-                terminated = True
-                reward = 500
-            else:
-                self._change_target()
-                reward = 250
+        if np.array_equal(tile, self._tiles_to_color[2]):
+            reward = -0.5
 
         if np.array_equal(tile, self._tiles_to_color[0]):
             cause = "collision"
             self._termination_stats[cause] += 1
             terminated = True
-            reward -= 500
+            reward = -2
 
-        if np.array_equal(tile, self._tiles_to_color[2]):
-            reward -= 10
+        if self.episode_step >= 1000:
+            cause = "max_actions"
+            self._termination_stats[cause] += 1
+            terminated = True
+            reward = 0
+
+        result = self.map.check_collision(self.hero)
+        if result is not None:
+            if result == "pedestrians":
+                cause = "collision"
+                self._termination_stats[cause] += 1
+                terminated = True
+                reward = -10
+
+            if result == "vehicles":
+                cause = "collision"
+                self._termination_stats[cause] += 1
+                terminated = True
+                reward = -5
+
+            if result == "target":
+                self._target_id += 1
+                if self._target_id > self.map.num_targets:
+                    cause = "success"
+                    self._termination_stats[cause] += 1
+                    terminated = True
+                    reward = 3
+                else:
+                    self._change_target()
+                    reward = 1
 
         self.episode_rewards.append(reward)
         info["step"]["reward"] = reward

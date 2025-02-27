@@ -8,9 +8,10 @@ from PIL import Image
 
 # msi
 asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets"
+#asset_path = "/home/dan/Data/projects/reinforcement/carla-bev-env/CarlaBEV/assets
 
 # aisys
-# asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
+asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
 
 
 def get_tile_dict(id):
@@ -45,6 +46,11 @@ def scale_coords(coord, factor):
 
 
 def get_spawn_locations(size):
+    return np.array([int(coord[1] / factor), int(coord[0] / factor) - factor, 0])
+
+
+def get_spawn_locations(size):
+    agent_loc = (8600, 1600)
     factor = int(1024 / size)
     car_size = 32 / factor
     offset = -size / 4 * factor + 4 * car_size

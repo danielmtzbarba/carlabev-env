@@ -14,42 +14,7 @@ import numpy as np
 
 from CarlaBEV.src.planning import cubic_spline_planner
 from CarlaBEV.src.control.utils import angle_mod
-
-
-class State:
-    """
-    Class representing the state of a vehicle.
-
-    :param x: (float) x-coordinate
-    :param y: (float) y-coordinate
-    :param yaw: (float) yaw angle
-    :param v: (float) speed
-    """
-
-    def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0):
-        """Instantiate the object."""
-        super().__init__()
-        self.x = x
-        self.y = y
-        self.yaw = yaw
-        self.v = v
-
-    def update(self, acceleration, delta):
-        """
-        Update the state of the vehicle.
-
-        Stanley Control uses bicycle model.
-
-        :param acceleration: (float) Acceleration
-        :param delta: (float) Steering
-        """
-        delta = np.clip(delta, -self.max_steer, self.max_steer)
-
-        self.x += self.v * np.cos(self.yaw) * self.dt
-        self.y += self.v * np.sin(self.yaw) * self.dt
-        self.yaw += self.v / self.L * np.tan(delta) * self.dt
-        self.yaw = angle_mod(self.yaw)
-        self.v += acceleration * self.dt
+from CarlaBEV.src.control.state import State
 
 
 class Controller(State):
@@ -57,9 +22,10 @@ class Controller(State):
     Kp = 1.0  # speed proportional gain
     dt = 0.1  # [s] time difference
 
-    def __init__(self, L=2.9) -> None:
+    def __init__(self, target_speed, L=2.9) -> None:
         super().__init__()
         self.time = 0.0
+        self._target_speed = target_speed
         self.max_steer = np.radians(30.0)  # [rad] max steering angle
         self.L = 2.9  # [m] Wheel base of vehicle
 
@@ -73,8 +39,8 @@ class Controller(State):
         self.cyaw = cyaw
         self.target_idx, _ = self.calc_target_index()
 
-    def control_step(self, target_speed):
-        ai = self.pid_control(target_speed)
+    def control_step(self):
+        ai = self.pid_control()
         di, self.target_idx = self.stanley_control()
         self.update(ai, di)
         self.time += self.dt
@@ -103,14 +69,14 @@ class Controller(State):
 
         return delta, current_target_idx
 
-    def pid_control(self, target):
+    def pid_control(self):
         """
         Proportional control for the speed.
 
         :param target: (float)
         :return: (float)
         """
-        return self.Kp * (target - self.v)
+        return self.Kp * (self._target_speed - self.v)
 
     def calc_target_index(self):
         """

@@ -7,12 +7,10 @@ import pygame
 import numpy as np
 
 from .vehicle import Car
+from CarlaBEV.src.actors.hero import Hero
 from .utils import get_spawn_locations
 from .map import Town01
 from .camera import Camera, Follow
-
-from CarlaBEV.envs import utils
-from CarlaBEV.src.planning import dijkstra
 
 
 class Actions(Enum):
@@ -115,10 +113,9 @@ class CarlaBEV(gym.Env):
             self._termination_stats = {"success": 0, "collision": 0, "max_actions": 0}
         self.map.reset()
         #
-        self.hero = Car(
+        self.hero = Hero(
             start=self._agent_spawn_loc,
-            window_center=self.window_center,
-            size=self.size,
+            window_size=self.size,
             car_size=32,
         )
 
@@ -142,7 +139,7 @@ class CarlaBEV(gym.Env):
     def step(self, action):
         action = self._action_to_direction[action]
         self.hero.step(action)
-        self.map.set_theta(self.hero.theta)
+        self.map.set_theta(self.hero.yaw)
         self.camera.scroll()
 
         self.episode_step += 1
@@ -167,7 +164,7 @@ class CarlaBEV(gym.Env):
 
         tile = np.array(self.map.agent_tile)[:-1]
 
-        if self.hero.speed < 1:
+        if self.hero.v < 1:
             reward = -0.2
 
         if np.array_equal(tile, self._tiles_to_color[2]):

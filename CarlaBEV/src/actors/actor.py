@@ -22,13 +22,13 @@ class Actor(pygame.sprite.Sprite):
         self.reset()
 
     def reset(self):
-        self._controller = Controller()
+        self._controller = Controller(self._target_speed)
         self._controller.set_route(self.rx, self.ry, ds=self.ds)
         self.rect = pygame.Rect((self._x0, self._y0, self._size, self._size))
         #
 
     def step(self):
-        self._controller.control_step(self._target_speed)
+        self._controller.control_step()
         self.rect.x = self._controller.x
         self.rect.y = self._controller.y
 

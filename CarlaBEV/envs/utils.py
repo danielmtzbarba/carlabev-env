@@ -8,10 +8,11 @@ from PIL import Image
 
 # msi
 asset_path = "/home/danielmtz/Data/projects/carlabev/CarlaBEV/assets"
-#asset_path = "/home/dan/Data/projects/reinforcement/carla-bev-env/CarlaBEV/assets
+# mac
+asset_path = "/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/assets"
 
 # aisys
-#asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
+# asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
 
 
 def get_tile_dict(id):
@@ -43,10 +44,6 @@ def load_planning_map():
 
 def scale_coords(coord, factor):
     return np.array([int(coord[1] / factor), int(coord[0] / factor), 0])
-
-
-def get_spawn_locations(size):
-    return np.array([int(coord[1] / factor), int(coord[0] / factor) - factor, 0])
 
 
 def get_spawn_locations(size):

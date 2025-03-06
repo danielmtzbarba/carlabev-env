@@ -9,7 +9,7 @@ from CarlaBEV.src.scenes.scene import Scene
 
 
 class Town01(object):
-    def __init__(self, target_id, size=1024, scale=1) -> None:
+    def __init__(self, target_id, size=1024) -> None:
         self._map_arr, self._map_img = load_map(size)
         self._Y, self._X, _ = self._map_arr.shape
         self.size = size  # The size of the square grid
@@ -81,8 +81,8 @@ class Town01(object):
     def check_collision(self, hero):
         return self._scene.collision_check(hero)
 
-    def next_target(self, target_id):
-        self._scene.next_target(target_id)
+    def next_target(self, id):
+        self._scene.next_target(id)
 
     @property
     def num_targets(self):

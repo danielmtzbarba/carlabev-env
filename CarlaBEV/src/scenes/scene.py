@@ -7,6 +7,7 @@ from CarlaBEV.src.scenes import SceneBuilder
 
 class Scene(object):
     def __init__(self, map_surface, size) -> None:
+        self._target_id = 0
         self._map_arr, self._map_img = utils.load_map(size)
         self._buider = SceneBuilder(size)
         self._map = map_surface
@@ -16,16 +17,18 @@ class Scene(object):
         self.reset()
 
     def reset(self):
+        self._target_id = 0
         scene_id = randint(1, 3)
         self.actors = self._buider.get_scene_actors(scene_id)
-        self.next_target(0)
+        self.next_target(self._target_id)
         for id in self.actors.keys():
             for actor in self.actors[id]:
                 actor.reset()
 
     def next_target(self, target_id):
+        self._target_id = target_id
         self.actors["target"].clear()
-        self.target = Target(target_id, scale=self._scale)
+        self.target = Target(self._target_id, scale=self._scale)
         self.actors["target"].append(self.target)
         return self.target
 

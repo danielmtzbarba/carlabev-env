@@ -1,6 +1,3 @@
-from dataclasses import dataclass
-from collections import deque
-from copy import deepcopy
 from enum import Enum
 
 import gymnasium as gym
@@ -12,6 +9,8 @@ from CarlaBEV.src.actors.hero import Hero
 from CarlaBEV.envs.utils import get_spawn_locations
 from CarlaBEV.envs.map import Town01
 from CarlaBEV.envs.camera import Camera, Follow
+from CarlaBEV.src.deeprl.reward import RewardFn
+from CarlaBEV.src.deeprl.stats import Stats
 
 
 class Actions(Enum):
@@ -20,149 +19,6 @@ class Actions(Enum):
     right = 2
     gas = 3
     brake = 4
-
-
-class Tiles(Enum):
-    obstacle = 0
-    free = 1
-    sidewalk = 2
-    vehicle = 3
-    pedestrian = 4
-    roadlines = 5
-    target = 6
-
-
-class Episode(object):
-    def __init__(self) -> None:
-        self._rewards: list = []
-        self._cause: str = None
-
-    def reset(self):
-        self._rewards.clear()
-        self._cause = None
-
-    def step(self, reward, cause=None):
-        self._rewards.append(reward)
-        if cause is not None:
-            self._cause = cause
-
-    def __len__(self):
-        return len(self._rewards)
-
-    @property
-    def cause(self):
-        return self._cause
-
-    @property
-    def episode_return(self):
-        return np.sum(self._rewards)
-
-
-class Stats(Episode):
-    last_episodes = deque([], maxlen=100)
-    last_returns = deque([], maxlen=100)
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.episode = 0
-
-    def terminated(self):
-        self.last_episodes.append(self.cause)
-        self.last_returns.append(self.episode_return)
-        self.episode += 1
-
-    def get_episode_info(self):
-        stats = {
-            "episode": self.episode,
-            "termination": self.cause,
-            "return": self.episode_return,
-            "length": len(self),
-            "mean_reward": self.mean_return,
-            "success_rate": self.success_rate,
-            "collision_rate": self.collision_rate,
-        }
-        return stats
-
-    @property
-    def mean_return(self):
-        return np.mean(self.last_returns)
-
-    @property
-    def collision_rate(self):
-        return self.last_episodes.count("collision") / len(self.last_episodes)
-
-    @property
-    def success_rate(self):
-        return self.last_episodes.count("success") / len(self.last_episodes)
-
-
-class RewardFn(object):
-    tiles_to_color = {
-        Tiles.obstacle.value: np.array([150, 150, 150]),
-        Tiles.free.value: np.array([255, 255, 255]),
-        Tiles.sidewalk.value: np.array([220, 220, 220]),
-        Tiles.vehicle.value: np.array([0, 7, 165]),
-        Tiles.pedestrian.value: np.array([200, 35, 0]),
-        Tiles.roadlines.value: np.array([255, 209, 103]),
-        Tiles.target.value: np.array([255, 0, 0]),
-    }
-
-    def __init__(self, max_actions=300) -> None:
-        self._current_target: int = 0
-        self._max_actions: int = max_actions
-        self._k: int = 0
-
-    def reset(self):
-        self._k = 0
-        self._current_target = 0
-
-    def step(self, tile, collision, info, num_targets):
-        reward, terminated, cause = 0.01, False, None
-
-        if np.array_equal(tile, self.tiles_to_color[0]):
-            reward, terminated, cause = -2, True, "collision"
-        elif collision is not None:
-            reward, terminated, cause = self.termination(collision, num_targets)
-
-        else:
-            if self._k >= self._max_actions:
-                reward, terminated, cause = -1, True, "max_actions"
-
-            elif info["hero"]["speed"] < 1:
-                reward = -0.2
-
-            elif np.array_equal(tile, self.tiles_to_color[2]):
-                reward = -0.5
-
-        self._k += 1
-
-        return reward, terminated, cause
-
-    def termination(self, collision, num_targets):
-        terminated = True
-        if collision == "pedestrians":
-            cause = "collision"
-            reward = -10
-
-        elif collision == "vehicles":
-            cause = "collision"
-            reward = -5
-
-        elif collision == "target":
-            self._current_target += 1
-            if self._current_target > num_targets:
-                cause = "success"
-                reward = 3
-            else:
-                terminated = False
-                cause = "ckpt"
-                reward = 1
-
-        return reward, terminated, cause
-
-    @property
-    def current_target(self):
-        return self._current_target
 
 
 class CarlaBEV(gym.Env):

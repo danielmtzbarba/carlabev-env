@@ -6,13 +6,13 @@ actors = {"vehicles": [], "pedestrians": [], "target": []}
 
 
 class SceneBuilder(object):
-    scenes = {
-        1: deepcopy(actors),
-        2: deepcopy(actors),
-        3: deepcopy(actors),
-    }
-
     def __init__(self, size) -> None:
+        self.scenes = {
+            1: deepcopy(actors),
+            2: deepcopy(actors),
+            3: deepcopy(actors),
+        }
+
         for scene in range(1, 4):
             self.scenes[scene] = build_scene(scene, self.scenes[scene], size)
 

@@ -1,15 +1,18 @@
-from random import randint
+from random import choice
 from CarlaBEV.envs import utils
 from CarlaBEV.src.scenes.target import Target, target_locations
 
 from CarlaBEV.src.scenes import SceneBuilder
+
+SCENE_IDS = ["scene_1-1", "scene_1-2", "scene_1-3"]
 
 
 class Scene(object):
     def __init__(self, map_surface, size) -> None:
         self._target_id = 0
         self._map_arr, self._map_img = utils.load_map(size)
-        self._buider = SceneBuilder(size)
+        self._scene_ids = SCENE_IDS
+        self._buider = SceneBuilder(self._scene_ids, size)
         self._map = map_surface
         self._size = size
         self._scale = int(1024 / size)
@@ -18,8 +21,8 @@ class Scene(object):
 
     def reset(self):
         self._target_id = 0
-        scene_id = randint(1, 3)
-        self.actors = self._buider.get_scene_actors(scene_id)
+        rdm_id = choice(self._scene_ids)
+        self.actors = self._buider.get_scene_actors(rdm_id)
         self.next_target(self._target_id)
         for id in self.actors.keys():
             for actor in self.actors[id]:

@@ -1,24 +1,33 @@
 import pygame
 
-from CarlaBEV.src.planning.planner import Planner
+from CarlaBEV.src.planning.planner import Planner, scale_route
 from CarlaBEV.src.control.stanley_controller import Controller
 
 
 class Actor(pygame.sprite.Sprite):
     def __init__(
         self,
-        start,
-        goal,
+        start=None,
+        goal=None,
         id=0,
         actor_size=1,
         resolution=1.0,
+        routeX=None,
+        routeY=None,
     ):
         pygame.sprite.Sprite.__init__(self)
-        self._planner = Planner(id=id, actor_size=actor_size, resolution=resolution)
         self.ds = resolution
-        rx, ry = self._planner.find_global_path(start, goal, self._map_size)
-        self.rx, self.ry = rx, ry
-        self._x0, self._y0 = rx[0], ry[1]
+
+        if routeX and routeY:
+            self.rx = scale_route(routeX, factor=8)
+            self.ry = scale_route(routeY, factor=8)
+        else:
+            self._planner = Planner(id=id, actor_size=actor_size, resolution=resolution)
+            self.rx, self.ry = self._planner.find_global_path(
+                start, goal, self._map_size
+            )
+
+        self._x0, self._y0 = self.rx[0], self.ry[1]
         self.reset()
 
     def reset(self):

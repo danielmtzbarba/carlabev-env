@@ -1,100 +1,39 @@
+from ast import literal_eval
 from copy import deepcopy
+import pandas as pd
+import os
+
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.actors.pedestrian import Pedestrian
+from CarlaBEV.envs.utils import asset_path
 
-actors = {"vehicles": [], "pedestrians": [], "target": []}
+actors_dict = {"vehicles": [], "pedestrians": [], "target": []}
 
 
 class SceneBuilder(object):
-    def __init__(self, size) -> None:
-        self.scenes = {
-            1: deepcopy(actors),
-            2: deepcopy(actors),
-            3: deepcopy(actors),
-        }
+    def __init__(self, scene_ids, size) -> None:
+        self.size = size
+        self.scenes = dict.fromkeys(scene_ids)
 
-        for scene in range(1, 4):
-            self.scenes[scene] = build_scene(scene, self.scenes[scene], size)
+        for scene_id in self.scenes.keys():
+            self.scenes[scene_id] = self._build_scene(scene_id)
 
-    def get_scene_actors(self, id):
-        return self.scenes[id]
-
-
-def build_scene(scene_id, actors_dict, size):
-    if scene_id == 1:
-        return build_scene_1(actors_dict, size)
-    elif scene_id == 2:
-        return build_scene_2(actors_dict, size)
-    elif scene_id == 3:
-        return build_scene_3(actors_dict, size)
-
-
-def build_scene_1(actors_dict, size):
-    pedestrians = [
-        [(8625, 4500), (8625, 1500)],
-        [(8630, 2900), (8630, 1500)],
-        [(8770, 6500), (8770, 1800)],
-        [(8770, 1800), (8770, 6500)],
-    ]
-
-    for start, goal in pedestrians:
-        actors_dict["pedestrians"].append(
-            Pedestrian(start, goal, map_size=size),
+    def _load_scene(self, scene_id):
+        df = pd.read_csv(
+            os.path.join(asset_path, "scenes", f"{scene_id}.csv"), index_col=0
         )
+        df["rx"] = df["rx"].replace(r"' '", r"', '", regex=True).apply(literal_eval)
+        df["ry"] = df["ry"].replace(r"' '", r"', '", regex=True).apply(literal_eval)
+        return df
 
-    vehicles = [
-        [(8730, 1800), (8730, 6500)],
-        [(8730, 2300), (8730, 6500)],
-        [(8650, 6500), (8650, 1500)],
-        [(8650, 2900), (8650, 1500)],
-    ]
-    for start, goal in vehicles:
-        actors_dict["vehicles"].append(
-            Vehicle(start, goal, map_size=size),
-        )
-    return actors_dict
+    def _build_scene(self, scene_id):
+        actors = deepcopy(actors_dict)
+        df = self._load_scene(scene_id)
+        for idx, row in df.iterrows():
+            _, class_id, _, _, rx, ry = row
+            Ditto = Pedestrian if class_id == "pedestrians" else Vehicle
+            actors[class_id].append(Ditto(map_size=self.size, routeX=rx, routeY=ry))
+        return actors
 
-
-def build_scene_2(actors_dict, size):
-    pedestrians = [
-        [(8625, 4500), (8625, 1500)],
-        [(8630, 2900), (8630, 1500)],
-        [(8770, 6500), (8770, 1800)],
-    ]
-
-    for start, goal in pedestrians:
-        actors_dict["pedestrians"].append(
-            Pedestrian(start, goal, map_size=size),
-        )
-
-    vehicles = [
-        [(8730, 2300), (8730, 6500)],
-        [(8650, 6500), (8650, 1500)],
-    ]
-    for start, goal in vehicles:
-        actors_dict["vehicles"].append(
-            Vehicle(start, goal, map_size=size),
-        )
-    return actors_dict
-
-
-def build_scene_3(actors_dict, size):
-    pedestrians = [
-        [(8630, 2900), (8630, 1500)],
-        [(8770, 1800), (8770, 6500)],
-    ]
-
-    for start, goal in pedestrians:
-        actors_dict["pedestrians"].append(
-            Pedestrian(start, goal, map_size=size),
-        )
-
-    vehicles = [
-        [(8730, 1800), (8730, 6500)],
-        [(8730, 2300), (8730, 6500)],
-    ]
-    for start, goal in vehicles:
-        actors_dict["vehicles"].append(
-            Vehicle(start, goal, map_size=size),
-        )
-    return actors_dict
+    def get_scene_actors(self, scene_id):
+        return self.scenes[scene_id]

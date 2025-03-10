@@ -2,7 +2,7 @@ from CarlaBEV.src.actors.actor import Actor
 
 
 class Vehicle(Actor):
-    def __init__(self, start, goal, map_size):
+    def __init__(self, map_size, start=None, goal=None, routeX=None, routeY=None):
         self._color = (0, 7, 175)
         self._map_size = map_size
         self._scale = int(1024 / self._map_size)
@@ -14,4 +14,6 @@ class Vehicle(Actor):
             id=0,
             actor_size=2,
             resolution=1.0,
+            routeX=routeX,
+            routeY=routeY,
         )

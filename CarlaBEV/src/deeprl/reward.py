@@ -33,7 +33,7 @@ class RewardFn(object):
         self._current_target = 0
 
     def step(self, tile, collision, info, num_targets):
-        reward, terminated, cause = 0.05, False, None
+        reward, terminated, cause = 0.025, False, None
 
         if np.array_equal(tile, self.tiles_to_color[0]):
             reward, terminated, cause = -2, True, "collision"
@@ -45,13 +45,13 @@ class RewardFn(object):
                 reward, terminated, cause = -1, True, "max_actions"
 
             elif info["hero"]["speed"] < 1:
-                reward = -0.2
+                reward = -0.5
 
             elif np.array_equal(tile, self.tiles_to_color[2]):
-                reward = -0.5
+                reward = -0.75
             
         reward -= round(0.01 * info["hero"]["dist2route"], 2)
-        print(reward)
+        #print(reward)
 
         self._k += 1
 

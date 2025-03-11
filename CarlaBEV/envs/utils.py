@@ -5,9 +5,8 @@ from PIL import Image
 
 # home
 asset_path = "/home/danielmtz/Data/projects/carlabev-env/CarlaBEV/assets/"
-
 # msi
-# asset_path = "/home/danielmtz/Data/projects/carlabev/CarlaBEV/assets"
+asset_path = "/home/danielmtz/Data/projects/carlabev/CarlaBEV/assets"
 # mac
 # asset_path = "/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/assets"
 

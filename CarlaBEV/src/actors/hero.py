@@ -3,7 +3,7 @@ import pygame
 import math
 
 
-from CarlaBEV.src.control.state import State
+from CarlaBEV.src.control.stanley_controller import Controller 
 
 
 class Hero(pygame.sprite.Sprite):
@@ -36,19 +36,15 @@ class Hero(pygame.sprite.Sprite):
         return pygame.math.Vector3(self.x, self.y, self.yaw)
 
 
-class DiscreteAgent(State, Hero):
+class DiscreteAgent(Controller, Hero):
     dt = 0.1
 
-    def __init__(self, start, window_size, color=(0, 7, 175), car_size=32):
-        State.__init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0)
+    def __init__(self, start, window_size, target_speed=0.0 ,color=(0, 7, 175), car_size=32):
+        Controller.__init__(self, target_speed=target_speed)
         Hero.__init__(self, window_size, color, car_size)
         #
         self.x0 = int(start[0] - self.l / 2)
         self.y0 = int(start[1] - self.w / 2)
-        #
-        self.max_steer = np.radians(30.0)  # [rad] max steering angle
-        self._target_speed = int(300 / self.scale)
-        self.L = 2.9  # [m] Wheel base of vehicle
         #
         self._setup()
 
@@ -62,7 +58,7 @@ class DiscreteAgent(State, Hero):
         self.turn(action[1])
         self.update(acc, 0)
 
-        self.rect.center = (round(self.x), round(self.y))
+        self.rect.center = (round(self.x)-2*16, round(self.y)-2*12)
 
     def accelerate(self, amount):
         """Increase the speed either forward or reverse"""
@@ -76,3 +72,9 @@ class DiscreteAgent(State, Hero):
         """Adjust the angle the car is heading"""
         self.yaw += math.radians(angle_degrees * 13)
         return 0
+
+    @property
+    def dist2route(self):
+        _, self.target_idx = self.stanley_control()
+        set_point = np.array([self.cx[self.target_idx], self.cy[self.target_idx]])
+        return np.linalg.norm(self.position - set_point, ord=2)

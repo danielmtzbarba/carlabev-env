@@ -32,6 +32,7 @@ class CarlaBEV(gym.Env):
     def __init__(self, size, discrete=True, render_mode=None):
         # Field Of View PIXEL SIZE
         self.size = size  # The size of the square grid
+        self.scale = int(1024/size)
         self.window_center = (int(size / 2), int(size / 2))
 
         # Environment
@@ -78,6 +79,7 @@ class CarlaBEV(gym.Env):
         return {
             "hero": {
                 "speed": self.hero.v,
+                "dist2route": self.hero.dist2route
             },
             "step": {
                 "distance_t0": self._initial_distance,
@@ -99,12 +101,16 @@ class CarlaBEV(gym.Env):
         self.hero = DiscreteAgent(
             start=self._agent_spawn_loc,
             window_size=self.size,
+            target_speed=int(300 / self.scale),
             car_size=32,
         )
+        cx, cy = self.map.agent_route
+        self.hero.set_route(cx, cy)
 
         # Camera
         self.camera = Camera(self.hero, resolution=(self.size, self.size))
         follow = Follow(self.camera, self.hero)
+
         self.camera.setmethod(follow)
 
         observation = self._get_obs()

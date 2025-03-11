@@ -83,6 +83,10 @@ class Town01(object):
 
     def next_target(self, id):
         self._scene.next_target(id)
+    
+    @property
+    def agent_route(self):
+        return self._scene.agent_route
 
     @property
     def num_targets(self):

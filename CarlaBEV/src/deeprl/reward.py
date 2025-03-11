@@ -33,7 +33,7 @@ class RewardFn(object):
         self._current_target = 0
 
     def step(self, tile, collision, info, num_targets):
-        reward, terminated, cause = 0.01, False, None
+        reward, terminated, cause = 0.05, False, None
 
         if np.array_equal(tile, self.tiles_to_color[0]):
             reward, terminated, cause = -2, True, "collision"
@@ -49,6 +49,9 @@ class RewardFn(object):
 
             elif np.array_equal(tile, self.tiles_to_color[2]):
                 reward = -0.5
+            
+        reward -= round(0.01 * info["hero"]["dist2route"], 2)
+        print(reward)
 
         self._k += 1
 

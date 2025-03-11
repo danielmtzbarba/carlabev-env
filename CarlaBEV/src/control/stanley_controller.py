@@ -31,14 +31,13 @@ class Controller(State):
 
     def set_route(self, ax, ay, ds=1.0):
         """Stanley steering control on a cubic spline."""
-
         cx, cy, cyaw, ck, s = cubic_spline_planner.calc_spline_course(ax, ay, ds=ds)
         self.x, self.y = cx[0], cy[0]
         self.cx, self.cy = cx, cy
         self.v = 0.0
         self.cyaw = cyaw
         self.target_idx, _ = self.calc_target_index()
-
+    
     def control_step(self):
         ai = self.pid_control()
         di, self.target_idx = self.stanley_control()

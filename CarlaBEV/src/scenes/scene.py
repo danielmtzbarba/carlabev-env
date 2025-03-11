@@ -1,6 +1,8 @@
 from random import choice
+import numpy as np
 from CarlaBEV.envs import utils
 from CarlaBEV.src.scenes.target import Target, target_locations
+import pygame
 
 from CarlaBEV.src.scenes import SceneBuilder
 
@@ -39,6 +41,9 @@ class Scene(object):
 
     def step(self):
         self._map.blit(self._map_img, (0, 0))
+        cx, cy = self.agent_route
+        for x, y in zip(cx, cy):
+            pygame.draw.circle(self._map, color=(0, 255, 0), center=(x,y), radius=1)
         for id in self.actors.keys():
             if id == "agent":
                 continue
@@ -59,7 +64,11 @@ class Scene(object):
 
     @property
     def agent_route(self):
-        return self.actors["agent"]
+        offset= 0
+        cx, cy = self.actors["agent"]
+        cx = np.array(cx, dtype=np.int32) 
+        cy = np.array(cy, dtype=np.int32) 
+        return (cx, cy) 
 
     @property
     def num_targets(self):

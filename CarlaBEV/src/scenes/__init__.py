@@ -5,9 +5,10 @@ import os
 
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.actors.pedestrian import Pedestrian
+from CarlaBEV.src.planning.planner import scale_route
 from CarlaBEV.envs.utils import asset_path
 
-actors_dict = {"vehicles": [], "pedestrians": [], "target": []}
+actors_dict = {"agent": None, "vehicles": [], "pedestrians": [], "target": []}
 
 
 class SceneBuilder(object):
@@ -31,6 +32,11 @@ class SceneBuilder(object):
         df = self._load_scene(scene_id)
         for idx, row in df.iterrows():
             _, class_id, _, _, rx, ry = row
+            routeX = scale_route(rx, factor=8, reverse=True)
+            routeY = scale_route(ry, factor=8, reverse=True)
+            if class_id == "agent":
+                actors[class_id] = (routeX, routeY)
+                continue
             Ditto = Pedestrian if class_id == "pedestrians" else Vehicle
             actors[class_id].append(Ditto(map_size=self.size, routeX=rx, routeY=ry))
         return actors

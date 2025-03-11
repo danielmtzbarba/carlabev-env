@@ -2,7 +2,9 @@ from CarlaBEV.src.planning.dijkstra import Dijkstra
 from CarlaBEV.envs.utils import scale_coords
 
 
-def scale_route(coords, factor):
+def scale_route(coords, factor, reverse=False):
+    if reverse:
+        coords.reverse()
     scaled = []
     for coord in coords:
         coord = int(coord / factor)

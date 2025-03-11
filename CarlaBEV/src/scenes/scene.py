@@ -25,6 +25,8 @@ class Scene(object):
         self.actors = self._buider.get_scene_actors(rdm_id)
         self.next_target(self._target_id)
         for id in self.actors.keys():
+            if id == "agent":
+                continue
             for actor in self.actors[id]:
                 actor.reset()
 
@@ -38,6 +40,8 @@ class Scene(object):
     def step(self):
         self._map.blit(self._map_img, (0, 0))
         for id in self.actors.keys():
+            if id == "agent":
+                continue
             for actor in self.actors[id]:
                 actor.step()
                 actor.draw(self._map)
@@ -45,11 +49,17 @@ class Scene(object):
     def collision_check(self, hero):
         result = None
         for id in self.actors.keys():
+            if id == "agent":
+                continue
             for actor in self.actors[id]:
                 collision = actor.isCollided(hero, self._const)
                 if collision:
                     result = id
         return result
+
+    @property
+    def agent_route(self):
+        return self.actors["agent"]
 
     @property
     def num_targets(self):

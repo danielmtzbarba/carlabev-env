@@ -5,7 +5,7 @@ from gymnasium import spaces
 import numpy as np
 import pygame
 
-from CarlaBEV.src.actors.hero import Hero
+from CarlaBEV.src.actors.hero import DiscreteAgent
 from CarlaBEV.envs.utils import get_spawn_locations
 from CarlaBEV.envs.map import Town01
 from CarlaBEV.envs.camera import Camera, Follow
@@ -96,7 +96,7 @@ class CarlaBEV(gym.Env):
 
         #
         self._agent_spawn_loc = get_spawn_locations(self.size)
-        self.hero = Hero(
+        self.hero = DiscreteAgent(
             start=self._agent_spawn_loc,
             window_size=self.size,
             car_size=32,

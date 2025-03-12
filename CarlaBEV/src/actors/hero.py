@@ -3,7 +3,7 @@ import pygame
 import math
 
 
-from CarlaBEV.src.control.stanley_controller import Controller 
+from CarlaBEV.src.control.stanley_controller import Controller
 
 
 class Hero(pygame.sprite.Sprite):
@@ -39,17 +39,27 @@ class Hero(pygame.sprite.Sprite):
 class DiscreteAgent(Controller, Hero):
     dt = 0.1
 
-    def __init__(self, start, window_size, target_speed=0.0 ,color=(0, 7, 175), car_size=32):
+    def __init__(
+        self,
+        route,
+        window_size,
+        target_speed=0.0,
+        color=(0, 7, 175),
+        car_size=32,
+    ):
         Controller.__init__(self, target_speed=target_speed)
         Hero.__init__(self, window_size, color, car_size)
         #
-        self.x0 = int(start[0] - self.l / 2)
-        self.y0 = int(start[1] - self.w / 2)
-        #
+        self.x0 = int(route[0][0] - self.l / 2)
+        self.y0 = int(route[1][0] - self.w / 2)
         self._setup()
+        #
+        self.set_route(route[0], route[1])
+        _, self.target_idx = self.stanley_control()
 
     def step(self, action):
         """Sprite update function, calcualtes any new position"""
+        _, self.target_idx = self.stanley_control()
         if action[2] > 0:
             acc = self.brake(action[2])
         else:
@@ -58,7 +68,7 @@ class DiscreteAgent(Controller, Hero):
         self.turn(action[1])
         self.update(acc, 0)
 
-        self.rect.center = (round(self.x)-2*16, round(self.y)-2*12)
+        self.rect.center = (round(self.x) - 2 * 16, round(self.y) - 2 * 12)
 
     def accelerate(self, amount):
         """Increase the speed either forward or reverse"""
@@ -75,6 +85,49 @@ class DiscreteAgent(Controller, Hero):
 
     @property
     def dist2route(self):
+        set_point = np.array([self.cx[self.target_idx], self.cy[self.target_idx]])
+        return np.linalg.norm(self.position - set_point, ord=2)
+
+
+class ContinuousAgent(Controller, Hero):
+    dt = 0.1
+
+    def __init__(
+        self,
+        route,
+        window_size,
+        target_speed=0.0,
+        color=(0, 7, 175),
+        car_size=32,
+    ):
+        Controller.__init__(self, target_speed=target_speed)
+        Hero.__init__(self, window_size, color, car_size)
+        #
+        self.x0 = int(route[0][0] - self.l / 2)
+        self.y0 = int(route[1][0] - self.w / 2)
+        self._setup()
+        #
+        self.set_route(route[0], route[1])
         _, self.target_idx = self.stanley_control()
+
+    def step(self, action):
+        """Sprite update function, calcualtes any new position"""
+        d, self.target_idx = self.stanley_control()
+        acc = self.accelerate(action[1]) - self.brake(action[2])
+        delta = action[0]
+        self.update(acc, delta)
+
+        self.rect.center = (round(self.x) - 2 * 16, round(self.y) - 2 * 12)
+
+    def accelerate(self, amount):
+        """Increase the speed either forward or reverse"""
+        return amount * self.scale / 2
+
+    def brake(self, amount):
+        """Slow the car by half"""
+        return -amount * self.scale / 4
+
+    @property
+    def dist2route(self):
         set_point = np.array([self.cx[self.target_idx], self.cy[self.target_idx]])
         return np.linalg.norm(self.position - set_point, ord=2)

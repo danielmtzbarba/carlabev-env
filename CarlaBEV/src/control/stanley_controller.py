@@ -37,7 +37,7 @@ class Controller(State):
         self.v = 0.0
         self.cyaw = cyaw
         self.target_idx, _ = self.calc_target_index()
-    
+
     def control_step(self):
         ai = self.pid_control()
         di, self.target_idx = self.stanley_control()

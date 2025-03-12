@@ -5,8 +5,7 @@ from gymnasium import spaces
 import numpy as np
 import pygame
 
-from CarlaBEV.src.actors.hero import DiscreteAgent
-from CarlaBEV.envs.utils import get_spawn_locations
+from CarlaBEV.src.actors.hero import ContinuousAgent, DiscreteAgent
 from CarlaBEV.envs.map import Town01
 from CarlaBEV.envs.camera import Camera, Follow
 from CarlaBEV.src.deeprl.reward import RewardFn
@@ -32,7 +31,7 @@ class CarlaBEV(gym.Env):
     def __init__(self, size, discrete=True, render_mode=None):
         # Field Of View PIXEL SIZE
         self.size = size  # The size of the square grid
-        self.scale = int(1024/size)
+        self.scale = int(1024 / size)
         self.window_center = (int(size / 2), int(size / 2))
 
         # Environment
@@ -42,6 +41,7 @@ class CarlaBEV(gym.Env):
 
         # Action_space
         if discrete:
+            self.Agent = DiscreteAgent
             self.action_space = spaces.Discrete(5)
 
             self._action_to_direction = {
@@ -52,6 +52,7 @@ class CarlaBEV(gym.Env):
                 Actions.brake.value: np.array([0, 0, 1]),
             }
         else:
+            self.Agent = ContinuousAgent
             self.action_space = spaces.Box(
                 np.array([-1, 0, 0]).astype(np.float32),
                 np.array([+1, +1, +1]).astype(np.float32),
@@ -77,10 +78,7 @@ class CarlaBEV(gym.Env):
 
     def _get_info(self):
         return {
-            "hero": {
-                "speed": self.hero.v,
-                "dist2route": self.hero.dist2route
-            },
+            "hero": {"speed": self.hero.v, "dist2route": self.hero.dist2route},
             "step": {
                 "distance_t0": self._initial_distance,
                 "distance": np.linalg.norm(
@@ -97,16 +95,12 @@ class CarlaBEV(gym.Env):
         self.map.reset()
 
         #
-        self._agent_spawn_loc = get_spawn_locations(self.size)
-        self.hero = DiscreteAgent(
-            start=self._agent_spawn_loc,
+        self.hero = self.Agent(
+            route=self.map.agent_route,
             window_size=self.size,
             target_speed=int(300 / self.scale),
             car_size=32,
         )
-        cx, cy = self.map.agent_route
-        self.hero.set_route(cx, cy)
-
         # Camera
         self.camera = Camera(self.hero, resolution=(self.size, self.size))
         follow = Follow(self.camera, self.hero)

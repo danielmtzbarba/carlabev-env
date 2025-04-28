@@ -43,7 +43,7 @@ class Scene(object):
         self._map.blit(self._map_img, (0, 0))
         cx, cy = self.agent_route
         for x, y in zip(cx, cy):
-            pygame.draw.circle(self._map, color=(0, 255, 0), center=(x,y), radius=1)
+            pygame.draw.circle(self._map, color=(0, 255, 0), center=(x, y), radius=1)
         for id in self.actors.keys():
             if id == "agent":
                 continue
@@ -64,11 +64,11 @@ class Scene(object):
 
     @property
     def agent_route(self):
-        offset= 0
+        offset = 0
         cx, cy = self.actors["agent"]
-        cx = np.array(cx, dtype=np.int32) 
-        cy = np.array(cy, dtype=np.int32) 
-        return (cx, cy) 
+        cx = np.array(cx, dtype=np.int32)
+        cy = np.array(cy, dtype=np.int32)
+        return (cx, cy)
 
     @property
     def num_targets(self):

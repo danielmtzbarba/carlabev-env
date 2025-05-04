@@ -35,20 +35,35 @@ class RewardFn(object):
     def step(self, tile, collision, info, num_targets):
         reward, terminated, cause = -0.01, False, None
 
-        if np.array_equal(tile, self.tiles_to_color[0]):
+        if np.array_equal(tile, self.tiles_to_color[0]):  # Obstacle
             reward, terminated, cause = -1.0, True, "collision"
         elif collision is not None:
             reward, terminated, cause = self.termination(collision, num_targets)
-
+        elif self._k >= self._max_actions:
+            reward, terminated, cause = 0.0, True, "max_actions"
         else:
-            if self._k >= self._max_actions:
-                reward, terminated, cause = 0.0, True, "max_actions"
+            if np.array_equal(tile, self.tiles_to_color[2]):  # Sidewalk
+                reward -= 0.5  # Increased penalty
 
-            elif np.array_equal(tile, self.tiles_to_color[2]):
-                reward = -0.2
+            # Progress reward
+            distance = info["step"]["distance"]
+            progress_reward = np.clip(-0.001 * distance, -1.0, 0.0)
+            reward += progress_reward
+
+            # Speed reward
+            speed = info["hero"]["speed"]
+            speed_reward = 0.01 * speed
+            reward += speed_reward
+
+            # Idle penalty
+            if speed <= 0.1:
+                reward -= 0.3
+
+        #  TODO:
+        #  elif np.array_equal(tile, self.tiles_to_color[1]):  # Roadlines
+        #    reward += 0.1  # Reward for staying in lane
 
         self._k += 1
-
         return reward, terminated, cause
 
     def termination(self, collision, num_targets):

@@ -79,5 +79,10 @@ class Scene(object):
         return self.target.position
 
     @property
-    def target_pose(self):
-        return self.target.pose
+    def current_ckpt(self):
+        return self.target.position
+    
+    @property
+    def final_target(self):
+        final_target = Target(self.num_targets, scale=self._scale)
+        return final_target.position

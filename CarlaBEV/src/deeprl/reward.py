@@ -33,7 +33,7 @@ class RewardFn(object):
         self._current_target = 0
 
     def step(self, tile, collision, info, num_targets):
-        reward, terminated, cause = -0.01, False, None
+        reward, terminated, cause = 0.01, False, None
 
         if np.array_equal(tile, self.tiles_to_color[0]):  # Obstacle
             reward, terminated, cause = -1.0, True, "collision"
@@ -46,24 +46,27 @@ class RewardFn(object):
                 reward -= 0.5  # Increased penalty
 
             # Progress reward
-            distance = info["step"]["distance"]
-            progress_reward = np.clip(-0.001 * distance, -1.0, 0.0)
-            reward += progress_reward
+            distance_t0 = info["env"]["dist2target_t0"]
+            distance_t = info["env"]["dist2target_t"]
+            distance_t_1 = info["env"]["dist2target_t_1"]
 
-            # Speed reward
-            speed = info["hero"]["speed"]
-            speed_reward = 0.01 * speed
-            reward += speed_reward
+            progress_reward = -0.001 * (distance_t - distance_t_1)
+            reward += progress_reward
+        
+            speed = info["hero"]["state"][3]
 
             # Idle penalty
-            if speed <= 0.1:
-                reward -= 0.3
+            if speed <= 1:
+                reward += -0.05
 
         #  TODO:
         #  elif np.array_equal(tile, self.tiles_to_color[1]):  # Roadlines
         #    reward += 0.1  # Reward for staying in lane
 
         self._k += 1
+        # Normalize reward
+        reward = np.clip(reward, -1.0, 1.0)
+        #
         return reward, terminated, cause
 
     def termination(self, collision, num_targets):
@@ -84,7 +87,7 @@ class RewardFn(object):
             else:
                 terminated = False
                 cause = "ckpt"
-                reward = 0.5
+                reward = 0.8
 
         return reward, terminated, cause
 

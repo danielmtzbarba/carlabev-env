@@ -101,7 +101,3 @@ class Controller(State):
         error_front_axle = np.dot([dx[target_idx], dy[target_idx]], front_axle_vec)
 
         return target_idx, error_front_axle
-
-    @property
-    def state(self):
-        return [self.x, self.y, self.yaw, self.v]

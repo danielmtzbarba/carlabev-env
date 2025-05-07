@@ -84,6 +84,11 @@ class Town01(object):
     def next_target(self, id):
         self._scene.next_target(id)
 
+    def dist2target(self, hero_position):
+        return np.linalg.norm(
+            hero_position - self.final_target, ord=2
+        )
+
     @property
     def agent_route(self):
         return self._scene.agent_route
@@ -107,3 +112,13 @@ class Town01(object):
     @property
     def target_position(self):
         return self._scene.target_position
+
+    @property
+    def current_ckpt(self):
+        return self._scene.current_ckpt
+    
+    @property
+    def final_target(self):
+        return self._scene.final_target
+
+    

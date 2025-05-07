@@ -77,14 +77,24 @@ class CarlaBEV(gym.Env):
         return self._render_frame()
 
     def _get_info(self):
+        # Get the distance to the target
+
         return {
-            "hero": {"speed": self.hero.v, "dist2route": self.hero.dist2route},
-            "step": {
-                "distance_t0": self._initial_distance,
-                "distance": np.linalg.norm(
-                    self.hero.position - self.map.target_position, ord=1
-                ),
+            "env": {
+                "dist2target_t0": self._dist2target_t0,
+                "dist2target_t_1": self._dist2target_t_1,
+                "dist2target_t": self._dist2target_t,
+                "dist2route": self.hero.dist2route
             },
+            "hero": {
+                "state": self.hero.state,
+                "last_state": self.hero.last_state,
+            },
+            "ep": {
+                "id": self.stats.episode,
+                "return": self.stats.episode_return,
+                "length": len(self.stats),
+            }
         }
 
     def reset(self, seed=None, options=None):
@@ -108,10 +118,11 @@ class CarlaBEV(gym.Env):
         self.camera.setmethod(follow)
 
         observation = self._get_obs()
-
-        self._initial_distance = np.linalg.norm(
-            self.hero.position - self.map.target_position, ord=1
-        )
+        #
+        self._dist2target_t0 = self.map.dist2target(self.hero.position)
+        self._dist2target_t_1 = self.map.dist2target(self.hero.position)
+        self._dist2target_t = self.map.dist2target(self.hero.position)
+        #
         info = self._get_info()
 
         if self.render_mode == "human":
@@ -122,11 +133,14 @@ class CarlaBEV(gym.Env):
     def step(self, action):
         if self.discrete:
             action = self._action_to_direction[action]
-
+        #
         self.hero.step(action)
         self.map.set_theta(self.hero.yaw)
         self.camera.scroll()
-
+        #
+        self._dist2target_t_1 = self._dist2target_t
+        self._dist2target_t = self.map.dist2target(self.hero.position)
+        #
         observation = self._get_obs()
         info = self._get_info()
 
@@ -135,11 +149,13 @@ class CarlaBEV(gym.Env):
         reward, terminated, cause = self.reward_fn.step(
             tile, result, info, self.map.num_targets
         )
-        self.stats.step(reward, cause)
 
+        self.stats.step(reward, cause)
+        
         if cause in self.termination_causes:
             self.stats.terminated()
-            info["stats_ep"] = self.stats.get_episode_info()
+            info["termination"] = self.stats.get_episode_info()
+            
         elif result == "target":
             self.map.next_target(self.reward_fn.current_target)
 

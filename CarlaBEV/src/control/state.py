@@ -19,6 +19,12 @@ class State:
         self.y = y
         self.yaw = yaw
         self.v = v
+        #
+        self.x_1 = x
+        self.y_1 = y
+        self.yaw_1 = yaw
+        self.v_1 = v
+        #
 
     def update(self, acceleration, delta):
         """
@@ -30,10 +36,34 @@ class State:
         :param delta: (float) Steering
         """
         delta = np.clip(delta, -self.max_steer, self.max_steer)
-
+        #
+        self.x_1 = self.x
+        self.y_1 = self.y
+        self.yaw_1 = self.yaw
+        self.v_1 = self.v
+        #
         self.x += self.v * np.cos(self.yaw) * self.dt
         self.y += self.v * np.sin(self.yaw) * self.dt
         self.yaw += self.v / self.L * np.tan(delta) * self.dt
-        self.yaw = angle_mod(self.yaw)
         self.v += acceleration * self.dt
+        #
+        self.yaw = angle_mod(self.yaw)
         self.v = np.clip(self.v, -1 * self._target_speed, self._target_speed)
+
+    @property
+    def state(self):
+        """
+        Get the state of the vehicle.
+
+        :return: (list) [x, y, yaw, v]
+        """
+        return [self.x, self.y, self.yaw, self.v]
+
+    @property
+    def last_state(self):
+        """
+        Get the last state of the vehicle.
+
+        :return: (list) [x, y, yaw, v]
+        """
+        return [self.x_1, self.y_1, self.yaw_1, self.v_1]

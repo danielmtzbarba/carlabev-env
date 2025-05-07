@@ -130,4 +130,4 @@ class ContinuousAgent(Controller, Hero):
     @property
     def dist2route(self):
         set_point = np.array([self.cx[self.target_idx], self.cy[self.target_idx]])
-        return np.linalg.norm(self.position - set_point, ord=2)
+        return np.linalg.norm(self.position - set_point, ord=1)

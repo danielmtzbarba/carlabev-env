@@ -53,16 +53,10 @@ class RewardFn(object):
             progress_reward = -0.001 * (distance_t - distance_t_1)
             reward += progress_reward
 
-            route_reward = -0.05 * dist2route
-            reward += route_reward
-
-            if dist2route <= 1.5:
-                reward += 0.3
-
             speed = info["hero"]["state"][3]
 
             # Idle penalty
-            if speed <= 5:
+            if speed <= 1:
                 reward += -0.05
 
         #  TODO:

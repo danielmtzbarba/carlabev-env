@@ -84,7 +84,8 @@ class CarlaBEV(gym.Env):
                 "dist2target_t0": self._dist2target_t0,
                 "dist2target_t_1": self._dist2target_t_1,
                 "dist2target_t": self._dist2target_t,
-                "dist2route": self.hero.dist2route
+                "dist2route_1": self._dist2route_1,
+                "dist2route": self.hero.dist2route,
             },
             "hero": {
                 "state": self.hero.state,
@@ -94,7 +95,7 @@ class CarlaBEV(gym.Env):
                 "id": self.stats.episode,
                 "return": self.stats.episode_return,
                 "length": len(self.stats),
-            }
+            },
         }
 
     def reset(self, seed=None, options=None):
@@ -108,8 +109,9 @@ class CarlaBEV(gym.Env):
         self.hero = self.Agent(
             route=self.map.agent_route,
             window_size=self.size,
+            color=(0, 0, 0),
             target_speed=int(300 / self.scale),
-            car_size=32,
+            car_size=8,
         )
         # Camera
         self.camera = Camera(self.hero, resolution=(self.size, self.size))
@@ -122,6 +124,7 @@ class CarlaBEV(gym.Env):
         self._dist2target_t0 = self.map.dist2target(self.hero.position)
         self._dist2target_t_1 = self.map.dist2target(self.hero.position)
         self._dist2target_t = self.map.dist2target(self.hero.position)
+        self._dist2route_1 = self.hero.dist2route
         #
         info = self._get_info()
 
@@ -134,11 +137,13 @@ class CarlaBEV(gym.Env):
         if self.discrete:
             action = self._action_to_direction[action]
         #
+        self._dist2target_t_1 = self._dist2target_t
+        self._dist2route_1 = self.hero.dist2route
+
         self.hero.step(action)
         self.map.set_theta(self.hero.yaw)
         self.camera.scroll()
         #
-        self._dist2target_t_1 = self._dist2target_t
         self._dist2target_t = self.map.dist2target(self.hero.position)
         #
         observation = self._get_obs()
@@ -151,11 +156,11 @@ class CarlaBEV(gym.Env):
         )
 
         self.stats.step(reward, cause)
-        
+
         if cause in self.termination_causes:
             self.stats.terminated()
             info["termination"] = self.stats.get_episode_info()
-            
+
         elif result == "target":
             self.map.next_target(self.reward_fn.current_target)
 

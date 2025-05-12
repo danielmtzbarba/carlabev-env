@@ -65,16 +65,6 @@ class Town01(object):
         self._fov_surface.blit(rotated_image, rotated_image_rect)
         self._agent_tile = self._fov_surface.get_at(self.center)
 
-    def has_collided(self, vehicle_rect, class_color):
-        pixels = surfarray.pixels3d(
-            self._fov_surface.subsurface(
-                pygame.Rect(*self.center, vehicle_rect[2], vehicle_rect[3])
-            )
-        )
-        if class_color in pixels:
-            return True
-        return False
-
     def set_theta(self, theta):
         self._theta = theta
 

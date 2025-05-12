@@ -35,12 +35,3 @@ class Follow(CamScroll):
     def scroll(self):
         self.camera.offset.x = int(self.player.rect.x + self.camera.CONST.x)
         self.camera.offset.y = int(self.player.rect.y + self.camera.CONST.y)
-
-
-class Auto(CamScroll):
-    def __init__(self, camera, player):
-        CamScroll.__init__(self, camera, player)
-
-    def scroll(self):
-        self.camera.offset.x += 1
-        self.camera.offset.y += 1

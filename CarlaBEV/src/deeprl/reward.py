@@ -20,7 +20,7 @@ class RewardFn(object):
         Tiles.vehicle.value: np.array([0, 7, 165]),
         Tiles.pedestrian.value: np.array([200, 35, 0]),
         Tiles.roadlines.value: np.array([255, 209, 103]),
-        Tiles.target.value: np.array([255, 0, 0]),
+        Tiles.target.value: np.array([0, 255, 0]),
     }
 
     def __init__(self, max_actions=300) -> None:
@@ -33,8 +33,8 @@ class RewardFn(object):
         self._current_target = 0
 
     def step(self, tile, collision, info, num_targets):
-        reward, terminated, cause = 0.01, False, None
-
+        reward, terminated, cause = -0.01, False, None
+        #
         if np.array_equal(tile, self.tiles_to_color[0]):  # Obstacle
             reward, terminated, cause = -1.0, True, "collision"
         elif collision is not None:
@@ -42,32 +42,51 @@ class RewardFn(object):
         elif self._k >= self._max_actions:
             reward, terminated, cause = 0.0, True, "max_actions"
         else:
-            if np.array_equal(tile, self.tiles_to_color[2]):  # Sidewalk
-                reward -= 0.5  # Increased penalty
+            non_terminal_rwd = self.non_terminal(tile, info)
+            reward += non_terminal_rwd
 
-            # Progress reward
-            distance_t = info["env"]["dist2target_t"]
-            distance_t_1 = info["env"]["dist2target_t_1"]
-            dist2route = info["env"]["dist2route"]
+        # Normalize reward
+        reward = np.clip(reward, -1.0, 1.0)
+        self._k += 1
+        #print(f"Reward: {reward:.4f}")
+        #
+        return reward, terminated, cause
+    
+    def non_terminal(self, tile, info):
+        reward = 0.0
+        progress_reward, route_rwd = 0.0, 0.0
 
-            progress_reward = -0.001 * (distance_t - distance_t_1)
-            reward += progress_reward
+        if np.array_equal(tile, self.tiles_to_color[2]):  # Sidewalk
+            reward = -0.25  
+        
+        #if np.array_equal(tile, self.tiles_to_color[6]):  # Route
+        #    reward = 0.25
 
-            speed = info["hero"]["state"][3]
+        # INFO 
+        speed = info["hero"]["state"][3]
+        distance_t = info["env"]["dist2target_t"]
+        distance_t_1 = info["env"]["dist2target_t_1"]
+        dist2route = info["env"]["dist2route"]
 
-            # Idle penalty
-            if speed <= 1:
-                reward += -0.05
+        # Progress reward
+        progress_reward = -0.05 * (distance_t - distance_t_1)
+        reward += progress_reward
+
+        route_rwd = -0.001 * (dist2route ** 2)  # Quadratic penalty
+        reward += route_rwd
+
+        # Idle penalty
+        if speed > 0 and speed < 1:
+            reward = -0.6
+
+        #print(f"R_rwd: {route_rwd:.4f}; P_rwd: {progress_reward:.4f}")
 
         #  TODO:
         #  elif np.array_equal(tile, self.tiles_to_color[1]):  # Roadlines
         #    reward += 0.1  # Reward for staying in lane
-
-        self._k += 1
-        # Normalize reward
-        reward = np.clip(reward, -1.0, 1.0)
-        #
-        return reward, terminated, cause
+        # Normalize non-terminal reward
+        reward = np.clip(reward, -0.7, 0.7)
+        return reward
 
     def termination(self, collision, num_targets):
         terminated = True
@@ -77,7 +96,7 @@ class RewardFn(object):
 
         elif collision == "vehicles":
             cause = "collision"
-            reward = -0.5
+            reward = -0.8
 
         elif collision == "target":
             self._current_target += 1

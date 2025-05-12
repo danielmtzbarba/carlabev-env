@@ -14,10 +14,13 @@ class Hero(pygame.sprite.Sprite):
         self.color = color
         #
         self.w = int(car_size / self.scale)
-        self.l = 2 * self.w
+        self.l = self.w
+        # Visual Offset Bug
+        self._offx = -2 * 16
+        self._offy = -2 * 16
 
     def _setup(self):
-        center = self.window_center - int(self.l / 2)
+        center = self.window_center
         self.render_rect = pygame.Rect((center, center, self.w, self.l))
         self.rect = pygame.Rect((self.x0, self.y0, self.w, self.l))
         # movement
@@ -50,8 +53,8 @@ class DiscreteAgent(Controller, Hero):
         Controller.__init__(self, target_speed=target_speed)
         Hero.__init__(self, window_size, color, car_size)
         #
-        self.x0 = int(route[0][0] - self.l / 2)
-        self.y0 = int(route[1][0] - self.w / 2)
+        self.x0 = int(route[0][0])
+        self.y0 = int(route[1][0])
         self._setup()
         #
         self.set_route(route[0], route[1])
@@ -68,7 +71,7 @@ class DiscreteAgent(Controller, Hero):
         self.turn(action[1])
         self.update(acc, 0)
 
-        self.rect.center = (round(self.x) - 2 * 16, round(self.y) - 2 * 12)
+        self.rect.center = (round(self.x) + self._offx, round(self.y) + self._offy)
 
     def accelerate(self, amount):
         """Increase the speed either forward or reverse"""

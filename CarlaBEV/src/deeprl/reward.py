@@ -60,8 +60,10 @@ class RewardFn(object):
         if np.array_equal(tile, self.tiles_to_color[2]):  # Sidewalk
             reward = -0.6  
         
-        if np.array_equal(tile, self.tiles_to_color[6]):  # Route
-            reward = 0.6
+        #if np.array_equal(tile, self.tiles_to_color[6]):  # Route
+           # reward = 0.6
+        # TODO: To enable route reward,
+        # a penalty for running in circles must be implemented.
 
         # INFO 
         speed = info["hero"]["state"][3]

@@ -110,7 +110,7 @@ class CarlaBEV(gym.Env):
             route=self.map.agent_route,
             window_size=self.size,
             color=(0, 0, 0),
-            target_speed=int(300 / self.scale),
+            target_speed=int(200 / self.scale),
             car_size=8,
         )
         # Camera

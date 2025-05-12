@@ -48,19 +48,20 @@ class RewardFn(object):
         # Normalize reward
         reward = np.clip(reward, -1.0, 1.0)
         self._k += 1
-        #print(f"Reward: {reward:.4f}")
+        #print(f"Return: {reward:.4f}")
         #
         return reward, terminated, cause
     
     def non_terminal(self, tile, info):
         reward = 0.0
         progress_reward, route_rwd = 0.0, 0.0
+        speed_penalty = 0.0
 
         if np.array_equal(tile, self.tiles_to_color[2]):  # Sidewalk
-            reward = -0.25  
+            reward = -0.6  
         
-        #if np.array_equal(tile, self.tiles_to_color[6]):  # Route
-        #    reward = 0.25
+        if np.array_equal(tile, self.tiles_to_color[6]):  # Route
+            reward = 0.6
 
         # INFO 
         speed = info["hero"]["state"][3]
@@ -69,15 +70,17 @@ class RewardFn(object):
         dist2route = info["env"]["dist2route"]
 
         # Progress reward
-        progress_reward = -0.05 * (distance_t - distance_t_1)
+        progress_reward = -0.5 * (distance_t - distance_t_1)
         reward += progress_reward
 
-        route_rwd = -0.001 * (dist2route ** 2)  # Quadratic penalty
+        route_rwd = -0.01 * (dist2route ** 2)  # Quadratic penalty
         reward += route_rwd
 
         # Idle penalty
-        if speed > 0 and speed < 1:
-            reward = -0.6
+        if speed >= 0 and speed < 1:
+            speed_penalty = -0.6
+
+        reward += speed_penalty 
 
         #print(f"R_rwd: {route_rwd:.4f}; P_rwd: {progress_reward:.4f}")
 
@@ -85,7 +88,7 @@ class RewardFn(object):
         #  elif np.array_equal(tile, self.tiles_to_color[1]):  # Roadlines
         #    reward += 0.1  # Reward for staying in lane
         # Normalize non-terminal reward
-        reward = np.clip(reward, -0.7, 0.7)
+        reward = np.clip(reward, -0.8, 0.8)
         return reward
 
     def termination(self, collision, num_targets):
@@ -96,7 +99,7 @@ class RewardFn(object):
 
         elif collision == "vehicles":
             cause = "collision"
-            reward = -0.8
+            reward = -0.9
 
         elif collision == "target":
             self._current_target += 1
@@ -106,7 +109,7 @@ class RewardFn(object):
             else:
                 terminated = False
                 cause = "ckpt"
-                reward = 0.8
+                reward = 0.9
 
         return reward, terminated, cause
 

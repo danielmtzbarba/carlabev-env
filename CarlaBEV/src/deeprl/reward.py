@@ -42,11 +42,13 @@ class RewardFn(object):
     def __init__(self, max_actions=300) -> None:
         self._current_target: int = 0
         self._max_actions: int = max_actions
+        self._steering_accum = 0.0
         self._k: int = 0
         self._normalizer = RewardNormalizer()
 
     def reset(self):
         self._k = 0
+        self._steering_accum = 0.0
         self._current_target = 0
 
     def step(self, tile, collision, info, num_targets):
@@ -71,7 +73,10 @@ class RewardFn(object):
             reward += -0.3
 
         x, y, yaw, v = info["hero"]["state"]
-        x_1, y_1, yaw_1, v_1 = info["hero"]["last_state"]
+        _, _, yaw_1, v_1 = info["hero"]["last_state"]
+        delta_yaw = yaw_1 - yaw
+
+        self._steering_accum += delta_yaw
 
         distance_t = info["env"]["dist2target_t"]
         distance_t_1 = info["env"]["dist2target_t_1"]
@@ -90,14 +95,13 @@ class RewardFn(object):
         if v < 1:
             speed_penalty = -0.3 * (1 - v)
             reward += speed_penalty
-        # === NEW: Steering penalty to avoid spinning ===
-        delta_steer = abs(yaw - yaw_1)
-        print(delta_steer)
-        if delta_steer > 0.2:
-            reward += -0.2 * delta_steer  # Penalize large steering change
 
-        if abs(yaw) > 0.5 and v < 0.5:
-            reward += -0.3  # Extra penalty: strong steering while not moving
+        # ===  Steering penalty to avoid spinning ===
+        # Accumulate absolute steering over N frames
+        if self._k % 20 == 0:
+            if abs(self._steering_accum) > 4.0:
+                reward += -0.8  # Penalize spinning behavior
+            self._steering_accum = 0  # Reset every 10 steps
 
         return np.clip(reward, -0.8, 0.8)
 

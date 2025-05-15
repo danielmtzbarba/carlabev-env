@@ -50,6 +50,7 @@ class Stats(Episode):
             "mean_reward": self.mean_return,
             "success_rate": self.success_rate,
             "collision_rate": self.collision_rate,
+            "unfinished_rate": self.unfinished_rate,
         }
         return stats
 
@@ -64,3 +65,7 @@ class Stats(Episode):
     @property
     def success_rate(self):
         return self.last_episodes.count("success") / len(self.last_episodes)
+
+    @property
+    def unfinished_rate(self):
+        return self.last_episodes.count("max_actions") / len(self.last_episodes)

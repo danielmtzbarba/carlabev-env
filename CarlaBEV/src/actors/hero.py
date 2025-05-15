@@ -75,15 +75,15 @@ class DiscreteAgent(Controller, Hero):
 
     def accelerate(self, amount):
         """Increase the speed either forward or reverse"""
-        return amount * 20 * self.scale
+        return amount * 10 * self.scale
 
     def brake(self, amount):
         """Slow the car by half"""
-        return -amount * 10 * self.scale
+        return -amount * 5 * self.scale
 
     def turn(self, angle_degrees):
         """Adjust the angle the car is heading"""
-        self.yaw += math.radians(angle_degrees * 5)
+        self.yaw += math.radians(angle_degrees * 2.5)
         return 0
 
     @property

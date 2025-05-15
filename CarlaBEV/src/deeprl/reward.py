@@ -66,7 +66,7 @@ class RewardFn(object):
             # reward += self._normalizer.normalize(self.non_terminal(tile, info))
             reward += self.non_terminal(tile, info)
 
-        print(self._k, reward)
+#        print(self._k, reward)
         self._k += 1
         return reward, terminated, cause
 
@@ -88,12 +88,14 @@ class RewardFn(object):
         dist2route = info["env"]["dist2route"]
 
         # Progress reward
-        progress_reward = -0.1 * (distance_t - distance_t_1)
+        progress_reward = -0.2 * (distance_t - distance_t_1)
         progress_reward = np.clip(progress_reward * 0.2, -0.5, 0.5)
+
         reward += progress_reward
 
         # Route alignment penalty
-        route_rwd = -0.001 * (dist2route**2)
+        route_rwd = -0.0001 * (dist2route**2)
+        route_rwd = np.clip(route_rwd * 2, -0.5, 0.5)
         reward += route_rwd
 
         if v < 2:

@@ -63,8 +63,10 @@ class RewardFn(object):
         elif self._k >= self._max_actions:
             reward, terminated, cause = 0.0, True, "max_actions"
         else:
-            reward += self._normalizer.normalize(self.non_terminal(tile, info))
+            # reward += self._normalizer.normalize(self.non_terminal(tile, info))
+            reward += self.non_terminal(tile, info)
 
+        print(self._k, reward)
         self._k += 1
         return reward, terminated, cause
 
@@ -91,15 +93,15 @@ class RewardFn(object):
         reward += progress_reward
 
         # Route alignment penalty
-        route_rwd = -0.01 * (dist2route**2)
+        route_rwd = -0.001 * (dist2route**2)
         reward += route_rwd
 
-        if v < 1:
-            reward -= 0.05
+        if v < 2:
+            reward -= 0.1
 
         if self._k % 20 == 0:
             # Idle penalty
-            if self._speed_accum < 1:
+            if self._speed_accum < 100:
                 speed_penalty = -0.8
                 reward += speed_penalty
 

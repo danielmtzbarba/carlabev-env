@@ -11,6 +11,7 @@ Ref:
 """
 
 import numpy as np
+from numpy.random import rand, randint
 
 from CarlaBEV.src.planning import cubic_spline_planner
 from CarlaBEV.src.control.utils import angle_mod
@@ -32,7 +33,7 @@ class Controller(State):
     def set_route(self, ax, ay, ds=1.0):
         """Stanley steering control on a cubic spline."""
         cx, cy, cyaw, ck, s = cubic_spline_planner.calc_spline_course(ax, ay, ds=ds)
-        self.x, self.y = cx[0], cy[0]
+        self.x, self.y = cx[0] + randint(-10, 10), cy[0] + randint(-10, 10)
         self.cx, self.cy = cx, cy
         self.v = 0.0
         self.cyaw = cyaw

@@ -68,6 +68,11 @@ def main():
 
         # Reset if episode ends
         if terminated:
+            print(
+                info["termination"]["episode"],
+                info["termination"]["return"],
+                info["termination"]["termination"],
+            )
             observation, info = env.reset()
             total_reward = 0
 

@@ -70,7 +70,9 @@ class RewardFn(object):
         if np.array_equal(tile, self.tiles_to_color[2]):  # Sidewalk
             reward += -0.3
 
-        speed = info["hero"]["state"][3]
+        x, y, yaw, v = info["hero"]["state"]
+        x_1, y_1, yaw_1, v_1 = info["hero"]["last_state"]
+
         distance_t = info["env"]["dist2target_t"]
         distance_t_1 = info["env"]["dist2target_t_1"]
         dist2route = info["env"]["dist2route"]
@@ -85,9 +87,17 @@ class RewardFn(object):
         reward += route_rwd
 
         # Idle penalty
-        if speed < 1:
-            speed_penalty = -0.3 * (1 - speed)
+        if v < 1:
+            speed_penalty = -0.3 * (1 - v)
             reward += speed_penalty
+        # === NEW: Steering penalty to avoid spinning ===
+        delta_steer = abs(yaw - yaw_1)
+        print(delta_steer)
+        if delta_steer > 0.2:
+            reward += -0.2 * delta_steer  # Penalize large steering change
+
+        if abs(yaw) > 0.5 and v < 0.5:
+            reward += -0.3  # Extra penalty: strong steering while not moving
 
         return np.clip(reward, -0.8, 0.8)
 

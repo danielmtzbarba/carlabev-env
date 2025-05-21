@@ -65,16 +65,6 @@ class Town01(object):
         self._fov_surface.blit(rotated_image, rotated_image_rect)
         self._agent_tile = self._fov_surface.get_at(self.center)
 
-    def has_collided(self, vehicle_rect, class_color):
-        pixels = surfarray.pixels3d(
-            self._fov_surface.subsurface(
-                pygame.Rect(*self.center, vehicle_rect[2], vehicle_rect[3])
-            )
-        )
-        if class_color in pixels:
-            return True
-        return False
-
     def set_theta(self, theta):
         self._theta = theta
 
@@ -83,6 +73,11 @@ class Town01(object):
 
     def next_target(self, id):
         self._scene.next_target(id)
+
+    def dist2target(self, hero_position):
+        return np.linalg.norm(
+            hero_position - self.final_target, ord=2
+        )
 
     @property
     def agent_route(self):
@@ -107,3 +102,13 @@ class Town01(object):
     @property
     def target_position(self):
         return self._scene.target_position
+
+    @property
+    def current_ckpt(self):
+        return self._scene.current_ckpt
+    
+    @property
+    def final_target(self):
+        return self._scene.final_target
+
+    

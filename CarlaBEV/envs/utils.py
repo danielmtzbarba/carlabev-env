@@ -11,7 +11,7 @@ asset_path = "/home/danielmtz/Data/projects/carlabev-env/CarlaBEV/assets/"
 # asset_path = "/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/assets"
 
 # aisys
-# asset_path = "/home/aisyslab/DanielM/projects/carla-bev-env/CarlaBEV/assets/"
+asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
 
 
 def get_tile_dict(id):

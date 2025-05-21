@@ -7,6 +7,7 @@ import pygame
 from CarlaBEV.src.scenes import SceneBuilder
 
 SCENE_IDS = ["scene_1-1", "scene_1-2", "scene_1-3"]
+# SCENE_IDS = ["scene_1-0"]
 
 
 class Scene(object):
@@ -64,7 +65,6 @@ class Scene(object):
 
     @property
     def agent_route(self):
-        offset = 0
         cx, cy = self.actors["agent"]
         cx = np.array(cx, dtype=np.int32)
         cy = np.array(cy, dtype=np.int32)
@@ -79,5 +79,10 @@ class Scene(object):
         return self.target.position
 
     @property
-    def target_pose(self):
-        return self.target.pose
+    def current_ckpt(self):
+        return self.target.position
+
+    @property
+    def final_target(self):
+        final_target = Target(self.num_targets, scale=self._scale)
+        return final_target.position

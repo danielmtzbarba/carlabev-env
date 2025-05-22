@@ -83,7 +83,7 @@ class DiscreteAgent(Controller, Hero):
 
     def turn(self, angle_degrees):
         """Adjust the angle the car is heading"""
-        self.yaw += math.radians(angle_degrees * 2.5)
+        self.yaw += math.radians(angle_degrees * 1.2)
         return 0
 
     @property

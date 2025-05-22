@@ -7,12 +7,13 @@ from gymnasium.wrappers import (
 
 from CarlaBEV.envs.carlabev import CarlaBEV
 
+
 def make_carlabev_env(seed, idx, capture_video, run_name, size):
     def thunk():
         if capture_video and idx == 0:
             env = CarlaBEV(render_mode="rgb_array", size=size)
             env = gym.wrappers.RecordVideo(
-                env, f"videos/{run_name}", episode_trigger=lambda x: x % 100 == 0
+                env, f"videos/{run_name}", episode_trigger=lambda x: x % 25 == 0
             )
         else:
             env = CarlaBEV(render_mode="rgb_array", size=size)

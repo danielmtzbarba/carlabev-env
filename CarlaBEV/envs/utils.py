@@ -11,7 +11,7 @@ asset_path = "/home/danielmtz/Data/projects/carlabev-env/CarlaBEV/assets/"
 # asset_path = "/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/assets"
 
 # aisys
-asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
+# asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
 
 
 def get_tile_dict(id):
@@ -64,26 +64,22 @@ def load_map(size):
     map_path = os.path.join(asset_path, f"Town01/Town01-{size}-rgb.png")
     map_img = pygame.image.load(map_path)
 
-    return arr, map_img
-
-
-def load_planning_map():
+    # Planning Map
     map_path = os.path.join(asset_path, "Town01/Town01-1024-sem.png")
-    map = Image.open(map_path)
-    x, y = map.size
-    pmap = map.resize((int(x / 8), int(y / 8)))
-    return np.array(pmap, dtype=np.uint8)
-
+    planning_map = Image.open(map_path)
+    x, y = planning_map.size
+    pmap = np.array(planning_map.resize((int(x / 8), int(y / 8))), dtype=np.uint8)
+    return arr, map_img, pmap
 
 def scale_coords(coord, factor):
     return np.array([int(coord[1] / factor), int(coord[0] / factor), 0])
 
 
-def get_spawn_locations(size):
-    agent_loc = (8600, 1600)
-    factor = int(1024 / size)
-    car_size = 32 / factor
-    offset = -size / 4 * factor + 4 * car_size
-    agent_loc = (8760 + offset, 1750 + offset)
-
-    return scale_coords(agent_loc, factor)
+def scale_route(coords, factor, reverse=False):
+    if reverse:
+        coords.reverse()
+    scaled = []
+    for coord in coords:
+        coord = int(coord / factor)
+        scaled.append(coord)
+    return scaled

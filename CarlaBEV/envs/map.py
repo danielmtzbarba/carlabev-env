@@ -1,16 +1,14 @@
 import numpy as np
 import math
 import pygame
-import pygame.surfarray as surfarray
-
 
 from .utils import load_map
 from CarlaBEV.src.scenes.scene import Scene
 
 
 class Town01(object):
-    def __init__(self, target_id, size=1024) -> None:
-        self._map_arr, self._map_img = load_map(size)
+    def __init__(self, size=1024) -> None:
+        self._map_arr, self._map_img, _ = load_map(size)
         self._Y, self._X, _ = self._map_arr.shape
         self.size = size  # The size of the square grid
         self.center = (int(self.size / 2), int(self.size / 2))

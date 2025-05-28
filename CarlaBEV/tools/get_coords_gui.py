@@ -1,8 +1,7 @@
-from CarlaBEV.envs.utils import load_planning_map, load_map
+from CarlaBEV.envs.utils import load_map
 import matplotlib.pyplot as plt
 
-map = load_planning_map()
-rgbmap, _ = load_map(size=1024)
+rgbmap, _, _ = load_map(size=1024)
 
 fig, ax = plt.subplots()
 ax.imshow(rgbmap)

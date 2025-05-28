@@ -71,7 +71,7 @@ class CarlaBEV(gym.Env):
         self.window = None
         self.clock = None
         #
-        self.map = Town01(target_id=0, size=self.size)
+        self.map = Town01(size=self.size)
 
     def _get_obs(self):
         return self._render_frame()

@@ -102,3 +102,8 @@ class Controller(State):
         error_front_axle = np.dot([dx[target_idx], dy[target_idx]], front_axle_vec)
 
         return target_idx, error_front_axle
+        
+    @property
+    def dist2route(self):
+        set_point = np.array([self.cx[self.target_idx], self.cy[self.target_idx]])
+        return np.linalg.norm(self.position - set_point, ord=2)

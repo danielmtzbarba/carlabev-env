@@ -13,7 +13,7 @@ SCENE_IDS = ["scene_1-1", "scene_1-2", "scene_1-3"]
 class Scene(object):
     def __init__(self, map_surface, size) -> None:
         self._target_id = 0
-        self._map_arr, self._map_img = utils.load_map(size)
+        self._map_arr, self._map_img, _ = utils.load_map(size)
         self._scene_ids = SCENE_IDS
         self._buider = SceneBuilder(self._scene_ids, size)
         self._map = map_surface

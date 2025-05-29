@@ -1,13 +1,13 @@
 from random import choice
 import numpy as np
 from CarlaBEV.envs import utils
-from CarlaBEV.src.scenes.target import Target 
+from CarlaBEV.src.scenes.target import Target
 import pygame
 
 from CarlaBEV.src.scenes import SceneBuilder
 
 SCENE_IDS = [f"scene-{i}" for i in range(10)]
-# SCENE_IDS = ["scene_1-0"]
+#SCENE_IDS = ["scene-debug"]
 
 
 class Scene(object):
@@ -30,15 +30,15 @@ class Scene(object):
         #
         rdm_id = choice(self._scene_ids)
         self.actors = self._buider.get_scene_actors(rdm_id)
-        
+
         for id in self.actors.keys():
             if id == "agent" or id == "target":
                 continue
             for actor in self.actors[id]:
                 actor.reset()
-        
+
         rx, ry = self.actors["agent"]
-        self._target_locations =  [(x, y) for x, y in zip(rx, ry)]
+        self._target_locations = [(x, y) for x, y in zip(rx, ry)]
         #
         self.next_target(self._target_id)
 

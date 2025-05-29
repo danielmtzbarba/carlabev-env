@@ -33,8 +33,8 @@ class SceneBuilder(object):
         factor = int(1024/self.size)
         for idx, row in df.iterrows():
             _, class_id, _, _, rx, ry = row
-            routeX = scale_route(rx, factor=factor, map_arr=self.semap, reverse=False)
-            routeY = scale_route(ry, factor=factor, map_arr=self.semap, reverse=False)
+            routeX = scale_route(rx, factor=factor, reverse=False)
+            routeY = scale_route(ry, factor=factor, reverse=False)
             if class_id == "agent":
                 actors[class_id] = (routeX, routeY)
                 continue

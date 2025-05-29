@@ -75,7 +75,7 @@ def scale_coords(coord, factor):
     return np.array([int(coord[1] / factor), int(coord[0] / factor), 0])
 
 
-def scale_route(coords, factor, map_arr, reverse=False):
+def scale_route(coords, factor, reverse=False):
     if reverse:
         coords.reverse()
     offset = factor + 1

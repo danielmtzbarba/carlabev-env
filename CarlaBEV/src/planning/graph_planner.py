@@ -57,6 +57,6 @@ class GraphPlanner(MapGraph):
         rx, ry = [], []
         for nodeid in path_ids:
             pos = self.get_node_pos(nodeid)
-            rx.append(pos[0])
-            ry.append(pos[1])
+            rx.append(pos[1])
+            ry.append(pos[0])
         return (rx, ry)

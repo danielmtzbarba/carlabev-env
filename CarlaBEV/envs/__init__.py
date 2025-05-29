@@ -5,7 +5,7 @@ from gymnasium.wrappers import (
     FrameStackObservation,
 )
 
-from CarlaBEV.envs.carlabev import CarlaBEV
+#from CarlaBEV.envs.carlabev import CarlaBEV
 
 
 def make_carlabev_env(seed, idx, capture_video, run_name, size):

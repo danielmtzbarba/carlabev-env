@@ -19,7 +19,7 @@ class SceneBuilder(object):
         for scene_id in self.scenes.keys():
             self.scenes[scene_id] = self._build_scene(scene_id)
 
-    def _load_scene(self, scene_id):
+    def load_scene(self, scene_id):
         df = pd.read_csv(
             os.path.join(asset_path, "scenes", f"{scene_id}.csv"), index_col=0
         )
@@ -29,7 +29,7 @@ class SceneBuilder(object):
 
     def _build_scene(self, scene_id):
         actors = deepcopy(actors_dict)
-        df = self._load_scene(scene_id)
+        df = self.load_scene(scene_id)
         factor = int(1024/self.size)
         for idx, row in df.iterrows():
             _, class_id, _, _, rx, ry = row

@@ -1,35 +1,25 @@
 import numpy as np
 import networkx as nx
 import pickle
-
-intersections = [
-    (8642, 1564),
-    (8654, 6755),
-    (7250, 1552),
-    (7241, 2446),
-    (7242, 3652),
-    (7242, 4704),
-    (7257, 6773),
-    (6199, 1552),
-    (6197, 2439),
-    (3349, 1545),
-    (3350, 2456),
-    (3350, 3639),
-    (3335, 4714),
-    (3315, 6773),
-    (2456, 1563),
-    (2446, 6757),
- ]
+import random
 
 class MapGraph(object):
-    def __init__(self, graph_path='planning_graph.pkl'):
+    def __init__(self, graph_path):
         self._load_graph(graph_path)
+        self.get_center_nodes()
         self.get_lane_nodes()
 
     def _load_graph(self, graph_path):
         # Load
         with open(graph_path, "rb") as f:
             self._G = pickle.load(f)
+    
+    def get_center_nodes(self):
+        self._pos = nx.get_node_attributes(self._G, 'pos')
+        # Filter to only centerline nodes
+        self._wp_nodes = [n for n in self._G.nodes if isinstance(n, str) and "_C_" in n]
+        random.shuffle(self._wp_nodes)
+        
     
     def get_lane_nodes(self):
         self._nodes = {

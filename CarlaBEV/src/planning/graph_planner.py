@@ -60,3 +60,46 @@ class GraphPlanner(MapGraph):
             rx.append(pos[1])
             ry.append(pos[0])
         return (rx, ry)
+    
+    def get_random_nodes(self, min_distance, max_distance):
+        while True:
+            start = random.choice(self._wp_nodes)
+            end = random.choice(self._wp_nodes)
+            if start == end:
+                continue
+
+            try:
+                p1 = np.array([self.get_node_pos(start)])
+                p2 = np.array([self.get_node_pos(end)])
+            except:
+                continue
+
+            dist = np.linalg.norm(p1 - p2)
+
+            if min_distance <= dist <= max_distance:
+                return start, end
+    
+    def find_path(self, start, end):
+        coords = []
+        try:
+            path = nx.shortest_path(self._G, start, end, weight='cost')
+            coords = np.array([self.get_node_pos(n) for n in path])
+        except nx.NetworkXNoPath:
+            # not found
+            pass 
+        return coords
+    
+        try:
+            i, j, lane, k = parse_node_label(start)
+            
+        except:
+            start = f'{j}-{i}_{lane}_{k}'
+
+        try:
+            i, j, lane, k = parse_node_label(end)
+            p2 = np.array([pos[end]])
+        except:
+            end = f'{j}-{i}_{lane}_{k}'
+            
+        
+            

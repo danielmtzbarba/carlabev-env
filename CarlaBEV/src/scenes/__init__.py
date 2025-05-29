@@ -5,15 +5,15 @@ import os
 
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.actors.pedestrian import Pedestrian
-from CarlaBEV.src.planning.planner import scale_route
-from CarlaBEV.envs.utils import asset_path
+from CarlaBEV.envs.utils import asset_path, scale_route
 
 actors_dict = {"agent": None, "vehicles": [], "pedestrians": [], "target": []}
 
 
 class SceneBuilder(object):
-    def __init__(self, scene_ids, size) -> None:
+    def __init__(self, scene_ids, size, semap) -> None:
         self.size = size
+        self.semap = semap
         self.scenes = dict.fromkeys(scene_ids)
 
         for scene_id in self.scenes.keys():
@@ -30,10 +30,11 @@ class SceneBuilder(object):
     def _build_scene(self, scene_id):
         actors = deepcopy(actors_dict)
         df = self._load_scene(scene_id)
+        factor = int(1024/self.size)
         for idx, row in df.iterrows():
             _, class_id, _, _, rx, ry = row
-            routeX = scale_route(rx, factor=8, reverse=True)
-            routeY = scale_route(ry, factor=8, reverse=True)
+            routeX = scale_route(rx, factor=factor, map_arr=self.semap, reverse=False)
+            routeY = scale_route(ry, factor=factor, map_arr=self.semap, reverse=False)
             if class_id == "agent":
                 actors[class_id] = (routeX, routeY)
                 continue

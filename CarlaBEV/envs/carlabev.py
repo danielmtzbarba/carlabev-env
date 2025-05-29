@@ -86,6 +86,7 @@ class CarlaBEV(gym.Env):
                 "dist2target_t": self._dist2target_t,
                 "dist2route_1": self._dist2route_1,
                 "dist2route": self.hero.dist2route,
+                "set_point": self.hero.set_point,
             },
             "hero": {
                 "state": self.hero.state,
@@ -182,7 +183,7 @@ class CarlaBEV(gym.Env):
         if self.clock is None and self.render_mode == "human":
             self.clock = pygame.time.Clock()
 
-        self.map.step(topleft=self.camera.offset)
+        self.map.step(topleft=self.camera.offset, course=self.hero.course)
         self.hero.draw(self.map.canvas)
 
         if self.render_mode == "human":

@@ -56,8 +56,8 @@ class Town01(object):
 
         return rotated_image, rotated_image_rect
 
-    def step(self, topleft):
-        self._scene.step()
+    def step(self, topleft, course):
+        self._scene.step(course)
         self.crop_fov(topleft)
         rotated_image, rotated_image_rect = self.rotate_fov()
         self._fov_surface.blit(rotated_image, rotated_image_rect)

@@ -69,21 +69,8 @@ class Town01(object):
     def check_collision(self, hero):
         return self._scene.collision_check(hero)
 
-    def next_target(self, id):
-        self._scene.next_target(id)
-
     def dist2target(self, hero_position):
-        return np.linalg.norm(
-            hero_position - self.final_target, ord=2
-        )
-
-    @property
-    def agent_route(self):
-        return self._scene.agent_route
-
-    @property
-    def num_targets(self):
-        return self._scene.num_targets
+        return np.linalg.norm(hero_position - self.target_position, ord=2)
 
     @property
     def canvas(self):
@@ -94,19 +81,18 @@ class Town01(object):
         return self._agent_tile
 
     @property
+    def agent_route(self):
+        return self._scene.agent_route
+
+    # Target
+    @property
+    def num_targets(self):
+        return self._scene.num_targets
+
+    @property
     def target_pose(self):
         return self._scene.target_pose
 
     @property
     def target_position(self):
         return self._scene.target_position
-
-    @property
-    def current_ckpt(self):
-        return self._scene.current_ckpt
-    
-    @property
-    def final_target(self):
-        return self._scene.final_target
-
-    

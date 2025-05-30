@@ -1,21 +1,23 @@
 import pygame
-from CarlaBEV.envs.utils import scale_coords
+
 
 class Target(pygame.sprite.Sprite):
-    lenght, width = 5, 5 
-
-    def __init__(self, target_pos, color=(0, 255, 0), scale=1):
+    def __init__(self, id, target_pos, color=(0, 255, 0), size=5, scale=1):
         pygame.sprite.Sprite.__init__(self)
+        self.id = id
         self.color = color
+        self.lenght = size
+        self.width = size
         self.scale = scale
-        self.reset(target_pos)
+        self._visible = False
+        self.x0, self.y0 = target_pos[0], target_pos[1]
 
-    def reset(self, target_location):
-        x, y = target_location[0], target_location[1]
-        self.position = pygame.math.Vector2(x, y)
+    def reset(self):
+        self._visible = True
+        self.position = pygame.math.Vector2(self.x0, self.y0)
         self.rect = pygame.Rect(
-            int(x - self.width / 2),
-            int(y - self.lenght / 2),
+            int(self.x0 - self.width / 2),
+            int(self.y0 - self.lenght / 2),
             self.width,
             self.lenght,
         )
@@ -34,10 +36,17 @@ class Target(pygame.sprite.Sprite):
             hero.rect.w + 1,
         )
         result = dummy_rect.colliderect(self.rect)
-        return result
+        if result:
+            self._visible = False
+        return self.id, result
 
     def draw(self, map):
-        self.rect = pygame.draw.rect(map, self.color, self.rect)
+        if self.visible:
+            self.rect = pygame.draw.rect(map, self.color, self.rect)
+
+    @property
+    def visible(self):
+        return self._visible
 
     @property
     def pose(self):

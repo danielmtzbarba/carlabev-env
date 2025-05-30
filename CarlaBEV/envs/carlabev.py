@@ -151,19 +151,14 @@ class CarlaBEV(gym.Env):
         info = self._get_info()
 
         tile = np.array(self.map.agent_tile)[:-1]
-        result = self.map.check_collision(self.hero)
-        reward, terminated, cause = self.reward_fn.step(
-            tile, result, info, self.map.num_targets
-        )
+        actor_id, result = self.map.check_collision(self.hero)
+        reward, terminated, cause = self.reward_fn.step(tile, result, info, actor_id)
 
         self.stats.step(reward, cause)
 
         if cause in self.termination_causes:
             self.stats.terminated()
             info["termination"] = self.stats.get_episode_info()
-
-        elif result == "target":
-            self.map.next_target(self.reward_fn.current_target)
 
         if self.render_mode == "human":
             self._render_frame()

@@ -1,16 +1,14 @@
 import numpy as np
 import math
 import pygame
-import pygame.surfarray as surfarray
-
 
 from .utils import load_map
 from CarlaBEV.src.scenes.scene import Scene
 
 
 class Town01(object):
-    def __init__(self, target_id, size=1024) -> None:
-        self._map_arr, self._map_img = load_map(size)
+    def __init__(self, size=1024) -> None:
+        self._map_arr, self._map_img, _ = load_map(size)
         self._Y, self._X, _ = self._map_arr.shape
         self.size = size  # The size of the square grid
         self.center = (int(self.size / 2), int(self.size / 2))
@@ -58,8 +56,8 @@ class Town01(object):
 
         return rotated_image, rotated_image_rect
 
-    def step(self, topleft):
-        self._scene.step()
+    def step(self, topleft, course):
+        self._scene.step(course)
         self.crop_fov(topleft)
         rotated_image, rotated_image_rect = self.rotate_fov()
         self._fov_surface.blit(rotated_image, rotated_image_rect)
@@ -71,21 +69,8 @@ class Town01(object):
     def check_collision(self, hero):
         return self._scene.collision_check(hero)
 
-    def next_target(self, id):
-        self._scene.next_target(id)
-
     def dist2target(self, hero_position):
-        return np.linalg.norm(
-            hero_position - self.final_target, ord=2
-        )
-
-    @property
-    def agent_route(self):
-        return self._scene.agent_route
-
-    @property
-    def num_targets(self):
-        return self._scene.num_targets
+        return np.linalg.norm(hero_position - self.target_position, ord=2)
 
     @property
     def canvas(self):
@@ -96,19 +81,18 @@ class Town01(object):
         return self._agent_tile
 
     @property
+    def agent_route(self):
+        return self._scene.agent_route
+
+    # Target
+    @property
+    def num_targets(self):
+        return self._scene.num_targets
+
+    @property
     def target_pose(self):
         return self._scene.target_pose
 
     @property
     def target_position(self):
         return self._scene.target_position
-
-    @property
-    def current_ckpt(self):
-        return self._scene.current_ckpt
-    
-    @property
-    def final_target(self):
-        return self._scene.final_target
-
-    

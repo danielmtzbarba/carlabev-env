@@ -26,7 +26,7 @@ class Dijkstra:
         self._dist2goal = 5
         #
         self._tiles = utils.get_tile_dict(id)
-        self._map = utils.load_planning_map()
+        _, _, self._map = utils.load_map()
         X, Y = self._map.shape
         #
         self.min_x = 0
@@ -215,11 +215,3 @@ def find_path(start, goal, map):
     rx, ry = dijkstra.planning(gx, gy, sx, sy)
 
     return rx, ry
-
-
-if __name__ == "__main__":
-    map = utils.load_planning_map()
-
-    start = utils.get_spawn_locations(128)
-    goal = utils.scale_coords((8704, 6650), 8)
-    rx, ry = find_path(start, goal, map)

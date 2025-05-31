@@ -71,7 +71,7 @@ class CarlaBEV(gym.Env):
         self.window = None
         self.clock = None
         #
-        self.map = Town01(target_id=0, size=self.size)
+        self.map = Town01(size=self.size)
 
     def _get_obs(self):
         return self._render_frame()
@@ -86,6 +86,7 @@ class CarlaBEV(gym.Env):
                 "dist2target_t": self._dist2target_t,
                 "dist2route_1": self._dist2route_1,
                 "dist2route": self.hero.dist2route,
+                "set_point": self.hero.set_point,
             },
             "hero": {
                 "state": self.hero.state,
@@ -101,6 +102,7 @@ class CarlaBEV(gym.Env):
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
+        self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
         self.map.reset()
@@ -150,10 +152,12 @@ class CarlaBEV(gym.Env):
         info = self._get_info()
 
         tile = np.array(self.map.agent_tile)[:-1]
-        result = self.map.check_collision(self.hero)
-        reward, terminated, cause = self.reward_fn.step(
-            tile, result, info, self.map.num_targets
-        )
+        actor_id, result = self.map.check_collision(self.hero)
+        reward, terminated, cause = self.reward_fn.step(tile, result, info, actor_id)
+
+        truncated = False
+        if cause == "max_actions":
+            truncated = True
 
         self.stats.step(reward, cause)
 
@@ -161,13 +165,17 @@ class CarlaBEV(gym.Env):
             self.stats.terminated()
             info["termination"] = self.stats.get_episode_info()
 
-        elif result == "target":
-            self.map.next_target(self.reward_fn.current_target)
+        if self._current_step >= 1000:
+            print(f"[SAFETY STOP] Forcing episode end at step {self._current_step}")
+            info["termination"] = self.stats.get_episode_info()
+            return observation, reward, True, True, info
 
         if self.render_mode == "human":
             self._render_frame()
 
-        return observation, reward, terminated, False, info
+        self._current_step += 1
+
+        return observation, reward, terminated, truncated, info
 
     def render(self):
         if self.render_mode == "rgb_array":
@@ -182,7 +190,7 @@ class CarlaBEV(gym.Env):
         if self.clock is None and self.render_mode == "human":
             self.clock = pygame.time.Clock()
 
-        self.map.step(topleft=self.camera.offset)
+        self.map.step(topleft=self.camera.offset, course=self.hero.course)
         self.hero.draw(self.map.canvas)
 
         if self.render_mode == "human":

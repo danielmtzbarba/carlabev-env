@@ -17,6 +17,7 @@ class Actor(pygame.sprite.Sprite):
     ):
         pygame.sprite.Sprite.__init__(self)
         self.ds = resolution
+        self.id = id
 
         if routeX and routeY:
             self.rx = scale_route(routeX, factor=8)
@@ -51,4 +52,4 @@ class Actor(pygame.sprite.Sprite):
             hero.rect.x + offsetx, hero.rect.y + offsety, hero.rect.w, hero.rect.w
         )
         result = dummy_rect.colliderect(self.rect)
-        return result
+        return self.id, result

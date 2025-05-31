@@ -83,13 +83,8 @@ class DiscreteAgent(Controller, Hero):
 
     def turn(self, angle_degrees):
         """Adjust the angle the car is heading"""
-        self.yaw += math.radians(angle_degrees * 1.2)
+        self.yaw += math.radians(angle_degrees * 2)
         return 0
-
-    @property
-    def dist2route(self):
-        set_point = np.array([self.cx[self.target_idx], self.cy[self.target_idx]])
-        return np.linalg.norm(self.position - set_point, ord=2)
 
 
 class ContinuousAgent(Controller, Hero):
@@ -129,8 +124,3 @@ class ContinuousAgent(Controller, Hero):
     def brake(self, amount):
         """Slow the car by half"""
         return -amount * self.scale / 4
-
-    @property
-    def dist2route(self):
-        set_point = np.array([self.cx[self.target_idx], self.cy[self.target_idx]])
-        return np.linalg.norm(self.position - set_point, ord=1)

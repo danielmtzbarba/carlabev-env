@@ -33,11 +33,12 @@ class Controller(State):
     def set_route(self, ax, ay, ds=1.0):
         """Stanley steering control on a cubic spline."""
         cx, cy, cyaw, ck, s = cubic_spline_planner.calc_spline_course(ax, ay, ds=ds)
-        self.x, self.y = cx[0] + randint(-10, 10), cy[0] + randint(-10, 10)
+        self.x, self.y = cx[0] + randint(-1, 1), cy[0] + randint(-1, 1)
         self.cx, self.cy = cx, cy
         self.v = 0.0
         self.cyaw = cyaw
         self.target_idx, _ = self.calc_target_index()
+        self.yaw = self.cyaw[self.target_idx]
 
     def control_step(self):
         ai = self.pid_control()
@@ -102,3 +103,15 @@ class Controller(State):
         error_front_axle = np.dot([dx[target_idx], dy[target_idx]], front_axle_vec)
 
         return target_idx, error_front_axle
+
+    @property
+    def set_point(self):
+        return np.array([self.cx[self.target_idx], self.cy[self.target_idx], self.cyaw[self.target_idx]])
+
+    @property
+    def dist2route(self):
+        return np.linalg.norm(self.position - self.set_point[:-1], ord=2)
+
+    @property
+    def course(self):
+        return (self.cx[self.target_idx:], self.cy[self.target_idx:], self.cyaw[self.target_idx:])

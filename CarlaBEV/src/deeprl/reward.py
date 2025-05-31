@@ -89,36 +89,56 @@ class RewardFn(object):
 
         # --- Progress reward (toward the target) ---
         delta_progress = distance_t_1 - distance_t  # positive if moving closer
+        # Yaw alignment
+        desired_yaw = set_point[2]
+        yaw_error = np.arctan2(np.sin(desired_yaw - yaw), np.cos(desired_yaw - yaw))
+        # --- Progress reward (toward the target) ---
+        delta_progress = distance_t_1 - distance_t  # Positive if getting closer
 
-        if delta_progress != 0:
-            progress_reward = np.clip(delta_progress * 0.1, -0.5, 0.5)
-            reward += progress_reward
+        # --- Yaw alignment ---
+        desired_yaw = set_point[2]
+        yaw_error = np.arctan2(
+            np.sin(desired_yaw - yaw), np.cos(desired_yaw - yaw)
+        )  # [-π, π]
+        yaw_alignment = np.cos(yaw_error)  # 1 = aligned, -1 = opposite
 
-            # --- Yaw alignment reward ---
-            desired_yaw = set_point[2]
-            yaw_error = np.arctan2(
-                np.sin(desired_yaw - yaw), np.cos(desired_yaw - yaw)
-            )  # wrapped [-pi, pi]
-            yaw_reward = (
-                np.cos(yaw_error) * 0.1
-            )  # max = 0.1 when aligned, min = -0.1 when opposite
-            reward += yaw_reward
+        if delta_progress > 0:
+            if abs(yaw_error) < np.radians(45):
+                # --- Aligned: allow progress reward ---
+                progress_reward = np.clip(delta_progress * 0.1, -0.5, 0.5)
+                reward += progress_reward
 
-            # --- Distance-to-route reward (smoothed) ---
-            safe_margin = 3  # pixels (adjust to your map's scale)
-            max_r = 0.3
-            min_r = -0.5
+                # --- Yaw reward (boosted when aligned) ---
+                yaw_reward = yaw_alignment * 0.3
+                reward += yaw_reward
 
-            if dist2route <= safe_margin:
-                route_reward = max_r  # full reward
-            elif dist2route <= 2 * safe_margin:
-                # Linear decay
-                decay = (dist2route - safe_margin) / safe_margin
-                route_reward = max_r * (1 - 5 * decay)
+                # --- Distance-to-route reward (only when aligned) ---
+                safe_margin = 3  # pixels
+                max_r = 0.3
+                min_r = -0.5
+
+                if dist2route <= safe_margin:
+                    route_reward = max_r
+                elif dist2route <= 2 * safe_margin:
+                    decay = (dist2route - safe_margin) / safe_margin
+                    route_reward = max_r * (1 - 5 * decay)
+                else:
+                    route_reward = min_r
+
+                reward += route_reward
             else:
-                route_reward = min_r  # full penalty
+                # --- Misaligned: penalize progress ---
+                reward -= 0.5  # discourage blindly moving forward
+                # Optional: small penalty for strong misalignment
+                reward += yaw_alignment * 0.1  # slightly negative if facing wrong
+        else:
+            # Optional: slight penalty for idling if needed
+            pass
 
-            reward += route_reward
+        # Debug info
+        # print(
+        #    f"Δprogress: {delta_progress:.3f}, Yaw err: {np.degrees(yaw_error):.1f}°, Reward: {reward:.3f}"
+        # )
 
         if self._k > 0 and self._k % 20 == 0:
             # Idle penalty

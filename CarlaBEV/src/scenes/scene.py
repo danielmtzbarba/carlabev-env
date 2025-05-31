@@ -46,6 +46,7 @@ class Scene(object):
 
     def collision_check(self, hero):
         result = None
+        coll_id = None
         for id in self.actors.keys():
             if id == "agent":
                 continue
@@ -53,7 +54,8 @@ class Scene(object):
                 actor_id, collision = actor.isCollided(hero, self._const)
                 if collision:
                     result = id
-        return actor_id, result
+                    coll_id = actor_id
+        return coll_id, result
 
     @property
     def agent_route(self):

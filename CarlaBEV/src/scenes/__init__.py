@@ -30,7 +30,7 @@ class SceneBuilder(object):
     def set_targets(self, actors_dict, rx, ry):
         n = len(rx) - 1
         for i, (x, y) in enumerate(zip(rx, ry)):
-            if i > 0:
+            if i < n:
                 id, size = i, 5
             else:
                 id, size = "goal", 10

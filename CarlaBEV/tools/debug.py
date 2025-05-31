@@ -38,15 +38,15 @@ def process_events(keys_held):
 def get_action_from_keys(keys_held):
     """Returns an action based on the keys currently held."""
     if keys_held[pygame.K_LEFT]:
-        return 1
+        return 5
     elif keys_held[pygame.K_RIGHT]:
-        return 2
+        return 6
     elif keys_held[pygame.K_UP]:
-        return 3
+        return 1
     elif keys_held[pygame.K_DOWN]:
-        return 4
-    else:
-        return 0  # No action
+        return 2
+
+    return 0  # No action
 
 
 def main():
@@ -70,11 +70,7 @@ def main():
         if terminated:
             ret = info["termination"]["return"]
             length = info["termination"]["length"]
-            print(
-                info["termination"]["episode"],
-                ret,
-                ret/length
-            )
+            print(info["termination"]["episode"], ret, ret / length)
             observation, info = env.reset()
             total_reward = 0
 

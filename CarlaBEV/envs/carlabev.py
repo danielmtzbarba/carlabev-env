@@ -14,10 +14,14 @@ from CarlaBEV.src.deeprl.stats import Stats
 
 class Actions(Enum):
     nothing = 0
-    left = 1
-    right = 2
-    gas = 3
-    brake = 4
+    gas = 1
+    brake = 2
+    gas_steer_left = 3
+    gas_steer_right = 4
+    steer_left = 5
+    steer_right = 6
+    brake_steer_left = 7
+    brake_steer_right = 8
 
 
 class CarlaBEV(gym.Env):
@@ -42,15 +46,20 @@ class CarlaBEV(gym.Env):
         # Action_space
         if discrete:
             self.Agent = DiscreteAgent
-            self.action_space = spaces.Discrete(5)
+            self.action_space = spaces.Discrete(9)
 
             self._action_to_direction = {
-                Actions.nothing.value: np.array([0, 0, 0]),
-                Actions.left.value: np.array([0, 1, 0]),
-                Actions.right.value: np.array([0, -1, 0]),
-                Actions.gas.value: np.array([1, 0, 0]),
-                Actions.brake.value: np.array([0, 0, 1]),
+                0: np.array([0, 0, 0]),  # nothing
+                1: np.array([1, 0, 0]),  # gas
+                2: np.array([0, 0, 1]),  # brake
+                3: np.array([1, 1, 0]),  # gas + steer left
+                4: np.array([1, -1, 0]),  # gas + steer right
+                5: np.array([0, 1, 0]),  # steer left (coast)
+                6: np.array([0, -1, 0]),  # steer right (coast)
+                7: np.array([0, 1, 1]),  # brake + steer left
+                8: np.array([0, -1, 1]),  # brake + steer right
             }
+
         else:
             self.Agent = ContinuousAgent
             self.action_space = spaces.Box(
@@ -141,7 +150,6 @@ class CarlaBEV(gym.Env):
         #
         self._dist2target_t_1 = self._dist2target_t
         self._dist2route_1 = self.hero.dist2route
-
         self.hero.step(action)
         self.map.set_theta(self.hero.yaw)
         self.camera.scroll()
@@ -158,6 +166,7 @@ class CarlaBEV(gym.Env):
         truncated = False
         if cause == "max_actions":
             truncated = True
+            terminated = True
 
         self.stats.step(reward, cause)
 

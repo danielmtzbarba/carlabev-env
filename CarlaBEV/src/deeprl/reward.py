@@ -52,8 +52,8 @@ class RewardFn(object):
         self._speed_accum = 0.0
 
     def step(self, tile, collision, info, target_id):
+        self._k += 1
         reward, terminated, cause = -0.01, False, None
-
         if np.array_equal(tile, self.tiles_to_color[0]):  # Obstacle
             reward, terminated, cause = -1.0, True, "collision"
         elif collision is not None:
@@ -64,8 +64,6 @@ class RewardFn(object):
             # reward += self._normalizer.normalize(self.non_terminal(tile, info))
             reward += self.non_terminal(tile, info)
 
-        #        print(self._k, reward)
-        self._k += 1
         return reward, terminated, cause
 
     def non_terminal(self, tile, info):

@@ -102,6 +102,7 @@ class CarlaBEV(gym.Env):
     def reset(self, seed=None, options=None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
+        self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
         self.map.reset()
@@ -154,16 +155,27 @@ class CarlaBEV(gym.Env):
         actor_id, result = self.map.check_collision(self.hero)
         reward, terminated, cause = self.reward_fn.step(tile, result, info, actor_id)
 
+        truncated = False
+        if cause == "max_actions":
+            truncated = True
+
         self.stats.step(reward, cause)
 
         if cause in self.termination_causes:
             self.stats.terminated()
             info["termination"] = self.stats.get_episode_info()
 
+        if self._current_step >= 1000:
+            print(f"[SAFETY STOP] Forcing episode end at step {self._current_step}")
+            info["termination"] = self.stats.get_episode_info()
+            return observation, reward, True, True, info
+
         if self.render_mode == "human":
             self._render_frame()
 
-        return observation, reward, terminated, False, info
+        self._current_step += 1
+
+        return observation, reward, terminated, truncated, info
 
     def render(self):
         if self.render_mode == "rgb_array":

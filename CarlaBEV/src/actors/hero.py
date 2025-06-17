@@ -14,7 +14,7 @@ class Hero(pygame.sprite.Sprite):
         self.color = color
         #
         self.w = int(car_size / self.scale)
-        self.l = self.w
+        self.l = 2 * self.w
         # Visual Offset Bug
         self._offx = -2 * 16
         self._offy = -2 * 16

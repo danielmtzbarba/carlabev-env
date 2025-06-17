@@ -122,7 +122,7 @@ class CarlaBEV(gym.Env):
             window_size=self.size,
             color=(0, 0, 0),
             target_speed=int(200 / self.scale),
-            car_size=8,
+            car_size=32,
         )
         # Camera
         self.camera = Camera(self.hero, resolution=(self.size, self.size))

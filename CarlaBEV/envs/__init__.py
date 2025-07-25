@@ -6,6 +6,7 @@ from gymnasium.wrappers import (
 )
 
 from CarlaBEV.envs.carlabev import CarlaBEV
+from CarlaBEV.wrappers.rgb_to_semantic import SemanticMaskWrapper
 
 
 def make_carlabev_env(seed, idx, capture_video, run_name, size):
@@ -20,6 +21,7 @@ def make_carlabev_env(seed, idx, capture_video, run_name, size):
 
         env = GrayscaleObservation(env)
         env = ResizeObservation(env, (96, 96))
+        env = SemanticMaskWrapper(env)
         env = FrameStackObservation(env, stack_size=4)
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env.action_space.seed(seed)

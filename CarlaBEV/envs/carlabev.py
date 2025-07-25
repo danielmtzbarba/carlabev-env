@@ -27,23 +27,36 @@ class Actions(Enum):
 class CarlaBEV(gym.Env):
     metadata = {
         "action_space": ["discrete", "continuous"],
+        "observation_space": ["bev", "latent", "vector"],
+        
         "render_modes": ["human", "rgb_array"],
         "render_fps": 60,
     }
     termination_causes = ["max_actions", "collision", "success"]
 
-    def __init__(self, size, discrete=True, render_mode=None):
+    def __init__(self, size, discrete=True, obs_space="bev", render_mode=None):
         # Field Of View PIXEL SIZE
         self.size = size  # The size of the square grid
         self.scale = int(1024 / size)
         self.window_center = (int(size / 2), int(size / 2))
 
-        # Environment
-        self.observation_space = spaces.Box(
-            low=0, high=255, shape=(size, size, 3), dtype=np.uint8
-        )
+        # Observation Space 
+        if obs_space == "bev":
+            self.observation_space = spaces.Box(
+                low=0, high=255, shape=(size, size, 3), dtype=np.uint8
+            )
+        elif obs_space == "latent":
+            self.observation_space = spaces.Box(
+                low=0, high=1, shape=(size,), dtype=np.float32
+            )
+        elif obs_space == "vector":
+            low = np.array([-1, -1, -1, 0, -1])
+            high= np.array([1, 1, 1, 1, 1])
+            self.observation_space = spaces.Box(
+                low=low, high=high, shape=(size,), dtype=np.float32
+            )
 
-        # Action_space
+        # Action Space
         if discrete:
             self.Agent = DiscreteAgent
             self.action_space = spaces.Discrete(9)
@@ -106,6 +119,8 @@ class CarlaBEV(gym.Env):
                 "return": self.stats.episode_return,
                 "length": len(self.stats),
             },
+            "nn":{
+            }
         }
 
     def reset(self, seed=None, options=None):

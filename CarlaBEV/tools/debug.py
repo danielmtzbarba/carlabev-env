@@ -3,10 +3,6 @@ import pygame
 from CarlaBEV.envs import CarlaBEV
 
 device = "cuda:0"
-size = 128
-
-env = CarlaBEV(size=size, render_mode="human")
-
 
 def init_key_tracking():
     """Initializes a dictionary to track which keys are currently held."""
@@ -49,8 +45,7 @@ def get_action_from_keys(keys_held):
     return 0  # No action
 
 
-def main():
-    size = 128  # Adjust as needed
+def main(size: int = 128):
     env = CarlaBEV(size=size, render_mode="human")
 
     observation, info = env.reset(seed=42)

@@ -27,7 +27,7 @@ class Actions(Enum):
 class CarlaBEV(gym.Env):
     metadata = {
         "action_space": ["discrete", "continuous"],
-        "observation_space": ["bev", "latent", "vector"],
+        "observation_space": ["bev", "vector"],
         "render_modes": ["human", "rgb_array"],
         "render_fps": 60,
     }
@@ -44,18 +44,12 @@ class CarlaBEV(gym.Env):
             self.observation_space = spaces.Box(
                 low=0, high=255, shape=(size, size, 3), dtype=np.uint8
             )
-        elif obs_space == "latent":
-            self.observation_space = spaces.Box(
-                low=0, high=1, shape=(size,), dtype=np.float32
-            )
         elif obs_space == "vector":
             low = np.array([-1, -1, -1, 0, -1])
             high = np.array([1, 1, 1, 1, 1])
             self.observation_space = spaces.Box(
                 low=low, high=high, shape=(size,), dtype=np.float32
             )
-
-        self.obs_mode = obs_space
 
         # Action Space
         if discrete:
@@ -90,6 +84,9 @@ class CarlaBEV(gym.Env):
         # Render mode
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
+        assert obs_space is None or obs_space in self.metadata["observation_space"]
+        self.obs_mode = obs_space
+        #
         self.discrete = discrete
         self.window = None
         self.clock = None
@@ -154,9 +151,6 @@ class CarlaBEV(gym.Env):
         #
         info = self._get_info()
 
-        if self.render_mode == "human":
-            self._render_frame()
-
         return observation, info
 
     def step(self, action):
@@ -194,16 +188,12 @@ class CarlaBEV(gym.Env):
             info["termination"] = self.stats.get_episode_info()
             return observation, reward, True, True, info
 
-        if self.render_mode == "human":
-            self._render_frame()
-
         self._current_step += 1
 
         return observation, reward, terminated, truncated, info
 
     def render(self):
-        if self.render_mode == "rgb_array":
-            return self._render_frame()
+        return self._render_frame()
 
     def _render_frame(self):
         if self.window is None and self.render_mode == "human":
@@ -224,18 +214,23 @@ class CarlaBEV(gym.Env):
             pygame.display.update()
 
             # We need to ensure that human-rendering occurs at the predefined framerate.
-            # The following line will automatically add a delay to
-            # keep the framerate stable.
             self.clock.tick(self.metadata["render_fps"])
-
-        else:
-            if self._obs_mode == "bev":  # rgb_array
-                rgb_array = np.transpose(
-                    np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)
-                )
-                return rgb_array
+        
+        # observation
+        if self.obs_mode == "bev":  # rgb_array
+            rgb_array = np.transpose(
+                np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)
+            )
+            return rgb_array
+        elif  self._obs_mode == "vector":
+            vector_data = np.rarray([], dtype=np.float32)
+            return vector_data 
 
     def close(self):
         if self.window is not None:
             pygame.display.quit()
             pygame.quit()
+    
+    @property
+    def observation(self):
+        return self._observation

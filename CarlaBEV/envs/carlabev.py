@@ -45,10 +45,8 @@ class CarlaBEV(gym.Env):
                 low=0, high=255, shape=(size, size, 3), dtype=np.uint8
             )
         elif obs_space == "vector":
-            low = np.array([-1, -1, -1, 0, -1])
-            high = np.array([1, 1, 1, 1, 1])
             self.observation_space = spaces.Box(
-                low=low, high=high, shape=(size,), dtype=np.float32
+                low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
             )
 
         # Action Space
@@ -94,7 +92,8 @@ class CarlaBEV(gym.Env):
         self.map = Town01(size=self.size)
 
     def _get_obs(self):
-        return self._render_frame()
+        self._render_frame()
+        return  self._observation
 
     def _get_info(self):
         # Get the distance to the target
@@ -142,7 +141,7 @@ class CarlaBEV(gym.Env):
 
         self.camera.setmethod(follow)
 
-        observation = self._get_obs()
+        self._get_obs()
         #
         self._dist2target_t0 = self.map.dist2target(self.hero.position)
         self._dist2target_t_1 = self.map.dist2target(self.hero.position)
@@ -151,7 +150,7 @@ class CarlaBEV(gym.Env):
         #
         info = self._get_info()
 
-        return observation, info
+        return self._observation, info
 
     def step(self, action):
         if self.discrete:
@@ -165,7 +164,7 @@ class CarlaBEV(gym.Env):
         #
         self._dist2target_t = self.map.dist2target(self.hero.position)
         #
-        observation = self._get_obs()
+        self._get_obs()
         info = self._get_info()
 
         tile = np.array(self.map.agent_tile)[:-1]
@@ -186,14 +185,15 @@ class CarlaBEV(gym.Env):
         if self._current_step >= 1000:
             print(f"[SAFETY STOP] Forcing episode end at step {self._current_step}")
             info["termination"] = self.stats.get_episode_info()
-            return observation, reward, True, True, info
+            return self._observation, reward, True, True, info
 
         self._current_step += 1
 
-        return observation, reward, terminated, truncated, info
+        return self._observation, reward, terminated, truncated, info
 
     def render(self):
-        return self._render_frame()
+        self._render_frame()
+        return self._rgb_array 
 
     def _render_frame(self):
         if self.window is None and self.render_mode == "human":
@@ -207,6 +207,10 @@ class CarlaBEV(gym.Env):
         self.map.step(topleft=self.camera.offset, course=self.hero.course)
         self.hero.draw(self.map.canvas)
 
+        self._rgb_array = np.transpose(
+            np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)
+        )
+
         if self.render_mode == "human":
             # The following line copies our drawings from `canvas` to the visible window
             self.window.blit(self.map.canvas, self.map.canvas.get_rect())
@@ -216,15 +220,14 @@ class CarlaBEV(gym.Env):
             # We need to ensure that human-rendering occurs at the predefined framerate.
             self.clock.tick(self.metadata["render_fps"])
         
-        # observation
-        if self.obs_mode == "bev":  # rgb_array
-            rgb_array = np.transpose(
-                np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)
-            )
-            return rgb_array
-        elif  self._obs_mode == "vector":
-            vector_data = np.rarray([], dtype=np.float32)
-            return vector_data 
+        elif self.obs_mode == "vector":
+            hero = self.hero.state
+            set_point = self.hero.set_point
+            dist = self.hero.dist2route,
+            vector_data = np.concatenate([hero, set_point]).astype(np.float32)
+            self._observation = vector_data
+
+        return self._rgb_array 
 
     def close(self):
         if self.window is not None:

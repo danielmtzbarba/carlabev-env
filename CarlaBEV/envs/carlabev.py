@@ -28,7 +28,6 @@ class CarlaBEV(gym.Env):
     metadata = {
         "action_space": ["discrete", "continuous"],
         "observation_space": ["bev", "latent", "vector"],
-        
         "render_modes": ["human", "rgb_array"],
         "render_fps": 60,
     }
@@ -40,7 +39,7 @@ class CarlaBEV(gym.Env):
         self.scale = int(1024 / size)
         self.window_center = (int(size / 2), int(size / 2))
 
-        # Observation Space 
+        # Observation Space
         if obs_space == "bev":
             self.observation_space = spaces.Box(
                 low=0, high=255, shape=(size, size, 3), dtype=np.uint8
@@ -51,10 +50,12 @@ class CarlaBEV(gym.Env):
             )
         elif obs_space == "vector":
             low = np.array([-1, -1, -1, 0, -1])
-            high= np.array([1, 1, 1, 1, 1])
+            high = np.array([1, 1, 1, 1, 1])
             self.observation_space = spaces.Box(
                 low=low, high=high, shape=(size,), dtype=np.float32
             )
+
+        self.obs_mode = obs_space
 
         # Action Space
         if discrete:
@@ -119,8 +120,7 @@ class CarlaBEV(gym.Env):
                 "return": self.stats.episode_return,
                 "length": len(self.stats),
             },
-            "nn":{
-            }
+            "nn": {},
         }
 
     def reset(self, seed=None, options=None):
@@ -228,11 +228,12 @@ class CarlaBEV(gym.Env):
             # keep the framerate stable.
             self.clock.tick(self.metadata["render_fps"])
 
-        else:  # rgb_array
-            rgb_array = np.transpose(
-                np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)
-            )
-            return rgb_array
+        else:
+            if self._obs_mode == "bev":  # rgb_array
+                rgb_array = np.transpose(
+                    np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)
+                )
+                return rgb_array
 
     def close(self):
         if self.window is not None:

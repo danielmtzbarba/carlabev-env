@@ -87,19 +87,4 @@ class GraphPlanner(MapGraph):
         except nx.NetworkXNoPath:
             # not found
             pass 
-        return coords
-    
-        try:
-            i, j, lane, k = parse_node_label(start)
-            
-        except:
-            start = f'{j}-{i}_{lane}_{k}'
-
-        try:
-            i, j, lane, k = parse_node_label(end)
-            p2 = np.array([pos[end]])
-        except:
-            end = f'{j}-{i}_{lane}_{k}'
-            
-        
-            
+        return path, coords

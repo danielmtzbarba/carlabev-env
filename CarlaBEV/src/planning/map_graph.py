@@ -73,3 +73,7 @@ class MapGraph(object):
     @property
     def G(self):
         return self._G
+    
+    @property
+    def nodes(self):
+        return self._nodes

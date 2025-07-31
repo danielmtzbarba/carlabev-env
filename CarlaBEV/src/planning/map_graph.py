@@ -11,8 +11,11 @@ class MapGraph(object):
 
     def _load_graph(self, graph_path):
         # Load
-        with open(graph_path, "rb") as f:
-            self._G = pickle.load(f)
+        if isinstance(graph_path, nx.Graph):
+            self._G = graph_path
+        else:
+            with open(graph_path, "rb") as f:
+                self._G = pickle.load(f)
     
     def get_center_nodes(self):
         self._pos = nx.get_node_attributes(self._G, 'pos')

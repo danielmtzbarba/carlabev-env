@@ -19,16 +19,15 @@ class MapGraph(object):
     
     def get_center_nodes(self):
         self._pos = nx.get_node_attributes(self._G, 'pos')
-        # Filter to only centerline nodes
-        self._wp_nodes = [n for n in self._G.nodes if isinstance(n, str) and "_C_" in n]
+        self._wp_nodes = [n for n in self._G.nodes if isinstance(n, str)]
         random.shuffle(self._wp_nodes)
         
     
     def get_lane_nodes(self):
         self._nodes = {
-            "center": [],
-            "left": [],
-            "right": [],
+            "C": [],
+            "L": [],
+            "R": [],
         }
         for lane in self._nodes.keys():
             self._nodes[lane] = [n for n, data in self._G.nodes(data=True) if data.get('lane') == lane]

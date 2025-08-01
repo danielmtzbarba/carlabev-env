@@ -24,8 +24,9 @@ BUTTON_HOVER = (70, 180, 70)
 class Node(object):
     offx = +200
     offy = -250
-    def __init__(self, id, position):
+    def __init__(self, id, position, lane="C"):
         self.id = id
+        self.lane = lane
         self._x = int(position[0])
         self._y = int(position[1])
         self.draw_x = self._x + self.offx
@@ -57,23 +58,23 @@ class Map(object):
         self.screen = screen
         self.size = size  
 
-        self.planner = GraphPlanner(os.path.join(asset_path, "Town01/town01.pkl"))
-        print(self.planner.nodes)
+        self.planner_c = GraphPlanner(os.path.join(asset_path, "Town01/town01-center.pkl"))
+        self.planner_l = GraphPlanner(os.path.join(asset_path, "Town01/town01-left.pkl"))
+        self.planner_r = GraphPlanner(os.path.join(asset_path, "Town01/town01-right.pkl"))
+        
+        self.planner = {
+            "C": self.planner_c,
+            "L": self.planner_l,
+            "R": self.planner_r,
+        }
 
-        graph_l, graph_r = create_lane_graphs(self.planner.G, 5)
-        self.planner_l = GraphPlanner(graph_l) 
-        self.planner_r = GraphPlanner(graph_r)
-        ids = [i for i in self.planner.nodes['center']] 
+
         self.nodes = {}
-        for i in ids:
-            pos = self.planner.get_node_pos(i)/8
-            self.nodes[i] = Node(i, pos) 
-            id_left = i.replace("C", "L")
-            pos = self.planner_l.get_node_pos(id_left)/8
-            self.nodes[id_left] = Node(id_left, pos)
-            id_right= i.replace("C", "R")
-            pos = self.planner_r.get_node_pos(id_right)/8
-            self.nodes[id_right] = Node(id_right, pos)
+        for lane, planner in self.planner.items():
+            ids = [i for i in planner.nodes[lane]]
+            for i in ids:
+                pos = planner.get_node_pos(i)/8
+                self.nodes[i] = Node(i, pos, lane=lane) 
     
     def draw_graph(self):
         for id, node in self.nodes.items():
@@ -88,16 +89,22 @@ class Map(object):
             if node.clicked(event):
                 print('selected_node: ', id)
                 return node
+       
+        min_dist = float('inf')
+        closest_node = None
+        click_pos = np.array([event.pos[1], event.pos[0]]) * 8
+        
+        for lane, planner in self.planner.items():
+            node = planner.get_closest_node(click_pos, lane) 
+            node_pos = np.array(planner.G.nodes[node]['pos'])
+            dist = np.linalg.norm(click_pos - node_pos)
 
-        #pos = 8 * np.array([event.pos[1]-self.offy, event.pos[0]-self.offx])
-        #node_id = self.planner.get_closest_node(pos)
+            if dist < min_dist:
+                min_dist = dist
+                closest_node = self.nodes[node]
 
-                if node_id:
-                    pos_scaled = self.planner.G.nodes[node_id]['pos']
-                    pos_scaled = np.array([pos_scaled[0]/8, pos_scaled[1]/8])
-                    self.nodes[node_id] = Node(node_id, pos_scaled)
-                    self.nodes[node_id].render(self.screen)
-                    return self.nodes[node_id] 
+        return closest_node
+        
 
 class SceneDesigner(GUI):
     def __init__(self):
@@ -138,6 +145,7 @@ class SceneDesigner(GUI):
         else:
             node = self.select_node(event)
             if isinstance(node, Node):
+                print(self.current_start.pos, node.pos)
                 actor = {
                     'start': self.current_start,
                     'end': node 
@@ -147,14 +155,20 @@ class SceneDesigner(GUI):
 
     def draw_actors(self):
         for actor in self.actors:
-            actor['start'].render(self.screen, RED)
-            actor['end'].render(self.screen, RED)
-            path, coords = self.map.planner.find_path(actor['start'].id, actor['end'].id)
-            for node_id in path:
-                pos_scaled = self.map.planner.G.nodes[node_id]['pos']
-                pos_scaled = np.array([pos_scaled[0]/8, pos_scaled[1]/8])
-                self.map.nodes[node_id] = Node(node_id, pos_scaled)
-                self.map.nodes[node_id].render(self.screen, RED)
+            start, end = actor['start'], actor['end']
+            start.render(self.screen, RED)
+            end.render(self.screen, RED)
+            
+            planner = None
+            if start.lane == end.lane:
+                planner = self.map.planner[start.lane]
+                path, coords = planner.find_path(start.id, end.id)
+
+                for node_id in path:
+                    pos_scaled = planner.G.nodes[node_id]['pos']
+                    pos_scaled = np.array([pos_scaled[0]/8, pos_scaled[1]/8])
+                    self.map.nodes[node_id] = Node(node_id, pos_scaled)
+                    self.map.nodes[node_id].render(self.screen, RED)
     
     def toggle_add_mode(self):
         self.add_mode = not self.add_mode

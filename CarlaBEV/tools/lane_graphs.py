@@ -25,6 +25,8 @@ def create_lane_graphs(G, offset):
     G_right = nx.Graph()
 
     for u, v in G.edges():
+        print(u, v)
+        continue
         try:
             p1 = np.array(G.nodes[u]['pos'])
             p2 = np.array(G.nodes[v]['pos'])

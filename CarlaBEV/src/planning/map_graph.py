@@ -20,7 +20,6 @@ class MapGraph(object):
     def get_center_nodes(self):
         self._pos = nx.get_node_attributes(self._G, 'pos')
         self._wp_nodes = [n for n in self._G.nodes if isinstance(n, str)]
-        random.shuffle(self._wp_nodes)
         
     
     def get_lane_nodes(self):
@@ -44,10 +43,15 @@ class MapGraph(object):
         for node, data in self._G.nodes(data=True):
             if 'pos' not in data:
                 continue
-            if lane_type and data.get('lane') != lane_type:
-                continue
-            node_pos = np.array(data['pos'])
-            dist = np.linalg.norm(pos_array - node_pos)
+            if lane_type == None:
+                node_pos = np.array(data['pos'])
+                dist = np.linalg.norm(pos_array - node_pos)
+            else:
+                if lane_type and data.get('lane') != lane_type:
+                    continue
+
+                node_pos = np.array(data['pos'])
+                dist = np.linalg.norm(pos_array - node_pos)
 
             if dist < min_dist:
                 min_dist = dist
@@ -79,3 +83,7 @@ class MapGraph(object):
     @property
     def nodes(self):
         return self._nodes
+
+    @property
+    def wp_nodes(self):
+        return self._wp_nodes

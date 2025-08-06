@@ -63,6 +63,10 @@ class Selector:
                 pygame.draw.circle(screen, BLUE, r.center, 7)
             text_surf = self.font.render(self.options[i], True, BLACK)
             screen.blit(text_surf, (r.right + 5, r.y - 2))
+    
+    @property
+    def selection(self):
+        return self.options[self.selected]
 
 
 class Button:
@@ -168,19 +172,20 @@ class GUI:
         self.scene_name = TextBox((10, 50, 180, 30), self.font, "Scene1")
         self.actor_selector = Selector((10, 100, 180, 100), self.font,
                                        ["Agent", "Vehicle", "Pedestrian"])
-        self.add_actor_btn = Button((10, 220, 180, 30), self.font, "Add Actor")
+        self.lane_selector = Selector((130, 100, 180, 100), self.font,
+                                       ["L", "C", "R"])
+        self.add_actor_btn = Button((10, 200, 180, 30), self.font, "Add Actor")
         self.listbox = ListBox((10, 260, 180, 300), self.font)
 
-        self.listbox.add_actor("Agent", "Hero1")
-        self.listbox.add_actor("Vehicle", "Car A")
-        self.listbox.add_actor("Vehicle", "Car B")
-        self.listbox.add_actor("Pedestrian", "Ped X")
+        self.save_btn = Button((10, 600, 180, 30), self.font, "Save scene")
+
 
     def handle_event(self, event):
         self.scene_name.handle_event(event)
 
         if not self.add_mode:
             self.actor_selector.handle_event(event)
+            self.lane_selector.handle_event(event)
         
         # Toggle Add mode
         if self.add_actor_btn.handle_event(event):
@@ -191,7 +196,9 @@ class GUI:
             
         if event.type == pygame.MOUSEBUTTONUP and self.add_mode: 
             self.add_actor(event)
-
+        
+        if not self.add_mode and self.save_btn.handle_event(event):
+            self.save_scene(self.scene_name.text)
         return None
 
     def draw_gui(self):
@@ -206,5 +213,7 @@ class GUI:
         # Elements
         self.scene_name.draw(self.screen)
         self.actor_selector.draw(self.screen)
+        self.lane_selector.draw(self.screen)
         self.add_actor_btn.draw(self.screen)
         self.listbox.draw(self.screen)
+        self.save_btn.draw(self.screen)

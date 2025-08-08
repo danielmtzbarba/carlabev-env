@@ -132,7 +132,9 @@ class Map(Scene):
         self.offx, self.offy = 200, -250
         self.screen = screen
         self.size = size  
-
+        
+        self.planner_1 = GraphPlanner(os.path.join(asset_path, "Town01/town01.pkl"))
+        #
         self.planner_c = GraphPlanner(os.path.join(asset_path, "Town01/town01-center.pkl"))
         self.planner_l = GraphPlanner(os.path.join(asset_path, "Town01/town01-left.pkl"))
         self.planner_r = GraphPlanner(os.path.join(asset_path, "Town01/town01-right.pkl"))
@@ -157,8 +159,10 @@ class Map(Scene):
         click_pos = np.array([event.pos[0], event.pos[1]]) 
         click_pos += np.array([-Node.offx, -Node.offy])
         
-        planner = self.planner[lane]
-        node = planner.get_closest_node(click_pos * 8, lane) 
+#        planner = self.planner[lane]
+        #node = planner.get_closest_node(click_pos * 8, lane) 
+        planner = self.planner_1
+        node = planner.get_closest_node(click_pos * 8, None) 
 
         node_pos = np.array(planner.G.nodes[node]['pos'])
         dist = np.linalg.norm(8 * click_pos - node_pos)
@@ -166,16 +170,17 @@ class Map(Scene):
         if dist < min_dist:
             min_dist = dist
             pos = planner.get_node_pos(node)/8
-            closest_node = Node(node, pos, lane=lane) 
+            closest_node = Node(node, pos, lane=None) 
 
         return closest_node
     
     def find_route(self, actor, lane):
-        planner = self.planner[lane]
+#        planner = self.planner[lane]
+        planner = self.planner_1
         start, end = actor.start_node, actor.end_node
         #
         if start.lane == end.lane:
-            planner = self.planner[start.lane]
+           # planner = self.planner[start.lane]
             path, _= planner.find_path(start.id, end.id)
 
             rx, ry, path_pos = [], [], []

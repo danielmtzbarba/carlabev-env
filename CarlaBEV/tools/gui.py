@@ -118,13 +118,17 @@ class ListBox:
         self.text_color = (0, 0, 0)
         self.header_color = (180, 180, 180)
         self.hover_color = (200, 220, 255)
+        self.selection = None
 
     def add_actor(self, category, actor_name):
         if category in self.categories:
             self.categories[category].append(actor_name)
+            self.selection = category, len(self.categories[category])-1
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.selection = (cat, idx, self.categories[cat][idx])
+            print(self.selection)
             if self.hovered is not None:
                 cat, idx = self.hovered
                 return (cat, idx, self.categories[cat][idx])  # category, index, name
@@ -151,15 +155,17 @@ class ListBox:
             # Draw items
             for i, item in enumerate(items):
                 item_rect = pygame.Rect(self.rect.x + 5, y, self.rect.width - 10, 20)
+                
 
                 # Hover effect
-                if item_rect.collidepoint(mouse_pos):
-                    pygame.draw.rect(screen, self.hover_color, item_rect)
-                    self.hovered = (cat, i)
+                if self.selection is not None:
+                    if f'{self.selection[0]}-{self.selection[1]}' == item:
+                        pygame.draw.rect(screen, self.hover_color, item_rect)
 
                 txt = self.font.render(item, True, self.text_color)
                 screen.blit(txt, (item_rect.x + 5, item_rect.y + 2))
                 y += 22
+            
 
 class GUI:
     def __init__(self):
@@ -175,9 +181,11 @@ class GUI:
         self.lane_selector = Selector((130, 100, 180, 100), self.font,
                                        ["L", "C", "R"])
         self.add_actor_btn = Button((10, 200, 180, 30), self.font, "Add Actor")
-        self.listbox = ListBox((10, 260, 180, 300), self.font)
-
+        self.del_btn = Button((10, 240, 180, 30), self.font, "Delete Actor")
+        self.listbox = ListBox((10, 280, 180, 300), self.font)
         self.save_btn = Button((10, 600, 180, 30), self.font, "Save scene")
+
+
 
 
     def handle_event(self, event):
@@ -216,4 +224,5 @@ class GUI:
         self.lane_selector.draw(self.screen)
         self.add_actor_btn.draw(self.screen)
         self.listbox.draw(self.screen)
+        self.del_btn.draw(self.screen)
         self.save_btn.draw(self.screen)

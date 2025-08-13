@@ -14,24 +14,21 @@ class GUI():
         self.current_frame = 0
         self.total_frames = 200  # Example: can be updated dynamically
 
-        # Left panel width
-        self.panel_width = 200
-
         # Elements
-        self.scene_name = TextBox((10, 50, 180, 30), self.font, "Scene1")
-        self.actor_selector = Selector((10, 100, 180, 100), self.font,
+        self.scene_name = TextBox((cfg.margin_x, 50, 180, 30), self.font, "Scene1")
+        self.actor_selector = Selector((cfg.margin_x, 100, 180, 100), self.font,
                                        ["Agent", "Vehicle", "Pedestrian"])
-        self.lane_selector = Selector((130, 100, 180, 100), self.font,
-                                       ["L", "C", "R"])
-        self.add_actor_btn = Button((10, 200, 180, 30), self.font, "Add Actor")
-        self.del_btn = Button((10, 240, 180, 30), self.font, "Delete Actor")
-        self.listbox = ListBox((10, 280, 180, 300), self.font)
-        self.save_btn = Button((10, 600, 180, 30), self.font, "Save scene")
+       # self.lane_selector = Selector((150, 100, 180, 100), self.font,
+       #                                ["L", "C", "R"])
+        self.add_actor_btn = Button((cfg.margin_x, 200, 180, 30), self.font, "Add Actor")
+        self.del_btn = Button((cfg.margin_x, 240, 180, 30), self.font, "Delete Actor")
+        self.listbox = ListBox((cfg.margin_x, 280, 180, 300), self.font)
+        self.save_btn = Button((cfg.margin_x, 600, 180, 30), self.font, "Save scene")
 
         # FOV display rect
         self.fov_rect = pygame.Rect(self.screen.get_width() - 220, 20, 200, 200)
-        self.timeline_rect = pygame.Rect(self.panel_width + 20, self.screen.get_height() - 40, 
-                                         self.screen.get_width() - self.panel_width - 40, 20)
+        self.timeline_rect = pygame.Rect(cfg.left_panel_w + 20, self.screen.get_height() - 40, 
+                                         self.screen.get_width() - 2 * cfg.left_panel_w - 40, 20)
 
     def handle_timeline_event(self, event):
         """Updates frame based on user dragging the handle."""
@@ -46,7 +43,7 @@ class GUI():
 
         if not self.add_mode:
             self.actor_selector.handle_event(event)
-            self.lane_selector.handle_event(event)
+            #self.lane_selector.handle_event(event)
             self.handle_timeline_event(event)
         
         # Toggle Add mode
@@ -82,21 +79,21 @@ class GUI():
 
     def draw_gui(self):
         # Draw background panel
-        pygame.draw.rect(self.screen, cfg.grey, (0, 0, self.panel_width, self.screen.get_height()))
-        pygame.draw.line(self.screen, cfg.black, (self.panel_width, 0), (self.panel_width, self.screen.get_height()), 2)
+        pygame.draw.rect(self.screen, cfg.grey, (0, 0, cfg.left_panel_w, self.screen.get_height()))
+        pygame.draw.line(self.screen, cfg.black, (cfg.left_panel_w, 0), (cfg.left_panel_w, self.screen.get_height()), 2)
 
         # Draw background panel
-        pygame.draw.rect(self.screen, cfg.grey, (945, 0, self.panel_width, self.screen.get_height()))
-        pygame.draw.line(self.screen, cfg.black, (945, 0), (945, self.screen.get_height()), 2)
+        pygame.draw.rect(self.screen, cfg.grey, (1025, 0, cfg.right_panel_w, self.screen.get_height()))
+        pygame.draw.line(self.screen, cfg.black, (1025, 0), (1025, self.screen.get_height()), 2)
 
         # Title
         title = self.font.render("Scenario Designer", True, cfg.black)
-        self.screen.blit(title, (10, 15))
+        self.screen.blit(title, (cfg.margin_x, 15))
 
         # Elements
         self.scene_name.draw(self.screen)
         self.actor_selector.draw(self.screen)
-        self.lane_selector.draw(self.screen)
+#        self.lane_selector.draw(self.screen)
         self.add_actor_btn.draw(self.screen)
         self.listbox.draw(self.screen)
         self.del_btn.draw(self.screen)

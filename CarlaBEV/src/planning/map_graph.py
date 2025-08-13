@@ -4,9 +4,8 @@ import pickle
 import random
 
 class MapGraph(object):
-    def __init__(self, graph_path):
-        self._load_graph(graph_path)
-        self.get_center_nodes()
+    def __init__(self, graph):
+        self._load_graph(graph)
         self.get_lane_nodes()
 
     def _load_graph(self, graph_path):
@@ -17,19 +16,20 @@ class MapGraph(object):
             with open(graph_path, "rb") as f:
                 self._G = pickle.load(f)
     
-    def get_center_nodes(self):
-        self._pos = nx.get_node_attributes(self._G, 'pos')
-        self._wp_nodes = [n for n in self._G.nodes if isinstance(n, str)]
-        
-    
     def get_lane_nodes(self):
         self._nodes = {
-            "C": [],
-            "L": [],
-            "R": [],
+            "vehicle": [],
+            "sidewalk": [],
+            "intersection": []
         }
-        for lane in self._nodes.keys():
-            self._nodes[lane] = [n for n, data in self._G.nodes(data=True) if data.get('lane') == lane]
+        for nodeid, data in self._G.nodes(data=True):
+            sem_cls = data.get('semantic')
+            if sem_cls:
+                self._nodes[sem_cls].append(nodeid)            
+
+    def get_node_pos(self, node_id):
+        pos = np.array(self._G.nodes[node_id]['pos'], dtype=np.int32)
+        return pos
 
     def get_closest_node(self, position, lane_type=None):
         """
@@ -59,23 +59,6 @@ class MapGraph(object):
 
         return closest_node
 
-    def merge_close_nodes(self, path, threshold=10):
-        """
-        Merge consecutive nodes in a path if they're closer than the threshold.
-        """
-        merged = []
-        for node in path:
-            pos = np.array(self._G.nodes[node]['pos'])
-            if not merged:
-                merged.append(pos)
-            elif np.linalg.norm(pos - merged[-1]) > threshold:
-                merged.append(pos)
-        return np.array(merged)
-    
-    def get_node_pos(self, node_id):
-        pos = np.array(self._G.nodes[node_id]['pos'], dtype=np.int32)
-        return pos
-
     @property
     def G(self):
         return self._G
@@ -83,7 +66,3 @@ class MapGraph(object):
     @property
     def nodes(self):
         return self._nodes
-
-    @property
-    def wp_nodes(self):
-        return self._wp_nodes

@@ -2,10 +2,16 @@ from dataclasses import dataclass
 
 @dataclass
 class Settings:
-    width: int = 1200
-    height: int = 900
-    offx: int = 50
-    offy: int = -250
+    width: int = 1280
+    height: int = 1000
+    #
+    left_panel_w: int = 250
+    right_panel_w: int = 250
+    #
+    offx: int = 120
+    offy: int = -200
+    margin_x: int = 30
+    margin_y: int = 35
     #
     white: tuple = (255, 255, 255)
     black: tuple = (0, 0, 0)

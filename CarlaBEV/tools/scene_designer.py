@@ -120,18 +120,8 @@ class Map(Scene):
         self.screen = screen
         self.size = size  
         
-        self.planner_1 = GraphPlanner(os.path.join(asset_path, "Town01/town01.pkl"))
+        self.planner = GraphPlanner(os.path.join(asset_path, "Town01/town01.pkl"))
         #
-        self.planner_c = GraphPlanner(os.path.join(asset_path, "Town01/town01-center.pkl"))
-        self.planner_l = GraphPlanner(os.path.join(asset_path, "Town01/town01-left.pkl"))
-        self.planner_r = GraphPlanner(os.path.join(asset_path, "Town01/town01-right.pkl"))
-        self.planner_ped = GraphPlanner(os.path.join(asset_path, "Town01/town01-ped.pkl"))
-        
-        self.planner = {
-            "C": self.planner_c,
-            "L": self.planner_l,
-            "R": self.planner_r,
-        }
 
     def render(self):
         # Draw map
@@ -148,7 +138,7 @@ class Map(Scene):
         
 #        planner = self.planner[lane]
         #node = planner.get_closest_node(click_pos * 8, lane) 
-        planner = self.planner_1
+        planner = self.planner
         node = planner.get_closest_node(click_pos * 8, None) 
 
         node_pos = np.array(planner.G.nodes[node]['pos'])
@@ -163,7 +153,7 @@ class Map(Scene):
     
     def find_route(self, actor, lane):
 #        planner = self.planner[lane]
-        planner = self.planner_1
+        planner = self.planner
         start, end = actor.start_node, actor.end_node
         #
         if start.lane == end.lane:
@@ -200,7 +190,8 @@ class SceneDesigner(GUI):
             self.current_start.render(self.screen, cfg.green)
 
     def add_actor(self, event):
-        lane = self.lane_selector.selection
+        #lane = self.lane_selector.selection
+        lane = None
         actor_type = self.actor_selector.selection
 
         if self.current_start is None:

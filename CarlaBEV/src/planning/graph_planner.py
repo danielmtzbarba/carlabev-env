@@ -7,14 +7,13 @@ from CarlaBEV.envs.utils import scale_coords, scale_route
 
 class GraphPlanner(MapGraph):
     def __init__(self, graph_path) -> None:
-        MapGraph.__init__(self, graph_path=graph_path)
+        MapGraph.__init__(self, graph=graph_path)
 
     def find_global_path(self, start_pos, target_pos, lane):
         try:
             start_node = self.get_closest_node(start_pos, lane)
             target_node = self.get_closest_node(target_pos, lane)
             path = nx.shortest_path(self._G, source=start_node, target=target_node, weight='cost')
-            #merged_path = self.merge_close_nodes(path, threshold=5)
             return self.preproc_route(path) 
 
         except nx.NetworkXNoPath:

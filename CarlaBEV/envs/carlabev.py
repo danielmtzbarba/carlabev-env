@@ -210,6 +210,7 @@ class CarlaBEV(gym.Env):
         self._rgb_array = np.transpose(
             np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)
         )
+        self._observation = self._rgb_array
 
         if self.render_mode == "human":
             # The following line copies our drawings from `canvas` to the visible window

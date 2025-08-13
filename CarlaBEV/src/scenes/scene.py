@@ -11,10 +11,12 @@ SCENE_IDS = [f"scene-{i}" for i in range(10)]
 
 class Scene(object):
     def __init__(self, map_surface, size) -> None:
-        self._map_arr, self._map_img, _ = utils.load_map(size)
+        _, self._map_img, _ = utils.load_map(size)
+        self._map = map_surface
+
         self._scene_ids = SCENE_IDS
         self._buider = SceneBuilder(self._scene_ids, size)
-        self._map = map_surface
+
         self._size = size
         self._scale = int(1024 / size)
         self._const = size / 4

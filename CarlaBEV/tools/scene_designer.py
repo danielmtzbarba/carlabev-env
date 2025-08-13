@@ -1,4 +1,5 @@
 import pygame
+from random import randint
 import os
 import sys
 
@@ -8,10 +9,13 @@ import math
 
 from CarlaBEV.envs.utils import asset_path, load_map
 from CarlaBEV.src.planning.graph_planner import GraphPlanner
+from CarlaBEV.tools.controls import init_key_tracking, get_action_from_keys, process_events
 
 from CarlaBEV.src.gui import GUI
 from CarlaBEV.src.gui.settings import Settings as cfg
 
+from CarlaBEV.envs import CarlaBEV
+device = "cuda:0"
 # -----------------------------------------
 class Node(object):
     def __init__(self, id, position, lane="C"):
@@ -123,9 +127,12 @@ class Map(Scene):
         self.planner = GraphPlanner(os.path.join(asset_path, "Town01/town01.pkl"))
         #
 
-    def render(self):
+    def render(self, map_sur):
         # Draw map
-        self.screen.blit(self._map_img, (cfg.offx, cfg.offy))
+        if map_sur is not None:
+            self.screen.blit(map_sur, (cfg.offx, cfg.offy))
+        else:
+            self.screen.blit(self._map_img, (cfg.offx, cfg.offy))
         # Draw scene
         self.draw_scene()
         
@@ -169,23 +176,31 @@ class Map(Scene):
         
 
 class SceneDesigner(GUI):
-    def __init__(self):
+    def __init__(self, env):
         GUI.__init__(self)
+        self.env = env 
         self.map = Map(self.screen, 128)
 
         # Actor data structure
         self.actors = []
         self.add_mode = False
+        self.play_mode = False
         self.current_start = None 
     
-    def render(self):
-        self.draw_map()
+    def render(self, env=None):
+        fov, map_sur = None, None
+        if env is not None:
+            fov = env.observation  
+            map_sur = env.map.map_surface
+        #
+        self.draw_map(map_sur)
         self.draw_gui()
+        self.draw_fov(fov)
         pygame.display.flip()
 
-    def draw_map(self):
+    def draw_map(self, map_sur=None):
         self.screen.fill(cfg.grey)
-        self.map.render() 
+        self.map.render(map_sur) 
         if self.current_start is not None:
             self.current_start.render(self.screen, cfg.green)
 
@@ -215,13 +230,23 @@ class SceneDesigner(GUI):
         data = self.map.get_scene_df(scene_id)
         data.to_csv(f"{scene_id}.csv")
 
-# Main loop
-def main():
-    pygame.init()
-    
-    app = SceneDesigner()
+    def toggle_play_mode(self):
+        self.play_mode = not self.play_mode
 
-    while True:
+# Main loop
+def main(size: int = 128):
+    env = CarlaBEV(size=size, render_mode="rgb_array")
+    observation, info = env.reset(seed=42)
+    #
+    total_reward = 0
+    running = True
+    #
+    keys_held = init_key_tracking()
+    pygame.init()
+    app = SceneDesigner(env=env)
+    # 
+    while running:
+        running = process_events(keys_held)
         for event in pygame.event.get():
             # Close App
             if event.type == pygame.QUIT:
@@ -229,9 +254,25 @@ def main():
                 sys.exit()
             
             app.handle_event(event)
+        
+        if app.play_mode:
+            action = get_action_from_keys(keys_held)
+            action = randint(0,8)
 
-        app.render()
+            # Step through the environment
+            observation, reward, terminated, _, info = env.step(action)
+            total_reward += reward
 
+            # Reset if episode ends
+            if terminated:
+                ret = info["termination"]["return"]
+                length = info["termination"]["length"]
+                observation, info = env.reset()
+                total_reward = 0
+
+        app.render(env)
+
+    env.close()
 
 if __name__ == "__main__":
     main()

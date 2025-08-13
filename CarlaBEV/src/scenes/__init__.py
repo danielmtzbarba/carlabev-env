@@ -10,7 +10,6 @@ from CarlaBEV.envs.utils import asset_path, scale_route
 
 actors_dict = {"agent": None, "vehicles": [], "pedestrians": [], "target": []}
 
-
 class SceneBuilder(object):
     def __init__(self, scene_ids, size) -> None:
         self.size = size

@@ -1,4 +1,5 @@
 import pygame
+import numpy as np
 
 from CarlaBEV.src.gui.components import Button, Selector, TextBox, ListBox
 from CarlaBEV.src.gui.settings import Settings as cfg
@@ -60,10 +61,11 @@ class GUI():
             self.save_scene(self.scene_name.text)
         return None
 
-    def draw_fov(self, vehicle_surface):
+    def draw_fov(self, vehicle_surface=None):
         """Draws the cropped FOV view."""
         pygame.draw.rect(self.screen, (0,0,0), self.fov_rect, 2)
-        if vehicle_surface:
+        if vehicle_surface is not None:
+            vehicle_surface = np_to_surface(vehicle_surface)
             scaled = pygame.transform.scale(vehicle_surface, (self.fov_rect.width, self.fov_rect.height))
             self.screen.blit(scaled, self.fov_rect.topleft)
         else:
@@ -108,3 +110,7 @@ class GUI():
     def update_frame_from_mouse(self, mouse_x):
         rel_x = max(0, min(mouse_x - self.timeline_rect.x, self.timeline_rect.width))
         self.current_frame = int((rel_x / self.timeline_rect.width) * self.total_frames)
+
+
+def np_to_surface(arr):
+    return pygame.surfarray.make_surface(np.transpose(arr, (1, 0, 2)))

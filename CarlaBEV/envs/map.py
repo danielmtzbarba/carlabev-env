@@ -75,6 +75,10 @@ class Town01(object):
     @property
     def canvas(self):
         return self._fov_surface
+    
+    @property
+    def map_surface(self):
+        return self._map_surface
 
     @property
     def agent_tile(self):

@@ -9,29 +9,17 @@ import math
 from CarlaBEV.envs.utils import asset_path, load_map
 from CarlaBEV.src.planning.graph_planner import GraphPlanner
 
-from CarlaBEV.tools.gui import GUI
-from CarlaBEV.tools.lane_graphs import create_lane_graphs
-
-# Constants
-WIDTH, HEIGHT = 1200, 900 
-WHITE = (255, 255, 255)
-GREY = (200, 200, 200)
-BLUE = (0, 120, 215)
-GREEN = (0, 200, 0)
-RED = (200, 0, 0)
-BUTTON_COLOR = (50, 150, 50)
-BUTTON_HOVER = (70, 180, 70)
+from CarlaBEV.src.gui import GUI
+from CarlaBEV.src.gui.settings import Settings as cfg
 
 # -----------------------------------------
 class Node(object):
-    offx = +200
-    offy = -250
     def __init__(self, id, position, lane="C"):
         self.id, self.lane = id, lane
         self._x = int(position[0])
         self._y = int(position[1])
-        self.draw_x = self._x + self.offx
-        self.draw_y = self._y + self.offy
+        self.draw_x = self._x + cfg.offx
+        self.draw_y = self._y + cfg.offy
         self.btn = pygame.Rect(self.draw_x, self.draw_y,  3, 3)
         self.color = None 
     
@@ -47,7 +35,7 @@ class Node(object):
     
     def clicked(self, event):
         if self.btn.collidepoint(event.pos):
-            self.color = RED
+            self.color = cfg.red 
             return True
 
     @property
@@ -69,10 +57,10 @@ class Actor(object):
         self.path.append(Node(node_id, pos))
 
     def draw(self, screen):
-        self.start_node.render(screen, GREEN)
-        self.end_node.render(screen, RED)
+        self.start_node.render(screen, cfg.green)
+        self.end_node.render(screen, cfg.red)
         for node in self.path:
-            node.render(screen, BLUE)
+            node.render(screen, cfg.blue)
 
     @property
     def data(self):
@@ -129,7 +117,6 @@ class Map(Scene):
     def __init__(self, screen, size=1024) -> None:
         Scene.__init__(self)
         _,  self._map_img, _ = load_map(size)
-        self.offx, self.offy = 200, -250
         self.screen = screen
         self.size = size  
         
@@ -148,7 +135,7 @@ class Map(Scene):
 
     def render(self):
         # Draw map
-        self.screen.blit(self._map_img, (self.offx, self.offy))
+        self.screen.blit(self._map_img, (cfg.offx, cfg.offy))
         # Draw scene
         self.draw_scene()
         
@@ -157,7 +144,7 @@ class Map(Scene):
         min_dist = float('inf')
         closest_node = None
         click_pos = np.array([event.pos[0], event.pos[1]]) 
-        click_pos += np.array([-Node.offx, -Node.offy])
+        click_pos += np.array([-cfg.offx, -cfg.offy])
         
 #        planner = self.planner[lane]
         #node = planner.get_closest_node(click_pos * 8, lane) 
@@ -193,12 +180,7 @@ class Map(Scene):
 
 class SceneDesigner(GUI):
     def __init__(self):
-        # Initialize window
-        pygame.display.set_caption("Traffic Scenario Designer")
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        self.font = pygame.font.SysFont(None, 24)
         GUI.__init__(self)
-        # Map
         self.map = Map(self.screen, 128)
 
         # Actor data structure
@@ -212,10 +194,10 @@ class SceneDesigner(GUI):
         pygame.display.flip()
 
     def draw_map(self):
-        self.screen.fill(GREY)
+        self.screen.fill(cfg.grey)
         self.map.render() 
         if self.current_start is not None:
-            self.current_start.render(self.screen, GREEN)
+            self.current_start.render(self.screen, cfg.green)
 
     def add_actor(self, event):
         lane = self.lane_selector.selection
@@ -228,7 +210,7 @@ class SceneDesigner(GUI):
         else:
             node = self.map.select_node(event, lane, actor_type)
             if isinstance(node, Node):
-                node.color = RED
+                node.color = cfg.red 
                 actor = self.map.add_actor(actor_type, self.current_start, node)
                 self.map.find_route(actor, lane)
                 self.listbox.add_actor(actor_type, actor.id)

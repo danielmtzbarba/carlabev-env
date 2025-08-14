@@ -1,7 +1,8 @@
 import numpy as np
 import networkx as nx
 import pickle
-import random
+
+from random import choice
 
 class MapGraph(object):
     def __init__(self, graph):
@@ -26,10 +27,12 @@ class MapGraph(object):
             sem_cls = data.get('semantic')
             if sem_cls:
                 self._nodes[sem_cls].append(nodeid)            
+        
+    def get_random_node(self, node_cls):
+        return choice(self._nodes[node_cls])
 
     def get_node_pos(self, node_id):
-        pos = np.array(self._G.nodes[node_id]['pos'], dtype=np.int32)
-        return pos
+        return np.array(self._G.nodes[node_id]['pos'], dtype=np.int32)
 
     def get_closest_node(self, position, lane_type=None):
         """

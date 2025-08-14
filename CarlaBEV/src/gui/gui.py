@@ -22,10 +22,11 @@ class GUI():
        # self.lane_selector = Selector((150, 100, 180, 100), self.font,
        #                                ["L", "C", "R"])
         self.add_actor_btn = Button((cfg.margin_x, 200, 180, 30), self.font, "Add Actor")
-        self.del_btn = Button((cfg.margin_x, 240, 180, 30), self.font, "Delete Actor")
-        self.listbox = ListBox((cfg.margin_x, 280, 180, 300), self.font)
-        self.save_btn = Button((cfg.margin_x, 600, 180, 30), self.font, "Save scene")
-
+        self.add_rdm_actor_btn = Button((cfg.margin_x, 240, 180, 30), self.font, "Random Actor")
+        self.del_btn = Button((cfg.margin_x, 280, 180, 30), self.font, "Delete Actor")
+        self.listbox = ListBox((cfg.margin_x, 320, 180, 300), self.font)
+        self.save_btn = Button((cfg.margin_x, 640, 180, 30), self.font, "Save scene")
+        self.play_btn = Button((cfg.margin_x + 1050, 300, 180, 30), self.font, "Play Scene")
         # FOV display rect
         self.fov_rect = pygame.Rect(self.screen.get_width() - 220, 20, 200, 200)
         self.timeline_rect = pygame.Rect(cfg.left_panel_w + 20, self.screen.get_height() - 40, 
@@ -53,12 +54,20 @@ class GUI():
             if not self.add_mode:
                 self.toggle_add_mode()
                 return "add_actor"
-            
+        
         if event.type == pygame.MOUSEBUTTONUP and self.add_mode: 
             self.add_actor(event)
         
+        if self.add_rdm_actor_btn.handle_event(event):
+            self.add_rdm_actor()
+
+        if not self.play_mode and self.play_btn.handle_event(event):
+            self.play_scene()
+            return True
+
         if not self.add_mode and self.save_btn.handle_event(event):
             self.save_scene(self.scene_name.text)
+
         return None
 
     def draw_fov(self, vehicle_surface=None):
@@ -97,9 +106,11 @@ class GUI():
         self.actor_selector.draw(self.screen)
 #        self.lane_selector.draw(self.screen)
         self.add_actor_btn.draw(self.screen)
+        self.add_rdm_actor_btn.draw(self.screen)
         self.listbox.draw(self.screen)
         self.del_btn.draw(self.screen)
         self.save_btn.draw(self.screen)
+        self.play_btn.draw(self.screen)
 
         # NEW: draw FOV
         self.draw_fov(None)  # Pass actual cropped vehicle surface here

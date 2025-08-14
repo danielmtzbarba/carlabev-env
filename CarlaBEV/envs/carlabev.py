@@ -96,8 +96,7 @@ class CarlaBEV(gym.Env):
         #
         self.map = Town01(size=self.size, AgentClass=self.Agent)
         self._scene_ids = SCENE_IDS
-        self._buider = SceneBuilder(self._scene_ids, size)
-
+        self._builder = SceneBuilder(self._scene_ids, size)
 
     def _get_obs(self):
         self._render_frame()
@@ -105,7 +104,6 @@ class CarlaBEV(gym.Env):
 
     def _get_info(self):
         # Get the distance to the target
-
         return {
             "env": {
                 "dist2target_t0": self._dist2target_t0,
@@ -127,15 +125,18 @@ class CarlaBEV(gym.Env):
             "nn": {},
         }
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed=None, scene=None):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
         self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
         #
-        rdm_id = choice(self._scene_ids)
-        actors = self._buider.get_scene_actors(rdm_id)
+        if scene is not None:
+            actors = self._builder.build_scene(scene)
+        else:
+            rdm_id = choice(self._scene_ids)
+            actors = self._builder.get_scene_actors(rdm_id)
         self.map.reset(actors)
         # Camera
         self.camera = Camera(self.map.hero, resolution=(self.size, self.size))
@@ -162,6 +163,7 @@ class CarlaBEV(gym.Env):
         #
         self.map.hero_step(action)
         self.camera.scroll()
+        self.map.step(topleft=self.camera.offset)
         #
         self._dist2target_t = self.map.dist2target()
         #
@@ -204,8 +206,6 @@ class CarlaBEV(gym.Env):
 
         if self.clock is None and self.render_mode == "human":
             self.clock = pygame.time.Clock()
-
-        self.map.step(topleft=self.camera.offset)
 
         self._rgb_array = np.transpose(
             np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)

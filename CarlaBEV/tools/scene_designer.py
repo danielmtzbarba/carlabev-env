@@ -18,7 +18,7 @@ from CarlaBEV.envs import CarlaBEV
 device = "cuda:0"
 # -----------------------------------------
 class Node(object):
-    def __init__(self, id, position, lane="C"):
+    def __init__(self, id, position, lane=None):
         self.id, self.lane = id, lane
         self._x = int(position[0])
         self._y = int(position[1])
@@ -41,6 +41,10 @@ class Node(object):
         if self.btn.collidepoint(event.pos):
             self.color = cfg.red 
             return True
+    
+    @property
+    def scaled_pos(self):
+        return [self._x, self._y]
 
     @property
     def pos(self):
@@ -68,7 +72,7 @@ class Actor(object):
 
     @property
     def data(self):
-        return [None, self.id, self.start_node.id, self.end_node.id, self.rx, self.ry]
+        return [None, self.id, self.start_node.scaled_pos, self.end_node.scaled_pos, self.rx, self.ry]
 # -----------------------------------------
         
 class Scene(object):
@@ -80,16 +84,16 @@ class Scene(object):
         self._scene_id = '' 
         self._scene_data = pd.DataFrame(data=[], columns=self.cols)
         self._actors = {
-            'Agent': [],
-            'Vehicle': [],
-            'Pedestrian': []
+            'agent': [],
+            'vehicle': [],
+            'pedestrian': []
         }
         self._idx = 0
 
     def add_actor(self, actor_type: str, start_node, end_node):
-        id=f'{actor_type}-{len(self._actors[actor_type])}'
-        actor = Actor(id, start_node, end_node)
-        self._actors[actor_type].append(actor)
+        id=f'{actor_type}-{len(self._actors[actor_type.lower()])}'
+        actor = Actor(actor_type.lower(), start_node, end_node)
+        self._actors[actor_type.lower()].append(actor)
         self._idx += 1 
         return actor
     
@@ -123,7 +127,6 @@ class Map(Scene):
         _,  self._map_img, _ = load_map(size)
         self.screen = screen
         self.size = size  
-        
         self.planner = GraphPlanner(os.path.join(asset_path, "Town01/town01.pkl"))
         #
 
@@ -135,7 +138,12 @@ class Map(Scene):
             self.screen.blit(self._map_img, (cfg.offx, cfg.offy))
         # Draw scene
         self.draw_scene()
-        
+    
+    def get_random_node(self, actor_type):
+        actor_cls = "sidewalk" if actor_type == "Pedestrian" else "vehicle"
+        rdm_node_id = self.planner.get_random_node(actor_cls)
+        pos = self.planner.get_node_pos(rdm_node_id)
+        return  Node(rdm_node_id, pos)
     
     def select_node(self, event, lane, actor):
         min_dist = float('inf')
@@ -184,8 +192,10 @@ class SceneDesigner(GUI):
         # Actor data structure
         self.actors = []
         self.add_mode = False
-        self.play_mode = not False
+        self.play_mode = False
         self.current_start = None 
+        #
+        self.loaded_scene = None
     
     def render(self, env=None):
         fov, map_sur = None, None
@@ -203,6 +213,15 @@ class SceneDesigner(GUI):
         self.map.render(map_sur) 
         if self.current_start is not None:
             self.current_start.render(self.screen, cfg.green)
+    
+    def add_rdm_actor(self):
+        actor_type = self.actor_selector.selection.lower()
+        node1 = self.map.get_random_node(actor_type) 
+        node2 = self.map.get_random_node(actor_type) 
+
+        actor = self.map.add_actor(actor_type, node1, node2)
+        self.map.find_route(actor, lane=None)
+        self.listbox.add_actor(actor_type, actor.id)
 
     def add_actor(self, event):
         #lane = self.lane_selector.selection
@@ -221,6 +240,10 @@ class SceneDesigner(GUI):
                 self.map.find_route(actor, lane)
                 self.listbox.add_actor(actor_type, actor.id)
                 self.toggle_add_mode()
+    
+    def play_scene(self):
+        self.loaded_scene = self.map.get_scene_df(self.scene_name.text)
+        self.toggle_play_mode()
 
     def toggle_add_mode(self):
         self.add_mode = not self.add_mode
@@ -236,24 +259,31 @@ class SceneDesigner(GUI):
 # Main loop
 def main(size: int = 128):
     env = CarlaBEV(size=size, render_mode="rgb_array")
-    observation, info = env.reset(seed=42)
-    #
-    total_reward = 0
-    running = True
+    env.reset()
     #
     keys_held = init_key_tracking()
     pygame.init()
     app = SceneDesigner(env=env)
     # 
+    running = True
     while running:
-        running = process_events(keys_held)
         for event in pygame.event.get():
-            # Close App
             if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_q:  # Press Q to quit
+                    running = False
+                elif event.key in keys_held:
+                    keys_held[event.key] = True
+            elif event.type == pygame.KEYUP:
+                if event.key in keys_held:
+                    keys_held[event.key] = False
             
-            app.handle_event(event)
+            flag = app.handle_event(event)
+
+            if flag:
+                observation, info = env.reset(scene=app.loaded_scene)
+                total_reward = 0
         
         if app.play_mode:
             action = get_action_from_keys(keys_held)
@@ -267,12 +297,14 @@ def main(size: int = 128):
             if terminated:
                 ret = info["termination"]["return"]
                 length = info["termination"]["length"]
-                observation, info = env.reset()
+                observation, info = env.reset(scene=app.loaded_scene)
                 total_reward = 0
 
         app.render(env)
 
     env.close()
+    pygame.quit()
+    sys.exit()
 
 if __name__ == "__main__":
     main()

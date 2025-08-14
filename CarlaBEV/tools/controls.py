@@ -9,7 +9,6 @@ def init_key_tracking():
         pygame.K_DOWN: False,
     }
 
-
 def process_events(keys_held):
     """Processes pygame events to update held keys and check for quitting."""
     running = True

@@ -184,7 +184,7 @@ class SceneDesigner(GUI):
         # Actor data structure
         self.actors = []
         self.add_mode = False
-        self.play_mode = False
+        self.play_mode = not False
         self.current_start = None 
     
     def render(self, env=None):

@@ -14,7 +14,7 @@ from CarlaBEV.src.deeprl.stats import Stats
 from CarlaBEV.src.scenes import SceneBuilder
 
 SCENE_IDS = [f"scene-{i}" for i in range(10)]
-# SCENE_IDS = ["scene-debug"]
+SCENE_IDS = ["scene_1-1"]
 
 
 class Actions(Enum):

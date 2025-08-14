@@ -80,7 +80,7 @@ class DiscreteAgent(Controller, Hero):
         self.turn(action[1])
 
         # === Apply smoothed acceleration ===
-        self.update(self.acc, 0)
+        self.update(-1 * self.acc, 0)
 
         # === Update rendering ===
         self.rect.center = (round(self.x) + self._offx, round(self.y) + self._offy)

@@ -1,4 +1,5 @@
 from enum import Enum
+from random import choice
 
 import gymnasium as gym
 from gymnasium import spaces
@@ -10,6 +11,10 @@ from CarlaBEV.envs.map import Town01
 from CarlaBEV.envs.camera import Camera, Follow
 from CarlaBEV.src.deeprl.reward import RewardFn
 from CarlaBEV.src.deeprl.stats import Stats
+from CarlaBEV.src.scenes import SceneBuilder
+
+SCENE_IDS = [f"scene-{i}" for i in range(10)]
+# SCENE_IDS = ["scene-debug"]
 
 
 class Actions(Enum):
@@ -90,6 +95,9 @@ class CarlaBEV(gym.Env):
         self.clock = None
         #
         self.map = Town01(size=self.size)
+        self._scene_ids = SCENE_IDS
+        self._buider = SceneBuilder(self._scene_ids, size)
+
 
     def _get_obs(self):
         self._render_frame()
@@ -125,8 +133,10 @@ class CarlaBEV(gym.Env):
         self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
-        self.map.reset()
-
+        #
+        rdm_id = choice(self._scene_ids)
+        actors = self._buider.get_scene_actors(rdm_id)
+        self.map.reset(actors)
         #
         self.hero = self.Agent(
             route=self.map.agent_route,
@@ -168,7 +178,7 @@ class CarlaBEV(gym.Env):
         info = self._get_info()
 
         tile = np.array(self.map.agent_tile)[:-1]
-        actor_id, result = self.map.check_collision(self.hero)
+        actor_id, result = self.map.collision_check(self.hero)
         reward, terminated, cause = self.reward_fn.step(tile, result, info, actor_id)
 
         truncated = False

@@ -1,50 +1,32 @@
-from random import choice
+
 import numpy as np
 from CarlaBEV.envs import utils
 import pygame
 
-from CarlaBEV.src.scenes import SceneBuilder
-
-SCENE_IDS = [f"scene-{i}" for i in range(10)]
-# SCENE_IDS = ["scene-debug"]
-
-
 class Scene(object):
-    def __init__(self, map_surface, size) -> None:
-        _, self._map_img, _ = utils.load_map(size)
-        self._map = map_surface
-
-        self._scene_ids = SCENE_IDS
-        self._buider = SceneBuilder(self._scene_ids, size)
-
-        self._size = size
+    def __init__(self, size) -> None:
         self._scale = int(1024 / size)
         self._const = size / 4
-        self.reset()
 
-    def reset(self):
-        #
-        rdm_id = choice(self._scene_ids)
-        self.actors = self._buider.get_scene_actors(rdm_id)
-
+    def reset(self, actors):
+        self.actors = actors
         for id in self.actors.keys():
             if id == "agent":
                 continue
             for actor in self.actors[id]:
                 actor.reset()
-        #
 
-    def step(self, course):
-        self._map.blit(self._map_img, (0, 0))
+    def _scene_step(self, course):
+        self._scene.blit(self._map_img, (0, 0))
         cx, cy, cyaw = course
         for x, y in zip(cx, cy):
-            pygame.draw.circle(self._map, color=(0, 255, 0), center=(x, y), radius=1)
+            pygame.draw.circle(self._scene, color=(0, 255, 0), center=(x, y), radius=1)
         for id in self.actors.keys():
             if id == "agent":
                 continue
             for actor in self.actors[id]:
                 actor.step()
-                actor.draw(self._map)
+                actor.draw(self._scene)
 
     def collision_check(self, hero):
         result = None

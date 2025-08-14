@@ -1,4 +1,3 @@
-
 import numpy as np
 from CarlaBEV.envs import utils
 import pygame
@@ -12,6 +11,13 @@ class Scene(object):
         self.actors = actors
         for id in self.actors.keys():
             if id == "agent":
+                self.hero = self.Agent(
+                    route=self.agent_route,
+                    window_size=self.size,
+                    color=(0, 0, 0),
+                    target_speed=int(200 / self._scale),
+                    car_size=32,
+                )
                 continue
             for actor in self.actors[id]:
                 actor.reset()
@@ -28,14 +34,14 @@ class Scene(object):
                 actor.step()
                 actor.draw(self._scene)
 
-    def collision_check(self, hero):
+    def collision_check(self):
         result = None
         coll_id = None
         for id in self.actors.keys():
             if id == "agent":
                 continue
             for actor in self.actors[id]:
-                actor_id, collision = actor.isCollided(hero, self._const)
+                actor_id, collision = actor.isCollided(self.hero, self._const)
                 if collision:
                     result = id
                     coll_id = actor_id

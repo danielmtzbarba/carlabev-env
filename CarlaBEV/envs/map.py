@@ -7,7 +7,8 @@ from CarlaBEV.src.scenes.scene import Scene
 
 #
 class Town01(Scene):
-    def __init__(self, size=1024) -> None:
+    def __init__(self, size=1024, AgentClass=None) -> None:
+        self.Agent = AgentClass
         self.size = size  # The size of the square grid
         self._map_arr, self._map_img, _ = load_map(size)
         self._Y, self._X, _ = self._map_arr.shape
@@ -50,18 +51,20 @@ class Town01(Scene):
 
         return rotated_image, rotated_image_rect
 
-    def step(self, topleft, course):
-        self._scene_step(course)
+    def step(self, topleft):
+        self._scene_step(self.hero.course)
         self._crop_fov(topleft)
         rotated_image, rotated_image_rect = self.rotate_fov()
         self._fov_surface.blit(rotated_image, rotated_image_rect)
         self._agent_tile = self._fov_surface.get_at(self.center)
+        self.hero.draw(self.canvas)
 
-    def set_theta(self, theta):
-        self._theta = theta
+    def hero_step(self, action):
+        self.hero.step(action)
+        self._theta = self.hero.yaw
 
-    def dist2target(self, hero_position):
-        return np.linalg.norm(hero_position - self.target_position, ord=2)
+    def dist2target(self):
+        return np.linalg.norm(self.hero.position - self.target_position, ord=2)
 
     @property
     def canvas(self):

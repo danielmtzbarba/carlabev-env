@@ -2,7 +2,6 @@ import numpy as np
 import pygame
 import math
 
-
 from CarlaBEV.src.control.stanley_controller import Controller
 
 

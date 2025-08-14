@@ -94,7 +94,7 @@ class CarlaBEV(gym.Env):
         self.window = None
         self.clock = None
         #
-        self.map = Town01(size=self.size)
+        self.map = Town01(size=self.size, AgentClass=self.Agent)
         self._scene_ids = SCENE_IDS
         self._buider = SceneBuilder(self._scene_ids, size)
 
@@ -112,12 +112,12 @@ class CarlaBEV(gym.Env):
                 "dist2target_t_1": self._dist2target_t_1,
                 "dist2target_t": self._dist2target_t,
                 "dist2route_1": self._dist2route_1,
-                "dist2route": self.hero.dist2route,
-                "set_point": self.hero.set_point,
+                "dist2route": self.map.hero.dist2route,
+                "set_point": self.map.hero.set_point,
             },
             "hero": {
-                "state": self.hero.state,
-                "last_state": self.hero.last_state,
+                "state": self.map.hero.state,
+                "last_state": self.map.hero.last_state,
             },
             "ep": {
                 "id": self.stats.episode,
@@ -137,26 +137,17 @@ class CarlaBEV(gym.Env):
         rdm_id = choice(self._scene_ids)
         actors = self._buider.get_scene_actors(rdm_id)
         self.map.reset(actors)
-        #
-        self.hero = self.Agent(
-            route=self.map.agent_route,
-            window_size=self.size,
-            color=(0, 0, 0),
-            target_speed=int(200 / self.scale),
-            car_size=32,
-        )
         # Camera
-        self.camera = Camera(self.hero, resolution=(self.size, self.size))
-        follow = Follow(self.camera, self.hero)
-
+        self.camera = Camera(self.map.hero, resolution=(self.size, self.size))
+        follow = Follow(self.camera, self.map.hero)
         self.camera.setmethod(follow)
 
         self._get_obs()
         #
-        self._dist2target_t0 = self.map.dist2target(self.hero.position)
-        self._dist2target_t_1 = self.map.dist2target(self.hero.position)
-        self._dist2target_t = self.map.dist2target(self.hero.position)
-        self._dist2route_1 = self.hero.dist2route
+        self._dist2target_t0 = self.map.dist2target()
+        self._dist2target_t_1 = self.map.dist2target()
+        self._dist2target_t = self.map.dist2target()
+        self._dist2route_1 = self.map.hero.dist2route
         #
         info = self._get_info()
 
@@ -167,18 +158,18 @@ class CarlaBEV(gym.Env):
             action = self._action_to_direction[action]
         #
         self._dist2target_t_1 = self._dist2target_t
-        self._dist2route_1 = self.hero.dist2route
-        self.hero.step(action)
-        self.map.set_theta(self.hero.yaw)
+        self._dist2route_1 = self.map.hero.dist2route
+        #
+        self.map.hero_step(action)
         self.camera.scroll()
         #
-        self._dist2target_t = self.map.dist2target(self.hero.position)
+        self._dist2target_t = self.map.dist2target()
         #
         self._get_obs()
         info = self._get_info()
 
         tile = np.array(self.map.agent_tile)[:-1]
-        actor_id, result = self.map.collision_check(self.hero)
+        actor_id, result = self.map.collision_check()
         reward, terminated, cause = self.reward_fn.step(tile, result, info, actor_id)
 
         truncated = False
@@ -214,8 +205,7 @@ class CarlaBEV(gym.Env):
         if self.clock is None and self.render_mode == "human":
             self.clock = pygame.time.Clock()
 
-        self.map.step(topleft=self.camera.offset, course=self.hero.course)
-        self.hero.draw(self.map.canvas)
+        self.map.step(topleft=self.camera.offset)
 
         self._rgb_array = np.transpose(
             np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)
@@ -232,9 +222,9 @@ class CarlaBEV(gym.Env):
             self.clock.tick(self.metadata["render_fps"])
         
         elif self.obs_mode == "vector":
-            hero = self.hero.state
-            set_point = self.hero.set_point
-            dist = self.hero.dist2route,
+            hero = self.map.hero.state
+            set_point = self.map.hero.set_point
+            dist = self.map.hero.dist2route,
             vector_data = np.concatenate([hero, set_point]).astype(np.float32)
             self._observation = vector_data
 

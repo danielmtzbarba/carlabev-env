@@ -23,10 +23,7 @@ class Actor(pygame.sprite.Sprite):
             self.rx = scale_route(routeX, factor=8)
             self.ry = scale_route(routeY, factor=8)
         else:
-            self._planner = Planner(id=id, actor_size=actor_size, resolution=resolution)
-            self.rx, self.ry = self._planner.find_global_path(
-                start, goal, self._map_size
-            )
+            raise("GG")
 
         self._x0, self._y0 = self.rx[0], self.ry[1]
         self.reset()

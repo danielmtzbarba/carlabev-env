@@ -57,6 +57,7 @@ class Actor(object):
         self.end_node = end_node
         self.rx, self.ry = [], [] 
         self.path = []
+        self.selected = False
     
     def set_route_wp(self, node_id, x, y):
         self.rx.append(x)
@@ -65,10 +66,11 @@ class Actor(object):
         self.path.append(Node(node_id, pos))
 
     def draw(self, screen):
-        self.start_node.render(screen, cfg.green)
-        self.end_node.render(screen, cfg.red)
-        for node in self.path:
-            node.render(screen, cfg.blue)
+        if self.selected:
+            self.start_node.render(screen, cfg.green)
+            self.end_node.render(screen, cfg.red)
+            for node in self.path:
+                node.render(screen, cfg.blue)
 
     @property
     def data(self):
@@ -91,7 +93,7 @@ class Scene(object):
         self._idx = 0
 
     def add_actor(self, actor_type: str, start_node, end_node):
-        id=f'{actor_type}-{len(self._actors[actor_type.lower()])}'
+#        id=f'{actor_type}-{len(self._actors[actor_type.lower()])}'
         actor = Actor(actor_type.lower(), start_node, end_node)
         self._actors[actor_type.lower()].append(actor)
         self._idx += 1 
@@ -127,8 +129,14 @@ class Map(Scene):
         _,  self._map_img, _ = load_map(size)
         self.screen = screen
         self.size = size  
-        self.planner = GraphPlanner(os.path.join(asset_path, "Town01/town01.pkl"))
         #
+        self.planner_ped = GraphPlanner(os.path.join(asset_path, "Town01/town01.pkl"))
+        self.planner_car = GraphPlanner(os.path.join(asset_path, "Town01/town01-vehicles.pkl"))
+        #
+        self.planner = {
+            "vehicle": self.planner_car,
+            "pedestrian": self.planner_ped
+        }
 
     def render(self, map_sur):
         # Draw map
@@ -141,8 +149,10 @@ class Map(Scene):
     
     def get_random_node(self, actor_type):
         actor_cls = "sidewalk" if actor_type == "Pedestrian" else "vehicle"
-        rdm_node_id = self.planner.get_random_node(actor_cls)
-        pos = self.planner.get_node_pos(rdm_node_id)
+        planner_id = "pedestrian" if actor_type == "Pedestrian" else "vehicle"
+        planner = self.planner[planner_id]
+        rdm_node_id = planner.get_random_node(actor_cls)
+        pos = planner.get_node_pos(rdm_node_id)
         return  Node(rdm_node_id, pos)
     
     def select_node(self, event, lane, actor):
@@ -151,9 +161,8 @@ class Map(Scene):
         click_pos = np.array([event.pos[0], event.pos[1]]) 
         click_pos += np.array([-cfg.offx, -cfg.offy])
         
-#        planner = self.planner[lane]
-        #node = planner.get_closest_node(click_pos * 8, lane) 
-        planner = self.planner
+        planner_id = "pedestrian" if actor.lower() == "pedestrian" else "vehicle"
+        planner = self.planner[planner_id]
         node = planner.get_closest_node(click_pos * 8, None) 
 
         node_pos = np.array(planner.G.nodes[node]['pos'])
@@ -167,13 +176,12 @@ class Map(Scene):
         return closest_node
     
     def find_route(self, actor, lane):
-#        planner = self.planner[lane]
-        planner = self.planner
+        planner_id = "pedestrian" if actor.id == "pedestrian" else "vehicle"
+        planner = self.planner[planner_id]
         start, end = actor.start_node, actor.end_node
         #
         if start.lane == end.lane:
-           # planner = self.planner[start.lane]
-            path, _= planner.find_path(start.id, end.id)
+            path, _= planner.find_path(start.id, end.id, actor.id)
 
             rx, ry, path_pos = [], [], []
             for node_id in path[1:-1]:
@@ -214,14 +222,24 @@ class SceneDesigner(GUI):
         if self.current_start is not None:
             self.current_start.render(self.screen, cfg.green)
     
-    def add_rdm_actor(self):
-        actor_type = self.actor_selector.selection.lower()
-        node1 = self.map.get_random_node(actor_type) 
-        node2 = self.map.get_random_node(actor_type) 
+    def add_rdm_scene(self):
+        scene_dict= {   
+            "Agent": 1,
+            "Vehicle": 10,
+            "Pedestrian": 20
+        }
+        self.map.reset()
+        for actor_type in scene_dict.keys():
+            for i in range(scene_dict[actor_type]):
+                node1 = self.map.get_random_node(actor_type) 
+                node2 = self.map.get_random_node(actor_type) 
+                try:
+                    actor = self.map.add_actor(actor_type.lower(), node1, node2)
+                    self.map.find_route(actor, lane=None)
+                except Exception as e:
+                    continue
 
-        actor = self.map.add_actor(actor_type, node1, node2)
-        self.map.find_route(actor, lane=None)
-        self.listbox.add_actor(actor_type, actor.id)
+        self.loaded_scene = self.map.get_scene_df(self.scene_name.text)
 
     def add_actor(self, event):
         #lane = self.lane_selector.selection
@@ -245,13 +263,14 @@ class SceneDesigner(GUI):
         self.loaded_scene = self.map.get_scene_df(self.scene_name.text)
         self.toggle_play_mode()
 
-    def toggle_add_mode(self):
-        self.add_mode = not self.add_mode
-        self.current_start = None
     
     def save_scene(self, scene_id):
         data = self.map.get_scene_df(scene_id)
         data.to_csv(f"{scene_id}.csv")
+
+    def toggle_add_mode(self):
+        self.add_mode = not self.add_mode
+        self.current_start = None
 
     def toggle_play_mode(self):
         self.play_mode = not self.play_mode
@@ -295,6 +314,7 @@ def main(size: int = 128):
 
             # Reset if episode ends
             if terminated:
+                app.add_rdm_scene()
                 ret = info["termination"]["return"]
                 length = info["termination"]["length"]
                 observation, info = env.reset(scene=app.loaded_scene)

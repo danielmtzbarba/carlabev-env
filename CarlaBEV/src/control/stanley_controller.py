@@ -41,10 +41,17 @@ class Controller(State):
         self.yaw = self.cyaw[self.target_idx]
 
     def control_step(self):
-        ai = self.pid_control()
-        di, self.target_idx = self.stanley_control()
-        self.update(ai, di)
-        self.time += self.dt
+        # Check if we're at or past the last waypoint
+        if self.target_idx >= len(self.cx) - 1:
+            self._target_speed = 0.0  # stop target
+            if self.v <= 0.01:        # fully stopped
+                return True           # signal finished
+        else:
+            ai = self.pid_control()
+            di, self.target_idx = self.stanley_control()
+            self.update(ai, di)
+            self.time += self.dt
+            return False  # still running
 
     def stanley_control(self):
         """

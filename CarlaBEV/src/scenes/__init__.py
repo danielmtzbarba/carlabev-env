@@ -56,7 +56,9 @@ class SceneBuilder(object):
                 actors[class_id] = (routeX, routeY)
                 actors = self.set_targets(actors, routeX, routeY)
                 continue
-            Ditto = Pedestrian if class_id == "pedestrians" else Vehicle
+            Ditto = Pedestrian if class_id == "pedestrian" else Vehicle
+            if len(rx) <  2:
+                continue
             actors[class_id].append(Ditto(map_size=self.size, routeX=rx, routeY=ry))
         return actors
     

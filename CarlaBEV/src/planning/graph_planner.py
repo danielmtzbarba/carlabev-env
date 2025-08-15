@@ -1,6 +1,7 @@
-import networkx as nx
-import numpy as np
+import math
 import random
+import numpy as np
+import networkx as nx
 
 from CarlaBEV.src.planning.map_graph import MapGraph 
 from CarlaBEV.envs.utils import scale_coords, scale_route
@@ -78,12 +79,46 @@ class GraphPlanner(MapGraph):
             if min_distance <= dist <= max_distance:
                 return start, end
     
-    def find_path(self, start, end):
-        coords = []
+    def find_path(self, start, end, agent_type=None, threshold=10):
+        merged_path, coords = [], []
         try:
-            path = nx.shortest_path(self._G, start, end, weight='cost')
-            coords = np.array([self.get_node_pos(n) for n in path])
+
+            """
+            if agent_type:
+                path = nx.shortest_path(self._G,
+                                        start, end,
+                                        weight=lambda u, v, attrs: restricted_weight(self._G, u, v, attrs, agent_type=agent_type))
+            else:
+                """
+            path = nx.shortest_path(self._G, start, end, weight="cost")                                                        
+
+            for node in path:
+                pos = np.array(self._G.nodes[node]['pos'])
+                if not merged_path:
+                    merged_path.append(node)
+                    coords.append(pos)
+                elif np.linalg.norm(pos - coords[-1]) > threshold:
+                    merged_path.append(node)
+                    coords.append(pos)
         except nx.NetworkXNoPath:
             # not found
             pass 
-        return path, coords
+        return merged_path, coords
+
+
+def restricted_weight(G, u, v, attrs, agent_type):
+    lane_u = G.nodes[u].get("lane")
+    lane_v = G.nodes[v].get("lane")
+    cost = attrs.get("cost", 1.0)
+
+    if agent_type == "vehicle" or agent_type == "agent":
+        # Vehicles can't go to sidewalk
+        if lane_u == "vehicle" and lane_v == "vehicle":
+            return math.inf
+
+    elif agent_type == "pedestrian":
+        # Pedestrians can't drive along vehicle lanes
+        if lane_u == "sidewalk" or lane_v == "sidewalk":
+            return math.inf
+
+    return cost

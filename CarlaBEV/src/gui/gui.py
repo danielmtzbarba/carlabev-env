@@ -22,11 +22,11 @@ class GUI():
        # self.lane_selector = Selector((150, 100, 180, 100), self.font,
        #                                ["L", "C", "R"])
         self.add_actor_btn = Button((cfg.margin_x, 200, 180, 30), self.font, "Add Actor")
-        self.add_rdm_actor_btn = Button((cfg.margin_x, 240, 180, 30), self.font, "Random Actor")
         self.del_btn = Button((cfg.margin_x, 280, 180, 30), self.font, "Delete Actor")
         self.listbox = ListBox((cfg.margin_x, 320, 180, 300), self.font)
         self.save_btn = Button((cfg.margin_x, 640, 180, 30), self.font, "Save scene")
-        self.play_btn = Button((cfg.margin_x + 1050, 300, 180, 30), self.font, "Play Scene")
+        self.add_rdm_actor_btn = Button((cfg.margin_x + 1040, 260,  180, 30), self.font, "Random Scene")
+        self.play_btn = Button((cfg.margin_x + 1040, 300, 180, 30), self.font, "Play Scene")
         # FOV display rect
         self.fov_rect = pygame.Rect(self.screen.get_width() - 220, 20, 200, 200)
         self.timeline_rect = pygame.Rect(cfg.left_panel_w + 20, self.screen.get_height() - 40, 
@@ -59,11 +59,16 @@ class GUI():
             self.add_actor(event)
         
         if self.add_rdm_actor_btn.handle_event(event):
-            self.add_rdm_actor()
+            self.add_rdm_scene()
 
-        if not self.play_mode and self.play_btn.handle_event(event):
-            self.play_scene()
-            return True
+        if self.play_btn.handle_event(event):
+            if not self.play_mode:
+                self.play_btn.text = "Stop Scene"
+                self.play_scene()
+                return True
+            else:
+                self.play_btn.text = "Play Scene"
+                self.toggle_play_mode()
 
         if not self.add_mode and self.save_btn.handle_event(event):
             self.save_scene(self.scene_name.text)

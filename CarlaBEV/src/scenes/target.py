@@ -2,7 +2,7 @@ import pygame
 
 
 class Target(pygame.sprite.Sprite):
-    def __init__(self, id, target_pos, color=(0, 255, 0), size=5, scale=1):
+    def __init__(self, id, target_pos, color=(255, 255, 0), size=2, scale=1):
         pygame.sprite.Sprite.__init__(self)
         self.id = id
         self.color = color

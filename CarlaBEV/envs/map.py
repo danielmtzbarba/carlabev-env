@@ -13,7 +13,7 @@ class Town01(Scene):
         self._map_arr, self._map_img, _ = load_map(size)
         self._Y, self._X, _ = self._map_arr.shape
         self._scene = pygame.Surface((self._X, self._Y))
-        Scene.__init__(self, size)
+        Scene.__init__(self, size, self._map_img)
         #
         self.center = (int(self.size / 2), int(self.size / 2))
         self._fov_surface = pygame.Surface((self.size, self.size))

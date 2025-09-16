@@ -38,8 +38,8 @@ class SceneBuilder(object):
             actors_dict["target"].append(Target(id=id, target_pos=(x, y), size=size))
         return actors_dict
 
-    def build_scene(self, scene):
 
+    def build_scene(self, scene):
         actors = deepcopy(actors_dict)
         if not isinstance(scene, pd.DataFrame):
             df = self.load_scene(scene)
@@ -62,7 +62,6 @@ class SceneBuilder(object):
             if len(rx) <  2:
                 continue
             actors[class_id].append(Ditto(map_size=self.size, routeX=rx, routeY=ry))
-
         return actors
     
     def get_scene_actors(self, scene_id):

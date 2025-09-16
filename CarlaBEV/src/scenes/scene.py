@@ -1,73 +1,19 @@
 import os
+import pygame
 import numpy as np
 import pandas as pd
-from CarlaBEV.envs import utils
-import pygame
 
-
-from CarlaBEV.src.gui.settings import Settings as cfg
+from CarlaBEV.src.planning import cubic_spline_planner
 from CarlaBEV.src.planning.graph_planner import GraphPlanner
+
 from CarlaBEV.src.actors.hero import ContinuousAgent, DiscreteAgent
+from CarlaBEV.src.actors.vehicle import Vehicle
+from CarlaBEV.src.scenes.target import Target
+from CarlaBEV.src.actors.pedestrian import Pedestrian
+
 from CarlaBEV.envs.utils import asset_path, load_map
-
-class Node(object):
-    def __init__(self, id, position, lane=None):
-        self.id, self.lane = id, lane
-        self._x = int(position[0])
-        self._y = int(position[1])
-        self.draw_x = self._x + cfg.offx
-        self.draw_y = self._y + cfg.offy
-        self.btn = pygame.Rect(self.draw_x, self.draw_y,  3, 3)
-        self.color = None 
-    
-    def reset(self):
-        self.color = None 
-    
-    def render(self, screen, color=None):
-        if color is not None:
-            self.color = color
-
-        if self.color is not None:
-            pygame.draw.rect(screen, self.color, self.btn)
-    
-    def clicked(self, event):
-        if self.btn.collidepoint(event.pos):
-            self.color = cfg.red 
-            return True
-    
-    @property
-    def scaled_pos(self):
-        return [self._x, self._y]
-
-    @property
-    def pos(self):
-        return [self.draw_x, self.draw_y]
-
-class Actor(object):
-    def __init__(self, id, start_node, end_node):
-        self.id = id
-        self.start_node = start_node
-        self.end_node = end_node
-        self.rx, self.ry = [], [] 
-        self.path = []
-        self.selected = False
-    
-    def set_route_wp(self, node_id, x, y):
-        self.rx.append(x)
-        self.ry.append(y)
-        pos = np.array([x, y])
-        self.path.append(Node(node_id, pos))
-
-    def draw(self, screen):
-        if self.selected:
-            self.start_node.render(screen, cfg.green)
-            self.end_node.render(screen, cfg.red)
-            for node in self.path:
-                node.render(screen, cfg.blue)
-
-    @property
-    def data(self):
-        return [None, self.id, self.start_node.scaled_pos, self.end_node.scaled_pos, self.rx, self.ry]
+from CarlaBEV.src.gui.settings import Settings as cfg
+from CarlaBEV.src.scenes.utils import * 
 
 class Scene(object):
     cols = ["scene_id", "class", "start", "goal", "rx", "ry"]
@@ -96,13 +42,13 @@ class Scene(object):
         #
 
     def reset(self, actors=None):
+        self._idx = 0
         if actors: 
             self._actors = actors
 
             for id in self._actors.keys():
                 if id == "agent":
                     route=self.agent_route
-
                     self.hero = self.Agent(
                         window_size=self.size,
                         route=route,
@@ -121,11 +67,9 @@ class Scene(object):
             self._actors = {
                 'agent': [],
                 'vehicle': [],
-                'pedestrian': []
+                'pedestrian': [],
+                'target': []
             }
-
-        self._idx = 0
-
 
     def draw_scene(self):
         for actor_type, actors in self._actors.items():
@@ -148,6 +92,43 @@ class Scene(object):
         self._idx += 1 
         return actor
         
+    def add_rdm_scene(self):
+        scene_dict= {   
+            "Agent": 1,
+            "Vehicle": 10,
+            "Pedestrian": 10
+        }
+        actors = {
+            'agent': [],
+            'vehicle': [],
+            'pedestrian': [],
+            'target': []
+        }
+        for actor_type in scene_dict.keys():
+            for i in range(scene_dict[actor_type]):
+                Ditto = Pedestrian if actor_type.lower() == "pedestrian" else Vehicle
+                node1 = get_random_node(self.planner, actor_type) 
+                node2 = get_random_node(self.planner, actor_type) 
+                actor = Ditto(start_node=node1, end_node=node2, map_size=self.size)
+                actor, path = find_route(self.planner, actor, lane=None)
+
+                try:
+                    cubic_spline_planner.calc_spline_course(path[0], path[1], ds=1.0)
+                except Exception as e:
+                    print('Route generation error')
+                    if actor_type.lower() == "agent":
+                        self.add_rdm_scene()
+                    else:
+                        continue
+
+                if actor_type.lower() == "agent":
+                    actors[actor_type.lower()] = path
+                    actors = set_targets(actors, path[0], path[1])
+                    continue
+                    
+                actors[actor_type.lower()].append(actor)
+        self.reset(actors)
+
     def get_scene_df(self, scene_id):
         i = 0
         df = pd.DataFrame(data=[], columns=self.cols)
@@ -168,11 +149,9 @@ class Scene(object):
 
     def _scene_step(self, course):
         self._scene.blit(self._map_img, (0, 0))
-        cx, cy, cyaw = course
-       # for x, y in zip(cx, cy):
-       #     pygame.draw.circle(self._scene, color=(255, 0, 0), center=(x, y), radius=1)
         for id in self._actors.keys():
             if id == "agent":
+                self.hero.draw(self.screen)
                 continue
             for actor in self._actors[id]:
                 actor.step()

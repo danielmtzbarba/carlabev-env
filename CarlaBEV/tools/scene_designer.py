@@ -11,6 +11,7 @@ from CarlaBEV.envs.utils import asset_path, load_map
 
 from CarlaBEV.tools.controls import init_key_tracking, get_action_from_keys, process_events
 from CarlaBEV.src.scenes.scene import Scene, Node
+from CarlaBEV.src.scenes.utils import * 
 
 from CarlaBEV.src.gui import GUI
 from CarlaBEV.src.gui.settings import Settings as cfg
@@ -53,8 +54,8 @@ class SceneDesigner(GUI):
     def add_rdm_scene(self):
         scene_dict= {   
             "Agent": 1,
-            "Vehicle": 10,
-            "Pedestrian": 20
+            "Vehicle": 1,
+            "Pedestrian": 1
         }
         self.env.map.reset()
         for actor_type in scene_dict.keys():
@@ -102,49 +103,7 @@ class SceneDesigner(GUI):
     def toggle_play_mode(self):
         self.play_mode = not self.play_mode
 
-def select_node(event, planner, lane, actor):
-    min_dist = float('inf')
-    closest_node = None
-    click_pos = np.array([event.pos[0], event.pos[1]]) 
-    click_pos += np.array([-cfg.offx, -cfg.offy])
-    
-    planner_id = "pedestrian" if actor.lower() == "pedestrian" else "vehicle"
-    planner = planner[planner_id]
-    node = planner.get_closest_node(click_pos * 8, None) 
 
-    node_pos = np.array(planner.G.nodes[node]['pos'])
-    dist = np.linalg.norm(8 * click_pos - node_pos)
-
-    if dist < min_dist:
-        min_dist = dist
-        pos = planner.get_node_pos(node)/8
-        closest_node = Node(node, pos, lane=None) 
-
-    return closest_node
-
-def get_random_node(planner, actor_type):
-    actor_cls = "sidewalk" if actor_type == "Pedestrian" else "vehicle"
-    planner_id = "pedestrian" if actor_type == "Pedestrian" else "vehicle"
-    planner = planner[planner_id]
-    rdm_node_id = planner.get_random_node(actor_cls)
-    pos = planner.get_node_pos(rdm_node_id)
-    return  Node(rdm_node_id, pos)
-
-
-def find_route(planner, actor, lane):
-    planner_id = "pedestrian" if actor.id == "pedestrian" else "vehicle"
-    planner = planner[planner_id]
-    start, end = actor.start_node, actor.end_node
-    #
-    if start.lane == end.lane:
-        path, _= planner.find_path(start.id, end.id, actor.id)
-
-        rx, ry, path_pos = [], [], []
-        for node_id in path[1:-1]:
-            pos_scaled = planner.G.nodes[node_id]['pos']
-            x, y = pos_scaled[0]/8, pos_scaled[1]/8
-            actor.set_route_wp(node_id, x, y)
-    return actor
 
 # Main loop
 def main(size: int = 128):
@@ -188,7 +147,7 @@ def main(size: int = 128):
                 app.add_rdm_scene()
                 ret = info["termination"]["return"]
                 length = info["termination"]["length"]
-                observation, info = env.reset(scene=app.loaded_scene)
+                observation, info = env.reset()
                 total_reward = 0
 
         app.render(env)

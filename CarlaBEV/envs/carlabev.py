@@ -126,18 +126,19 @@ class CarlaBEV(gym.Env):
         }
 
     def reset(self, seed=None, scene=None):
-        # We need the following line to seed self.np_random
         super().reset(seed=seed)
         self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
-        #
+
         if scene is not None:
-            actors = self._builder.build_scene(scene)
-        else:
             rdm_id = choice(self._scene_ids)
             actors = self._builder.get_scene_actors(rdm_id)
-        self.map.reset(actors)
+            self.map.reset(actors)
+        else:
+            self.map.reset() 
+            df = self.map.add_rdm_scene()
+
         # Camera
         self.camera = Camera(self.map.hero, resolution=(self.size, self.size))
         follow = Follow(self.camera, self.map.hero)

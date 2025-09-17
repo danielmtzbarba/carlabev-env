@@ -87,7 +87,8 @@ class Scene(object):
         self.draw_scene()
 
     def add_actor(self, actor_type: str, start_node, end_node):
-        actor = Actor(actor_type.lower(), start_node, end_node)
+        Ditto = Pedestrian if actor_type.lower() == "pedestrian" else Vehicle
+        actor = Ditto(start_node=start_node, end_node=end_node, map_size=self.size)
         self._actors[actor_type.lower()].append(actor)
         self._idx += 1 
         return actor

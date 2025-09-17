@@ -34,22 +34,9 @@ class SceneDesigner(GUI):
         self.loaded_scene = None
     
     def render(self, env=None):
-        fov, map_sur = None, None
-        if env is not None:
-            fov = env.observation  
-            map_sur = env.map.map_surface
-        #
-        self.draw_map(map_sur)
         self.draw_gui()
-        self.draw_fov(fov)
+        self.draw_fov()
         pygame.display.flip()
-
-    def draw_map(self, map_sur=None):
-        self.screen.fill(cfg.grey)
-        self.env.map.screen = self.screen
-        self.env.map.render(map_sur) 
-        if self.current_start is not None:
-            self.current_start.render(self.screen, cfg.green)
     
     def add_rdm_scene(self):
         scene_dict= {   
@@ -104,7 +91,6 @@ class SceneDesigner(GUI):
         self.play_mode = not self.play_mode
 
 
-
 # Main loop
 def main(size: int = 128):
     env = CarlaBEV(size=size, render_mode="rgb_array")
@@ -144,7 +130,6 @@ def main(size: int = 128):
 
             # Reset if episode ends
             if terminated:
-                app.add_rdm_scene()
                 ret = info["termination"]["return"]
                 length = info["termination"]["length"]
                 observation, info = env.reset()

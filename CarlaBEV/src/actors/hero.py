@@ -3,7 +3,7 @@ import pygame
 import math
 
 from CarlaBEV.src.control.stanley_controller import Controller
-
+from CarlaBEV.src.gui.settings import Settings as cfg
 
 class Hero(pygame.sprite.Sprite):
     def __init__(self, window_size, color=(0, 7, 175), car_size=32):
@@ -20,14 +20,15 @@ class Hero(pygame.sprite.Sprite):
 
     def _setup(self):
         center = self.window_center
-        self.render_rect = pygame.Rect((center, center, self.w, self.l))
+        self.fov_rect= pygame.Rect((center, center, self.w, self.l))
         self.rect = pygame.Rect((self.x0, self.y0, self.w, self.l))
         # movement
-        self.x = self.rect.x
-        self.y = self.rect.y
+        self.x = self.rect.x + cfg.offx
+        self.y = self.rect.y + cfg.offy
 
-    def draw(self, display):
-        pygame.draw.rect(display, self.color, self.render_rect)
+    def draw(self, display_fov, display):
+        pygame.draw.rect(display_fov, self.color, self.fov_rect)
+#        pygame.draw.rect(display, self.color, self.rect)
 
     @property
     def position(self):

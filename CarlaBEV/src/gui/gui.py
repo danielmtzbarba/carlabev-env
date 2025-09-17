@@ -75,11 +75,12 @@ class GUI():
 
         return None
 
-    def draw_fov(self, vehicle_surface=None):
+    def draw_fov(self):
         """Draws the cropped FOV view."""
+        vehicle_surface = self.env.map.canvas
         pygame.draw.rect(self.screen, (0,0,0), self.fov_rect, 2)
         if vehicle_surface is not None:
-            vehicle_surface = np_to_surface(vehicle_surface)
+         #   vehicle_surface = np_to_surface(vehicle_surface)
             scaled = pygame.transform.scale(vehicle_surface, (self.fov_rect.width, self.fov_rect.height))
             self.screen.blit(scaled, self.fov_rect.topleft)
         else:
@@ -94,6 +95,10 @@ class GUI():
         pygame.draw.circle(self.screen, (0,120,215), (handle_x, self.timeline_rect.centery), 8)
 
     def draw_gui(self):
+        self.screen.fill(cfg.grey)
+        self.screen.blit(self.env.map.map_surface, (cfg.offx, cfg.offy))
+        if self.current_start is not None:
+            self.current_start.render(self.screen, cfg.green)
         # Draw background panel
         pygame.draw.rect(self.screen, cfg.grey, (0, 0, cfg.left_panel_w, self.screen.get_height()))
         pygame.draw.line(self.screen, cfg.black, (cfg.left_panel_w, 0), (cfg.left_panel_w, self.screen.get_height()), 2)
@@ -118,7 +123,7 @@ class GUI():
         self.play_btn.draw(self.screen)
 
         # NEW: draw FOV
-        self.draw_fov(None)  # Pass actual cropped vehicle surface here
+        self.draw_fov()  # Pass actual cropped vehicle surface here
 
         # NEW: draw timeline
         self.draw_timeline()

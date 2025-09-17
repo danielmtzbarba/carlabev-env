@@ -80,8 +80,8 @@ class Actor(pygame.sprite.Sprite):
 
     def step(self):
         self._controller.control_step()
-        self.rect.x = self._controller.x
-        self.rect.y = self._controller.y
+        self.rect.x = self._controller.x 
+        self.rect.y = self._controller.y 
 
     def draw(self, screen):
         if self.selected:

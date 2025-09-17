@@ -57,7 +57,7 @@ class Town01(Scene):
         rotated_image, rotated_image_rect = self.rotate_fov()
         self._fov_surface.blit(rotated_image, rotated_image_rect)
         self._agent_tile = self._fov_surface.get_at(self.center)
-        self.hero.draw(self.canvas)
+        self.hero.draw(self.canvas, self.map_surface)
 
     def hero_step(self, action):
         self.hero.step(action)

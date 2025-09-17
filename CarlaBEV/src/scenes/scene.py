@@ -151,7 +151,7 @@ class Scene(object):
         self._scene.blit(self._map_img, (0, 0))
         for id in self._actors.keys():
             if id == "agent":
-                self.hero.draw(self.screen)
+                self.hero.draw(self.canvas, self.map_surface)
                 continue
             for actor in self._actors[id]:
                 actor.step()

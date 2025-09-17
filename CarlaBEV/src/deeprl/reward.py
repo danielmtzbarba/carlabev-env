@@ -162,9 +162,9 @@ class RewardFn(object):
         return np.clip(reward, -0.8, 0.8)
 
     def termination(self, collision, target_id):
-        if collision == "pedestrians":
+        if collision == "pedestrian":
             return -1.0, True, "collision"
-        elif collision == "vehicles":
+        elif collision == "vehicle":
             return -0.9, True, "collision"
         elif collision == "target":
             if target_id == "goal":

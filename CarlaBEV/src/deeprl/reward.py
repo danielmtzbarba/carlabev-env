@@ -39,9 +39,9 @@ class RewardFn(object):
         Tiles.target.value: np.array([0, 255, 0]),
     }
 
-    def __init__(self, max_actions=500) -> None:
+    def __init__(self, max_actions=2000) -> None:
         self._k: int = 0
-        self._max_actions: int = max_actions
+        self.max_actions: int = max_actions
         self._normalizer = RewardNormalizer()
         self._steering_accum = 0.0
         self._speed_accum = 0.0
@@ -55,8 +55,12 @@ class RewardFn(object):
         self._k += 1
         reward, terminated, cause = -0.01, False, None
 
-        if self._k >= self._max_actions:
+        if self._k >= self.max_actions:
             reward, terminated, cause = 0.0, True, "max_actions"
+            return reward, terminated, cause
+        
+        if info["env"]["dist2route"] > 30:
+            reward, terminated, cause = 0.0, True, "out_of_bounds"
             return reward, terminated, cause
 
         if np.array_equal(tile, self.tiles_to_color[0]):  # Obstacle

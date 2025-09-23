@@ -36,7 +36,7 @@ class CarlaBEV(gym.Env):
         "render_modes": ["human", "rgb_array"],
         "render_fps": 60,
     }
-    termination_causes = ["max_actions", "collision", "success"]
+    termination_causes = ["max_actions", "collision", "success", "out_of_bounds"]
 
     def __init__(self, size, discrete=True, obs_space="bev", render_mode=None):
         # Field Of View PIXEL SIZE
@@ -125,19 +125,22 @@ class CarlaBEV(gym.Env):
             "nn": {},
         }
 
-    def reset(self, seed=None, scene=None):
+    def reset(self, seed=None, scene="rdm"):
         super().reset(seed=seed)
         self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
 
-        if scene is not None:
-            rdm_id = choice(self._scene_ids)
-            actors = self._builder.get_scene_actors(rdm_id)
-            self.map.reset(actors)
+        if isinstance(scene, str):
+            if scene == "rdm":
+                self.map.reset() 
+                df = self.map.add_rdm_scene()
+            else:
+                rdm_id = choice(self._scene_ids)
+                actors = self._builder.get_scene_actors(rdm_id)
+                self.map.reset(actors)
         else:
-            self.map.reset() 
-            df = self.map.add_rdm_scene()
+            print(scene)
 
         # Camera
         self.camera = Camera(self.map.hero, resolution=(self.size, self.size))
@@ -186,7 +189,7 @@ class CarlaBEV(gym.Env):
             self.stats.terminated()
             info["termination"] = self.stats.get_episode_info()
 
-        if self._current_step >= 1000:
+        if self._current_step >= self.reward_fn.max_actions:
             print(f"[SAFETY STOP] Forcing episode end at step {self._current_step}")
             info["termination"] = self.stats.get_episode_info()
             return self._observation, reward, True, True, info

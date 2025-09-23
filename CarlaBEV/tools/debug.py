@@ -48,7 +48,7 @@ def get_action_from_keys(keys_held):
 def main(size: int = 128):
     env = CarlaBEV(size=size, render_mode="human")
 
-    observation, info = env.reset(seed=42)
+    observation, info = env.reset(seed=42, scene="rdm")
     total_reward = 0
     running = True
     keys_held = init_key_tracking()
@@ -66,7 +66,7 @@ def main(size: int = 128):
             ret = info["termination"]["return"]
             length = info["termination"]["length"]
             print(info["termination"]["episode"], ret, ret / length)
-            observation, info = env.reset()
+            observation, info = env.reset(scene="rdm")
             total_reward = 0
 
     env.close()

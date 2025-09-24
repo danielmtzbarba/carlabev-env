@@ -26,7 +26,6 @@ class SceneDesigner(GUI):
         self.env = env 
 
         # Actor data structure
-        self.actors = []
         self.add_mode = False
         self.play_mode = False
         self.current_start = None 
@@ -58,7 +57,6 @@ class SceneDesigner(GUI):
         self.loaded_scene = self.env.map.get_scene_df(self.scene_name.text)
 
     def add_actor(self, event):
-        #lane = self.lane_selector.selection
         lane = None
         actor_type = self.actor_selector.selection
 
@@ -72,7 +70,7 @@ class SceneDesigner(GUI):
                 node.color = cfg.red 
                 actor = self.env.map.add_actor(actor_type, self.current_start, node)
                 find_route(self.env.map.planner, actor, lane)
-                self.listbox.add_actor(actor_type, actor.id)
+                self.listbox.add_actor(actor_type, str(actor.id))
                 self.toggle_add_mode()
     
     def play_scene(self):
@@ -94,7 +92,7 @@ class SceneDesigner(GUI):
 # Main loop
 def main(size: int = 128):
     env = CarlaBEV(size=size, render_mode="rgb_array")
-    env.reset()
+    env.reset(scene="rdm")
     #
     keys_held = init_key_tracking()
     pygame.init()

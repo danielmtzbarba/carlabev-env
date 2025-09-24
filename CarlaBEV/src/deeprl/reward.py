@@ -1,6 +1,7 @@
 from enum import Enum
 import numpy as np
 
+from CarlaBEV.src.control.utils import lateral_error 
 
 class Tiles(Enum):
     obstacle = 0
@@ -59,7 +60,7 @@ class RewardFn(object):
             reward, terminated, cause = 0.0, True, "max_actions"
             return reward, terminated, cause
         
-        if info["env"]["dist2route"] > 30:
+        if info["env"]["dist2wp"] > 30:
             reward, terminated, cause = 0.0, True, "out_of_bounds"
             return reward, terminated, cause
 
@@ -86,10 +87,14 @@ class RewardFn(object):
         self._steering_accum += delta_yaw
         self._speed_accum += v
 
-        distance_t = info["env"]["dist2target_t"]
-        distance_t_1 = info["env"]["dist2target_t_1"]
-        dist2route = info["env"]["dist2route"]
+        distance_t = info["env"]["dist2goal"]
+        distance_t_1 = info["env"]["dist2goal_t_1"]
+        dist2wp = info["env"]["dist2wp"]
         set_point = info["env"]["set_point"]
+        xs, ys, yaws = info["env"]["nextwps"]
+        wps  = np.array([xs, ys]).transpose()  
+        dist2route = lateral_error(x, y, wps, signed=False) 
+        reward -= dist2route * 0.03
 
         # --- Progress reward (toward the target) ---
         delta_progress = distance_t_1 - distance_t  # positive if moving closer
@@ -121,10 +126,10 @@ class RewardFn(object):
                 max_r = 0.3
                 min_r = -0.5
 
-                if dist2route <= safe_margin:
+                if dist2wp <= safe_margin:
                     route_reward = max_r
-                elif dist2route <= 2 * safe_margin:
-                    decay = (dist2route - safe_margin) / safe_margin
+                elif dist2wp <= 2 * safe_margin:
+                    decay = (dist2wp - safe_margin) / safe_margin
                     route_reward = max_r * (1 - 5 * decay)
                 else:
                     route_reward = min_r

@@ -15,13 +15,13 @@ def make_carlabev_env(seed, idx, capture_video, run_name, obs_space, size):
 
         if capture_video and idx == 0:
             env = gym.wrappers.RecordVideo(
-                env, f"videos/{run_name}", episode_trigger=lambda x: x % 250 == 0
+                env, f"videos/{run_name}", episode_trigger=lambda x: x % 25 == 0
             )
 
         if obs_space == "bev":
             env = GrayscaleObservation(env)
             env = ResizeObservation(env, (96, 96))
-            env = SemanticMaskWrapper(env)
+#            env = SemanticMaskWrapper(env)
             env = FrameStackObservation(env, stack_size=4)
 
         env = gym.wrappers.RecordEpisodeStatistics(env)

@@ -113,6 +113,21 @@ class Controller(State):
 
         return target_idx, error_front_axle
 
+    def next_wps(self, n):
+        try:
+            wps = (
+                self.cx[self.target_idx : self.target_idx + n],
+                self.cy[self.target_idx : self.target_idx + n],
+                self.cyaw[self.target_idx : self.target_idx + n],
+            )
+        except:
+            wps = (
+                self.cx[self.target_idx : -1],
+                self.cy[self.target_idx : -1],
+                self.cyaw[self.target_idx : -1],
+            )
+        return wps 
+
     @property
     def set_point(self):
         return np.array(
@@ -124,8 +139,9 @@ class Controller(State):
         )
 
     @property
-    def dist2route(self):
+    def dist2wp(self):
         return np.linalg.norm(self.position - self.set_point[:-1], ord=2)
+
 
     @property
     def course(self):

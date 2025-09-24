@@ -106,11 +106,12 @@ class CarlaBEV(gym.Env):
         # Get the distance to the target
         return {
             "env": {
-                "dist2target_t0": self._dist2target_t0,
-                "dist2target_t_1": self._dist2target_t_1,
-                "dist2target_t": self._dist2target_t,
-                "dist2route_1": self._dist2route_1,
-                "dist2route": self.map.hero.dist2route,
+                "dist2goal_t0": self._dist2goal_t0,
+                "dist2goal_t_1": self._dist2goal_t_1,
+                "dist2goal": self._dist2goal,
+                "dist2wp_1": self._dist2wp_1,
+                "dist2wp": self.map.hero.dist2wp,
+                "nextwps": self.map.hero.next_wps(5),
                 "set_point": self.map.hero.set_point,
             },
             "hero": {
@@ -125,7 +126,7 @@ class CarlaBEV(gym.Env):
             "nn": {},
         }
 
-    def reset(self, seed=None, scene="rdm"):
+    def reset(self, seed=None, options=None, scene="rdm"):
         super().reset(seed=seed)
         self._current_step = 0
         self.stats.reset()
@@ -149,10 +150,10 @@ class CarlaBEV(gym.Env):
 
         self._get_obs()
         #
-        self._dist2target_t0 = self.map.dist2target()
-        self._dist2target_t_1 = self.map.dist2target()
-        self._dist2target_t = self.map.dist2target()
-        self._dist2route_1 = self.map.hero.dist2route
+        self._dist2goal_t0 = self.map.dist2goal()
+        self._dist2goal_t_1 = self.map.dist2goal()
+        self._dist2goal = self.map.dist2goal()
+        self._dist2wp_1 = self.map.hero.dist2wp
         #
         info = self._get_info()
 
@@ -162,14 +163,14 @@ class CarlaBEV(gym.Env):
         if self.discrete:
             action = self._action_to_direction[action]
         #
-        self._dist2target_t_1 = self._dist2target_t
-        self._dist2route_1 = self.map.hero.dist2route
+        self._dist2goal_t_1 = self._dist2goal
+        self._dist2wp_1 = self.map.hero.dist2wp
         #
         self.map.hero_step(action)
         self.camera.scroll()
         self.map.step(topleft=self.camera.offset)
         #
-        self._dist2target_t = self.map.dist2target()
+        self._dist2goal = self.map.dist2goal()
         #
         self._get_obs()
         info = self._get_info()
@@ -228,7 +229,7 @@ class CarlaBEV(gym.Env):
         elif self.obs_mode == "vector":
             hero = self.map.hero.state
             set_point = self.map.hero.set_point
-            dist = self.map.hero.dist2route,
+            dist = self.map.hero.dist2wp,
             vector_data = np.concatenate([hero, set_point]).astype(np.float32)
             self._observation = vector_data
 

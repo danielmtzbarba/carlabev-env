@@ -53,7 +53,7 @@ class Scene(object):
                         window_size=self.size,
                         route=route,
                         color=(0, 0, 0),
-                        target_speed=int(200 / self._scale),
+                        target_speed=int(100 / self._scale),
                         car_size=32,
                     )
                     continue
@@ -96,8 +96,8 @@ class Scene(object):
     def add_rdm_scene(self):
         scene_dict= {   
             "Agent": 1,
-            "Vehicle": 10,
-            "Pedestrian": 10
+            "Vehicle": 15,
+            "Pedestrian": 15
         }
         actors = {
             'agent': [],
@@ -138,19 +138,18 @@ class Scene(object):
                 data = actor.data
                 data[0] = scene_id
                 df.loc[i] = data
-                rx = df.loc[i, "rx"]
-                ry = df.loc[i, "ry"]
-                df.loc[i, "rx"] = [8*int(x) for x in rx]
-                df.loc[i, "ry"] = [8*int(y) for y in ry]
-                i+=1
+                rx = df.at[i, "rx"]  # .at is safer for a single cell
+                ry = df.at[i, "ry"]
+                df.at[i, "rx"] = [8*int(x) for x in rx]
+                df.at[i, "ry"] = [8*int(y) for y in ry]
+                i += 1
                                 
-        df.astype({'rx': "object", 'ry': "object"}).dtypes
         self._scene_data = df
         return self._scene_data
 
     def _scene_step(self, course):
         self._scene.blit(self._map_img, (0, 0))
-        for id in self._actors.keys():
+        for id in ["target", "agent", "vehicle", "pedestrian"]:
             if id == "agent":
                 self.hero.draw(self.canvas, self.map_surface)
                 continue

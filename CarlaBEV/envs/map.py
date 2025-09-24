@@ -63,7 +63,7 @@ class Town01(Scene):
         self.hero.step(action)
         self._theta = self.hero.yaw
 
-    def dist2target(self):
+    def dist2goal(self):
         return np.linalg.norm(self.hero.position - self.target_position, ord=2)
 
     @property

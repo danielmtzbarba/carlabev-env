@@ -1,4 +1,5 @@
 import gymnasium as gym
+import numpy as np
 
 def rgb_to_semantic_mask(rgb_image):
     """

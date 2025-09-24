@@ -1,4 +1,5 @@
 from enum import Enum
+from random import choice
 
 import gymnasium as gym
 from gymnasium import spaces
@@ -10,47 +11,66 @@ from CarlaBEV.envs.map import Town01
 from CarlaBEV.envs.camera import Camera, Follow
 from CarlaBEV.src.deeprl.reward import RewardFn
 from CarlaBEV.src.deeprl.stats import Stats
+from CarlaBEV.src.scenes import SceneBuilder
+
+SCENE_IDS = [f"scene-{i}" for i in range(10)]
+SCENE_IDS = ["scene_1-1"]
 
 
 class Actions(Enum):
     nothing = 0
-    left = 1
-    right = 2
-    gas = 3
-    brake = 4
+    gas = 1
+    brake = 2
+    gas_steer_left = 3
+    gas_steer_right = 4
+    steer_left = 5
+    steer_right = 6
+    brake_steer_left = 7
+    brake_steer_right = 8
 
 
 class CarlaBEV(gym.Env):
     metadata = {
         "action_space": ["discrete", "continuous"],
+        "observation_space": ["bev", "vector"],
         "render_modes": ["human", "rgb_array"],
         "render_fps": 60,
     }
-    termination_causes = ["max_actions", "collision", "success"]
+    termination_causes = ["max_actions", "collision", "success", "out_of_bounds"]
 
-    def __init__(self, size, discrete=True, render_mode=None):
+    def __init__(self, size, discrete=True, obs_space="bev", render_mode=None):
         # Field Of View PIXEL SIZE
         self.size = size  # The size of the square grid
         self.scale = int(1024 / size)
         self.window_center = (int(size / 2), int(size / 2))
 
-        # Environment
-        self.observation_space = spaces.Box(
-            low=0, high=255, shape=(size, size, 3), dtype=np.uint8
-        )
+        # Observation Space
+        if obs_space == "bev":
+            self.observation_space = spaces.Box(
+                low=0, high=255, shape=(size, size, 3), dtype=np.uint8
+            )
+        elif obs_space == "vector":
+            self.observation_space = spaces.Box(
+                low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
+            )
 
-        # Action_space
+        # Action Space
         if discrete:
             self.Agent = DiscreteAgent
-            self.action_space = spaces.Discrete(5)
+            self.action_space = spaces.Discrete(9)
 
             self._action_to_direction = {
-                Actions.nothing.value: np.array([0, 0, 0]),
-                Actions.left.value: np.array([0, 1, 0]),
-                Actions.right.value: np.array([0, -1, 0]),
-                Actions.gas.value: np.array([1, 0, 0]),
-                Actions.brake.value: np.array([0, 0, 1]),
+                0: np.array([0, 0, 0]),  # nothing
+                1: np.array([1, 0, 0]),  # gas
+                2: np.array([0, 0, 1]),  # brake
+                3: np.array([1, 1, 0]),  # gas + steer left
+                4: np.array([1, -1, 0]),  # gas + steer right
+                5: np.array([0, 1, 0]),  # steer left (coast)
+                6: np.array([0, -1, 0]),  # steer right (coast)
+                7: np.array([0, 1, 1]),  # brake + steer left
+                8: np.array([0, -1, 1]),  # brake + steer right
             }
+
         else:
             self.Agent = ContinuousAgent
             self.action_space = spaces.Box(
@@ -67,97 +87,102 @@ class CarlaBEV(gym.Env):
         # Render mode
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
+        assert obs_space is None or obs_space in self.metadata["observation_space"]
+        self.obs_mode = obs_space
+        #
         self.discrete = discrete
         self.window = None
         self.clock = None
         #
-        self.map = Town01(size=self.size)
+        self.map = Town01(size=self.size, AgentClass=self.Agent)
+        self._scene_ids = SCENE_IDS
+        self._builder = SceneBuilder(self._scene_ids, size)
 
     def _get_obs(self):
-        return self._render_frame()
+        self._render_frame()
+        return  self._observation
 
     def _get_info(self):
         # Get the distance to the target
-
         return {
             "env": {
-                "dist2target_t0": self._dist2target_t0,
-                "dist2target_t_1": self._dist2target_t_1,
-                "dist2target_t": self._dist2target_t,
-                "dist2route_1": self._dist2route_1,
-                "dist2route": self.hero.dist2route,
-                "set_point": self.hero.set_point,
+                "dist2goal_t0": self._dist2goal_t0,
+                "dist2goal_t_1": self._dist2goal_t_1,
+                "dist2goal": self._dist2goal,
+                "dist2wp_1": self._dist2wp_1,
+                "dist2wp": self.map.hero.dist2wp,
+                "nextwps": self.map.hero.next_wps(5),
+                "set_point": self.map.hero.set_point,
             },
             "hero": {
-                "state": self.hero.state,
-                "last_state": self.hero.last_state,
+                "state": self.map.hero.state,
+                "last_state": self.map.hero.last_state,
             },
             "ep": {
                 "id": self.stats.episode,
                 "return": self.stats.episode_return,
                 "length": len(self.stats),
             },
+            "nn": {},
         }
 
-    def reset(self, seed=None, options=None):
-        # We need the following line to seed self.np_random
+    def reset(self, seed=None, options=None, scene="rdm"):
         super().reset(seed=seed)
         self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
-        self.map.reset()
 
-        #
-        self.hero = self.Agent(
-            route=self.map.agent_route,
-            window_size=self.size,
-            color=(0, 0, 0),
-            target_speed=int(200 / self.scale),
-            car_size=8,
-        )
+        if isinstance(scene, str):
+            if scene == "rdm":
+                self.map.reset() 
+                df = self.map.add_rdm_scene()
+            else:
+                rdm_id = choice(self._scene_ids)
+                actors = self._builder.get_scene_actors(rdm_id)
+                self.map.reset(actors)
+        else:
+            print(scene)
+
         # Camera
-        self.camera = Camera(self.hero, resolution=(self.size, self.size))
-        follow = Follow(self.camera, self.hero)
-
+        self.camera = Camera(self.map.hero, resolution=(self.size, self.size))
+        follow = Follow(self.camera, self.map.hero)
         self.camera.setmethod(follow)
 
-        observation = self._get_obs()
+        self._get_obs()
         #
-        self._dist2target_t0 = self.map.dist2target(self.hero.position)
-        self._dist2target_t_1 = self.map.dist2target(self.hero.position)
-        self._dist2target_t = self.map.dist2target(self.hero.position)
-        self._dist2route_1 = self.hero.dist2route
+        self._dist2goal_t0 = self.map.dist2goal()
+        self._dist2goal_t_1 = self.map.dist2goal()
+        self._dist2goal = self.map.dist2goal()
+        self._dist2wp_1 = self.map.hero.dist2wp
         #
         info = self._get_info()
 
-        if self.render_mode == "human":
-            self._render_frame()
-
-        return observation, info
+        return self._observation, info
 
     def step(self, action):
         if self.discrete:
             action = self._action_to_direction[action]
         #
-        self._dist2target_t_1 = self._dist2target_t
-        self._dist2route_1 = self.hero.dist2route
-
-        self.hero.step(action)
-        self.map.set_theta(self.hero.yaw)
+        self._dist2goal_t_1 = self._dist2goal
+        self._dist2wp_1 = self.map.hero.dist2wp
+        #
+        self.map.hero_step(action)
         self.camera.scroll()
+        self.map.step(topleft=self.camera.offset)
         #
-        self._dist2target_t = self.map.dist2target(self.hero.position)
+        self._dist2goal = self.map.dist2goal()
         #
-        observation = self._get_obs()
+        self._get_obs()
         info = self._get_info()
 
         tile = np.array(self.map.agent_tile)[:-1]
-        actor_id, result = self.map.check_collision(self.hero)
+        actor_id, result = self.map.collision_check()
         reward, terminated, cause = self.reward_fn.step(tile, result, info, actor_id)
 
         truncated = False
         if cause == "max_actions":
             truncated = True
+            terminated = True
 
         self.stats.step(reward, cause)
 
@@ -165,21 +190,18 @@ class CarlaBEV(gym.Env):
             self.stats.terminated()
             info["termination"] = self.stats.get_episode_info()
 
-        if self._current_step >= 1000:
+        if self._current_step >= self.reward_fn.max_actions:
             print(f"[SAFETY STOP] Forcing episode end at step {self._current_step}")
             info["termination"] = self.stats.get_episode_info()
-            return observation, reward, True, True, info
-
-        if self.render_mode == "human":
-            self._render_frame()
+            return self._observation, reward, True, True, info
 
         self._current_step += 1
 
-        return observation, reward, terminated, truncated, info
+        return self._observation, reward, terminated, truncated, info
 
     def render(self):
-        if self.render_mode == "rgb_array":
-            return self._render_frame()
+        self._render_frame()
+        return self._rgb_array 
 
     def _render_frame(self):
         if self.window is None and self.render_mode == "human":
@@ -190,8 +212,10 @@ class CarlaBEV(gym.Env):
         if self.clock is None and self.render_mode == "human":
             self.clock = pygame.time.Clock()
 
-        self.map.step(topleft=self.camera.offset, course=self.hero.course)
-        self.hero.draw(self.map.canvas)
+        self._rgb_array = np.transpose(
+            np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)
+        )
+        self._observation = self._rgb_array
 
         if self.render_mode == "human":
             # The following line copies our drawings from `canvas` to the visible window
@@ -200,17 +224,22 @@ class CarlaBEV(gym.Env):
             pygame.display.update()
 
             # We need to ensure that human-rendering occurs at the predefined framerate.
-            # The following line will automatically add a delay to
-            # keep the framerate stable.
             self.clock.tick(self.metadata["render_fps"])
+        
+        elif self.obs_mode == "vector":
+            hero = self.map.hero.state
+            set_point = self.map.hero.set_point
+            dist = self.map.hero.dist2wp,
+            vector_data = np.concatenate([hero, set_point]).astype(np.float32)
+            self._observation = vector_data
 
-        else:  # rgb_array
-            rgb_array = np.transpose(
-                np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)
-            )
-            return rgb_array
+        return self._rgb_array 
 
     def close(self):
         if self.window is not None:
             pygame.display.quit()
             pygame.quit()
+    
+    @property
+    def observation(self):
+        return self._observation

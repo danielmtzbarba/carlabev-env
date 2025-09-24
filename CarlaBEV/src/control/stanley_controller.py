@@ -11,7 +11,7 @@ Ref:
 """
 
 import numpy as np
-from numpy.random import rand, randint
+from numpy.random import randint
 
 from CarlaBEV.src.planning import cubic_spline_planner
 from CarlaBEV.src.control.utils import angle_mod
@@ -19,7 +19,7 @@ from CarlaBEV.src.control.state import State
 
 
 class Controller(State):
-    k = 0.5  # control gain
+    k = 2.0  # control gain
     Kp = 1.0  # speed proportional gain
     dt = 0.1  # [s] time difference
 
@@ -27,7 +27,7 @@ class Controller(State):
         super().__init__()
         self.time = 0.0
         self._target_speed = target_speed
-        self.max_steer = np.radians(30.0)  # [rad] max steering angle
+        self.max_steer = np.radians(35.0)  # [rad] max steering angle
         self.L = 2.9  # [m] Wheel base of vehicle
 
     def set_route(self, ax, ay, ds=1.0):
@@ -41,10 +41,17 @@ class Controller(State):
         self.yaw = self.cyaw[self.target_idx]
 
     def control_step(self):
-        ai = self.pid_control()
-        di, self.target_idx = self.stanley_control()
-        self.update(ai, di)
-        self.time += self.dt
+        # Check if we're at or past the last waypoint
+        if self.target_idx >= len(self.cx) - 1:
+            self._target_speed = 0.0  # stop target
+            if self.v <= 0.01:        # fully stopped
+                return True           # signal finished
+        else:
+            ai = self.pid_control()
+            di, self.target_idx = self.stanley_control()
+            self.update(ai, di)
+            self.time += self.dt
+            return False  # still running
 
     def stanley_control(self):
         """
@@ -64,9 +71,11 @@ class Controller(State):
         # theta_e corrects the heading error
         theta_e = angle_mod(self.cyaw[current_target_idx] - self.yaw)
         # theta_d corrects the cross track error
-        theta_d = np.arctan2(self.k * error_front_axle, self.v)
+        theta_d = np.arctan2(self.k * error_front_axle, max(self.v, 1e-3))
+
         # Steering control
         delta = theta_e + theta_d
+        delta = np.clip(delta, -self.max_steer, self.max_steer)
 
         return delta, current_target_idx
 
@@ -104,14 +113,40 @@ class Controller(State):
 
         return target_idx, error_front_axle
 
-    @property
-    def set_point(self):
-        return np.array([self.cx[self.target_idx], self.cy[self.target_idx], self.cyaw[self.target_idx]])
+    def next_wps(self, n):
+        try:
+            wps = (
+                self.cx[self.target_idx : self.target_idx + n],
+                self.cy[self.target_idx : self.target_idx + n],
+                self.cyaw[self.target_idx : self.target_idx + n],
+            )
+        except:
+            wps = (
+                self.cx[self.target_idx : -1],
+                self.cy[self.target_idx : -1],
+                self.cyaw[self.target_idx : -1],
+            )
+        return wps 
 
     @property
-    def dist2route(self):
+    def set_point(self):
+        return np.array(
+            [
+                self.cx[self.target_idx],
+                self.cy[self.target_idx],
+                self.cyaw[self.target_idx],
+            ]
+        )
+
+    @property
+    def dist2wp(self):
         return np.linalg.norm(self.position - self.set_point[:-1], ord=2)
+
 
     @property
     def course(self):
-        return (self.cx[self.target_idx:], self.cy[self.target_idx:], self.cyaw[self.target_idx:])
+        return (
+            self.cx[self.target_idx :],
+            self.cy[self.target_idx :],
+            self.cyaw[self.target_idx :],
+        )

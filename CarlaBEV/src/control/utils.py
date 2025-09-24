@@ -158,3 +158,38 @@ def calc_speed_profile(cx, cy, cyaw, target_speed):
     speed_profile[-1] = 0.0
 
     return speed_profile
+
+
+def point_to_segment_distance(px, py, x1, y1, x2, y2, signed=False):
+    # Vectors
+    A = np.array([x1, y1])
+    B = np.array([x2, y2])
+    P = np.array([px, py])
+    AB = B - A
+    AP = P - A
+
+    # Projection of AP onto AB, normalized
+    t = np.dot(AP, AB) / np.dot(AB, AB)
+    t = np.clip(t, 0.0, 1.0)  # constrain to segment
+
+    # Closest point on segment
+    closest = A + t * AB
+    error = np.linalg.norm(P - closest)
+
+    if signed:
+        # cross product z-component (2D)
+        cross = AB[0] * AP[1] - AB[1] * AP[0]
+        error *= np.sign(cross) if cross != 0 else 1
+
+    return error
+
+
+def lateral_error(px, py, waypoints, signed=False):
+    min_error = float("inf")
+    for i in range(len(waypoints) - 1):
+        x1, y1 = waypoints[i]
+        x2, y2 = waypoints[i+1]
+        e = point_to_segment_distance(px, py, x1, y1, x2, y2, signed=signed)
+        if abs(e) < abs(min_error):
+            min_error = e
+    return min_error

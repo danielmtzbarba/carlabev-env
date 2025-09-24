@@ -6,21 +6,24 @@ from gymnasium.wrappers import (
 )
 
 from CarlaBEV.envs.carlabev import CarlaBEV
+from CarlaBEV.wrappers.rgb_to_semantic import SemanticMaskWrapper
 
 
-def make_carlabev_env(seed, idx, capture_video, run_name, size):
+def make_carlabev_env(seed, idx, capture_video, run_name, obs_space, size):
     def thunk():
+        env = CarlaBEV(render_mode="rgb_array", obs_space=obs_space, size=size)
+
         if capture_video and idx == 0:
-            env = CarlaBEV(render_mode="rgb_array", size=size)
             env = gym.wrappers.RecordVideo(
                 env, f"videos/{run_name}", episode_trigger=lambda x: x % 25 == 0
             )
-        else:
-            env = CarlaBEV(render_mode="rgb_array", size=size)
 
-        env = GrayscaleObservation(env)
-        env = ResizeObservation(env, (96, 96))
-        env = FrameStackObservation(env, stack_size=4)
+        if obs_space == "bev":
+            env = GrayscaleObservation(env)
+            env = ResizeObservation(env, (96, 96))
+#            env = SemanticMaskWrapper(env)
+            env = FrameStackObservation(env, stack_size=4)
+
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env.action_space.seed(seed)
 

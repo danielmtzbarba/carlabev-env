@@ -1,8 +1,4 @@
-import pygame
-
-from CarlaBEV.envs import CarlaBEV
-
-device = "cuda:0"
+import pygame 
 
 def init_key_tracking():
     """Initializes a dictionary to track which keys are currently held."""
@@ -12,7 +8,6 @@ def init_key_tracking():
         pygame.K_UP: False,
         pygame.K_DOWN: False,
     }
-
 
 def process_events(keys_held):
     """Processes pygame events to update held keys and check for quitting."""
@@ -43,34 +38,3 @@ def get_action_from_keys(keys_held):
         return 2
 
     return 0  # No action
-
-
-def main(size: int = 128):
-    env = CarlaBEV(size=size, render_mode="human")
-
-    observation, info = env.reset(seed=42, scene="rdm")
-    total_reward = 0
-    running = True
-    keys_held = init_key_tracking()
-
-    while running:
-        running = process_events(keys_held)
-        action = get_action_from_keys(keys_held)
-
-        # Step through the environment
-        observation, reward, terminated, _, info = env.step(action)
-        total_reward += reward
-
-        # Reset if episode ends
-        if terminated:
-            ret = info["termination"]["return"]
-            length = info["termination"]["length"]
-            print(info["termination"]["episode"], ret, ret / length)
-            observation, info = env.reset(scene="rdm")
-            total_reward = 0
-
-    env.close()
-
-
-if __name__ == "__main__":
-    main()

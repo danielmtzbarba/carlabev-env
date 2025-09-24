@@ -2,7 +2,7 @@ import pygame
 
 
 class Target(pygame.sprite.Sprite):
-    def __init__(self, id, target_pos, color=(0, 255, 0), size=5, scale=1):
+    def __init__(self, id, target_pos, color=(255, 128, 0), size=1, scale=1):
         pygame.sprite.Sprite.__init__(self)
         self.id = id
         self.color = color
@@ -26,18 +26,21 @@ class Target(pygame.sprite.Sprite):
         pass
 
     def isCollided(self, hero, offset):
-        offsetx = offset - hero.rect.w / 2
-        offsety = offset - hero.rect.w / 2
+        result = None
+        if self._visible:
+            offsetx = offset - hero.rect.w / 2
+            offsety = offset - hero.rect.w / 2
 
-        dummy_rect = pygame.Rect(
-            hero.rect.x + offsetx,
-            hero.rect.y + offsety,
-            hero.rect.w + 1,
-            hero.rect.w + 1,
-        )
-        result = dummy_rect.colliderect(self.rect)
-        if result:
-            self._visible = False
+            dummy_rect = pygame.Rect(
+                hero.rect.x + offsetx,
+                hero.rect.y + offsety,
+                hero.rect.w + 1,
+                hero.rect.w + 1,
+            )
+            result = dummy_rect.colliderect(self.rect)
+            if result:
+                self._visible = False
+
         return self.id, result
 
     def draw(self, map):

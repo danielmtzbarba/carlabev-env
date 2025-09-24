@@ -2,16 +2,11 @@ import os
 import pygame
 import numpy as np
 from PIL import Image
+from dotenv import load_dotenv
 
-# home
-#asset_path = "/home/danielmtz/Data/projects/carlabev-env/CarlaBEV/assets/"
-# msi
-asset_path = "/home/danielmtz/Data/projects/carlabev/CarlaBEV/assets"
-# mac
-# asset_path = "/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/assets"
-
-# aisys
-# asset_path = "/home/danielmtz/Data/projects/carla-bev-env/CarlaBEV/assets/"
+# Load environment variables. Assumes that project contains .env file with API keys
+load_dotenv()
+asset_path = os.environ["ASSET_PATH"]
 
 
 def get_tile_dict(id):
@@ -70,6 +65,7 @@ def load_map(size):
     x, y = planning_map.size
     pmap = np.array(planning_map.resize((int(x / 8), int(y / 8))), dtype=np.uint8)
     return arr, map_img, pmap
+
 
 def scale_coords(coord, factor):
     return np.array([int(coord[1] / factor), int(coord[0] / factor), 0])

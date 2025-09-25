@@ -53,12 +53,13 @@ class DiscreteAgent(Controller, Hero):
         Controller.__init__(self, target_speed=target_speed)
         Hero.__init__(self, window_size, color, car_size)
         #
-        self.x0 = int(route[0][0])
-        self.y0 = int(route[1][0])
+        xs, ys = route[0], route[1]
+        self.x0 = int(xs[0])
+        self.y0 = int(ys[0])
         self.acc = 0.0
         self._setup()
         #
-        self.set_route(route[0], route[1])
+        self.set_route(xs, ys)
         _, self.target_idx = self.stanley_control()
 
     def step(self, action):

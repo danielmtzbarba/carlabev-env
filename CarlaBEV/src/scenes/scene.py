@@ -48,10 +48,9 @@ class Scene(object):
 
             for id in self._actors.keys():
                 if id == "agent":
-                    route=self.agent_route
                     self.hero = self.Agent(
                         window_size=self.size,
-                        route=route,
+                        route=self.agent_route,
                         color=(0, 0, 0),
                         target_speed=int(100 / self._scale),
                         car_size=32,
@@ -93,41 +92,76 @@ class Scene(object):
         self._idx += 1 
         return actor
         
-    def add_rdm_scene(self):
-        scene_dict= {   
+    def add_rdm_scene(self, max_retries=20):
+        scene_dict = {   
             "Agent": 1,
             "Vehicle": 15,
-            "Pedestrian": 15
+            "Pedestrian": 15,
         }
+
         actors = {
-            'agent': [],
-            'vehicle': [],
-            'pedestrian': [],
-            'target': []
+            "agent": None,        # agent stores path, not object
+            "vehicle": [],
+            "pedestrian": [],
+            "target": [],
         }
-        for actor_type in scene_dict.keys():
-            for i in range(scene_dict[actor_type]):
-                Ditto = Pedestrian if actor_type.lower() == "pedestrian" else Vehicle
-                node1 = get_random_node(self.planner, actor_type) 
-                node2 = get_random_node(self.planner, actor_type) 
-                actor = Ditto(start_node=node1, end_node=node2, map_size=self.size)
-                actor, path = find_route(self.planner, actor, lane=None)
 
-                try:
-                    cubic_spline_planner.calc_spline_course(path[0], path[1], ds=1.0)
-                except Exception as e:
-                    print('Route generation error')
-                    if actor_type.lower() == "agent":
-                        self.add_rdm_scene()
-                    else:
-                        continue
+        # --------------------
+        # Stage 1: Ensure Agent
+        # --------------------
+        retries = 0
+        success = False
+        while not success and retries < max_retries:
+            try:
+                node1 = get_random_node(self.planner, "Agent")
+                node2 = get_random_node(self.planner, "Agent")
+                agent = Vehicle(start_node=node1, end_node=node2, map_size=self.size)  # or special Agent class?
 
-                if actor_type.lower() == "agent":
-                    actors[actor_type.lower()] = path
-                    actors = set_targets(actors, path[0], path[1])
-                    continue
-                    
-                actors[actor_type.lower()].append(actor)
+                agent, path = find_route(self.planner, agent, lane=None)
+                cubic_spline_planner.calc_spline_course(path[0], path[1], ds=1.0)
+
+                actors["agent"] = path
+                actors = set_targets(actors, path[0], path[1])
+                success = True
+            except Exception as e:
+                retries += 1
+                print(f"[CRITICAL] Failed to generate agent route (attempt {retries}): {e}")
+
+        if not success:
+            raise RuntimeError(f"Could not generate valid agent route after {max_retries} attempts.")
+
+        # --------------------
+        # Stage 2: Other actors
+        # --------------------
+        for actor_type, count in scene_dict.items():
+            if actor_type == "Agent":
+                continue  # already handled
+
+            Ditto = Pedestrian if actor_type.lower() == "pedestrian" else Vehicle
+
+            for i in range(count):
+                retries = 0
+                success = False
+                while not success and retries < max_retries:
+                    try:
+                        node1 = get_random_node(self.planner, actor_type)
+                        node2 = get_random_node(self.planner, actor_type)
+                        actor = Ditto(start_node=node1, end_node=node2, map_size=self.size)
+
+                        actor, path = find_route(self.planner, actor, lane=None)
+                        cubic_spline_planner.calc_spline_course(path[0], path[1], ds=1.0)
+
+                        actors[actor_type.lower()].append(actor)
+                        success = True
+                    except Exception as e:
+                        retries += 1
+
+                if not success:
+                    print(f"[ERROR] Could not add {actor_type} after {max_retries} retries. Skipping.")
+
+        # --------------------
+        # Stage 3: Reset scene
+        # --------------------
         self.reset(actors)
 
     def get_scene_df(self, scene_id):

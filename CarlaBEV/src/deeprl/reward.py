@@ -44,12 +44,10 @@ class RewardFn(object):
         self._k: int = 0
         self.max_actions: int = max_actions
         self._normalizer = RewardNormalizer()
-        self._steering_accum = 0.0
         self._speed_accum = 0.0
 
     def reset(self):
         self._k = 0
-        self._steering_accum = 0.0
         self._speed_accum = 0.0
 
     def step(self, tile, collision, info, target_id):
@@ -60,7 +58,7 @@ class RewardFn(object):
             reward, terminated, cause = 0.0, True, "max_actions"
             return reward, terminated, cause
         
-        if info["env"]["dist2wp"] > 20:
+        if info["env"]["dist2wp"] > 25:
             reward, terminated, cause = -0.5, True, "out_of_bounds"
             return reward, terminated, cause
 
@@ -77,98 +75,44 @@ class RewardFn(object):
     def non_terminal(self, tile, info):
         reward = 0.0
 
+        # Off-road penalty
         if np.array_equal(tile, self.tiles_to_color[2]):  # Sidewalk
-            reward += -0.3
+            reward -= 0.1
 
+        # Vehicle state
         x, y, yaw, v = info["hero"]["state"]
         _, _, yaw_1, v_1 = info["hero"]["last_state"]
         delta_yaw = yaw_1 - yaw
 
-        self._steering_accum += delta_yaw
-        self._speed_accum += v
-
+        # Waypoints
         distance_t = info["env"]["dist2goal"]
         distance_t_1 = info["env"]["dist2goal_t_1"]
-        dist2wp = info["env"]["dist2wp"]
         set_point = info["env"]["set_point"]
-        xs, ys, yaws = info["env"]["nextwps"]
-        wps  = np.array([xs, ys]).transpose()  
-        dist2route = lateral_error(x, y, wps, signed=False) 
-        reward -= dist2route * 0.03
+        xs, ys, _ = info["env"]["nextwps"]
+        wps = np.array([xs, ys]).T  
 
-        # --- Progress reward (toward the target) ---
-        delta_progress = distance_t_1 - distance_t  # positive if moving closer
-        # Yaw alignment
-        desired_yaw = set_point[2]
-        yaw_error = np.arctan2(np.sin(desired_yaw - yaw), np.cos(desired_yaw - yaw))
-        # --- Progress reward (toward the target) ---
-        delta_progress = distance_t_1 - distance_t  # Positive if getting closer
+        # Lateral error
+        dist2route = lateral_error(x, y, wps, signed=True)
+        reward -= 0.05 * abs(dist2route)  # mild penalty
 
-        # --- Yaw alignment ---
-        desired_yaw = set_point[2]
-        yaw_error = np.arctan2(
-            np.sin(desired_yaw - yaw), np.cos(desired_yaw - yaw)
-        )  # [-π, π]
-        yaw_alignment = np.cos(yaw_error)  # 1 = aligned, -1 = opposite
-
+        # Progress & alignment (only if moving forward)
+        delta_progress = distance_t_1 - distance_t
         if delta_progress > 0:
-            if abs(yaw_error) < np.radians(45):
-                # --- Aligned: allow progress reward ---
-                progress_reward = np.clip(delta_progress * 0.1, -0.5, 0.5)
-                reward += progress_reward
+            desired_yaw = set_point[2]
+            yaw_error = np.arctan2(np.sin(desired_yaw - yaw), np.cos(desired_yaw - yaw))
+            yaw_alignment = np.cos(yaw_error)
 
-                # --- Yaw reward (boosted when aligned) ---
-                yaw_reward = yaw_alignment * 0.3
-                reward += yaw_reward
-
-                # --- Distance-to-route reward (only when aligned) ---
-                safe_margin = 3  # pixels
-                max_r = 0.3
-                min_r = -0.5
-
-                if dist2wp <= safe_margin:
-                    route_reward = max_r
-                elif dist2wp <= 2 * safe_margin:
-                    decay = (dist2wp - safe_margin) / safe_margin
-                    route_reward = max_r * (1 - 5 * decay)
-                else:
-                    route_reward = min_r
-
-                reward += route_reward
-            else:
-                # --- Misaligned: penalize progress ---
-                reward -= 0.5  # discourage blindly moving forward
-                # Optional: small penalty for strong misalignment
-                reward += yaw_alignment * 0.1  # slightly negative if facing wrong
+            reward += 0.2 * delta_progress * yaw_alignment
+            reward += 0.5 * yaw_alignment
+            reward += 0.2 * np.exp(-abs(dist2route))
         else:
-            # Optional: slight penalty for idling if needed
-            pass
+            reward -= 0.05  # small penalty for idling or moving backward
 
-        # Debug info
-        # print(
-        #    f"Δprogress: {delta_progress:.3f}, Yaw err: {np.degrees(yaw_error):.1f}°, Reward: {reward:.3f}"
-        # )
-
-        if self._k > 0 and self._k % 20 == 0:
-            # Idle penalty
-            if self._speed_accum < 100:
-                speed_penalty = -0.8
-                reward += speed_penalty
-
-            # Accumulate absolute steering over N frames
-            if abs(self._steering_accum) > 4.0:
-                # ===  Steering penalty to avoid spinning ===
-                reward += -0.8  # Penalize spinning behavior
-
-            # Reset every 20 step
-            self._speed_accum = 0.0
-            self._steering_accum = 0.0
-
-        # smooth driving
+        # Smoothness
         jerk = abs(v_1 - v) + abs(delta_yaw)
-        reward -= 0.01 * jerk
+        reward -= 0.005 * jerk
 
-        return np.clip(reward, -0.8, 0.8)
+        return np.clip(reward, -0.5, 1.0)
 
     def termination(self, collision, target_id):
         if collision == "pedestrian":
@@ -179,5 +123,5 @@ class RewardFn(object):
             if target_id == "goal":
                 return 10.0, True, "success"
             else:
-                return 0.4, False, "ckpt"
+                return 0.6, False, "ckpt"
         return -0.01, False, "unknown"

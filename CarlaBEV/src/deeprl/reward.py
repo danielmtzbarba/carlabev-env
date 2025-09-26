@@ -60,8 +60,8 @@ class RewardFn(object):
             reward, terminated, cause = 0.0, True, "max_actions"
             return reward, terminated, cause
         
-        if info["env"]["dist2wp"] > 30:
-            reward, terminated, cause = 0.0, True, "out_of_bounds"
+        if info["env"]["dist2wp"] > 20:
+            reward, terminated, cause = -0.5, True, "out_of_bounds"
             return reward, terminated, cause
 
         if np.array_equal(tile, self.tiles_to_color[0]):  # Obstacle
@@ -172,12 +172,12 @@ class RewardFn(object):
 
     def termination(self, collision, target_id):
         if collision == "pedestrian":
-            return -1.0, True, "collision"
+            return -5.0, True, "collision"
         elif collision == "vehicle":
-            return -0.9, True, "collision"
+            return -2.0, True, "collision"
         elif collision == "target":
             if target_id == "goal":
-                return 1.0, True, "success"
+                return 10.0, True, "success"
             else:
-                return 0.5, False, "ckpt"
+                return 0.4, False, "ckpt"
         return -0.01, False, "unknown"

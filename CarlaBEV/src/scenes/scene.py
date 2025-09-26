@@ -32,7 +32,7 @@ class Scene(object):
         }
         #
         self.planner_ped = GraphPlanner(os.path.join(asset_path, "Town01/town01.pkl"))
-        self.planner_car = GraphPlanner(os.path.join(asset_path, "Town01/town01-vehicles.pkl"))
+        self.planner_car = GraphPlanner(os.path.join(asset_path, "Town01/town01-vehicles-100.pkl"))
         #
         self.planner = {
             "vehicle": self.planner_car,
@@ -52,9 +52,11 @@ class Scene(object):
                         window_size=self.size,
                         route=self.agent_route,
                         color=(0, 0, 0),
-                        target_speed=int(100 / self._scale),
+                        target_speed=int(50 / self._scale),
                         car_size=32,
                     )
+
+                    self._actors = set_targets(self._actors, self.hero.cx, self.hero.cy)
                     continue
 
                 for actor in self._actors[id]:
@@ -118,11 +120,10 @@ class Scene(object):
                 agent = Vehicle(start_node=node1, end_node=node2, map_size=self.size)  # or special Agent class?
 
                 agent, path = find_route(self.planner, agent, lane=None)
-                cubic_spline_planner.calc_spline_course(path[0], path[1], ds=1.0)
+                if len(path[0]) > 5:
+                    actors["agent"] = path
+                    success = True
 
-                actors["agent"] = path
-                actors = set_targets(actors, path[0], path[1])
-                success = True
             except Exception as e:
                 retries += 1
                 print(f"[CRITICAL] Failed to generate agent route (attempt {retries}): {e}")
@@ -149,10 +150,10 @@ class Scene(object):
                         actor = Ditto(start_node=node1, end_node=node2, map_size=self.size)
 
                         actor, path = find_route(self.planner, actor, lane=None)
-                        cubic_spline_planner.calc_spline_course(path[0], path[1], ds=1.0)
+                        if len(path[0]) > 5:
+                            actors[actor_type.lower()].append(actor)
+                            success = True
 
-                        actors[actor_type.lower()].append(actor)
-                        success = True
                     except Exception as e:
                         retries += 1
 

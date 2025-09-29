@@ -1,4 +1,5 @@
 import pygame
+import math
 import numpy as np
 
 from CarlaBEV.src.gui.settings import Settings as cfg
@@ -99,7 +100,15 @@ class Actor(pygame.sprite.Sprite):
             hero.rect.x + offsetx, hero.rect.y + offsety, hero.rect.w, hero.rect.w
         )
         result = dummy_rect.colliderect(self.rect)
-        return self.id, result
+
+        # --- Distance estimation (center-to-center) ---
+        hero_center = dummy_rect.center
+        obj_center = self.rect.center
+        dx = hero_center[0] - obj_center[0]
+        dy = hero_center[1] - obj_center[1]
+        distance = math.hypot(dx, dy)  # Euclidean distance in pixels
+
+        return self.id, result, distance
 
     @property
     def data(self):

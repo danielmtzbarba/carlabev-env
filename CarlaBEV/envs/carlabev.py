@@ -113,6 +113,7 @@ class CarlaBEV(gym.Env):
                 "dist2wp": self.map.hero.dist2wp,
                 "nextwps": self.map.hero.next_wps(5),
                 "set_point": self.map.hero.set_point,
+                "dist2actors": [],
             },
             "hero": {
                 "state": self.map.hero.state,
@@ -176,7 +177,8 @@ class CarlaBEV(gym.Env):
         info = self._get_info()
 
         tile = np.array(self.map.agent_tile)[:-1]
-        actor_id, result = self.map.collision_check()
+        actor_id, result, dist2actors = self.map.collision_check(min_dist=35)
+        info["dist2actors"] = dist2actors
         reward, terminated, cause = self.reward_fn.step(tile, result, info, actor_id)
 
         truncated = False

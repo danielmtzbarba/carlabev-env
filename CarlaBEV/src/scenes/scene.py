@@ -192,18 +192,21 @@ class Scene(object):
                 actor.step()
                 actor.draw(self._scene)
 
-    def collision_check(self):
+    def collision_check(self, min_dist=20):
         result = None
         coll_id = None
+        close_actors = []
         for id in self._actors.keys():
             if id == "agent":
                 continue
             for actor in self._actors[id]:
-                actor_id, collision = actor.isCollided(self.hero, self._const)
+                actor_id, collision, distance = actor.isCollided(self.hero, self._const)
+                if abs(distance) < min_dist:
+                    close_actors.append(distance)
                 if collision:
                     result = id
                     coll_id = actor_id
-        return coll_id, result
+        return coll_id, result, close_actors
 
     @property
     def agent_route(self):

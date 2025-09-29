@@ -41,7 +41,7 @@ class Target(pygame.sprite.Sprite):
             if result:
                 self._visible = False
 
-        return self.id, result
+        return self.id, result, 9999
 
     def draw(self, map):
         if self.visible:

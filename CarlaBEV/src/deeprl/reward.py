@@ -44,11 +44,9 @@ class RewardFn(object):
         self._k: int = 0
         self.max_actions: int = max_actions
         self._normalizer = RewardNormalizer()
-        self._speed_accum = 0.0
 
     def reset(self):
         self._k = 0
-        self._speed_accum = 0.0
 
     def step(self, tile, collision, info, target_id):
         self._k += 1
@@ -77,7 +75,7 @@ class RewardFn(object):
 
         # Off-road penalty
         if np.array_equal(tile, self.tiles_to_color[2]):  # Sidewalk
-            reward -= 0.1
+            reward -= 0.2
 
         # Vehicle state
         x, y, yaw, v = info["hero"]["state"]
@@ -102,26 +100,33 @@ class RewardFn(object):
             yaw_error = np.arctan2(np.sin(desired_yaw - yaw), np.cos(desired_yaw - yaw))
             yaw_alignment = np.cos(yaw_error)
 
-            reward += 0.2 * delta_progress * yaw_alignment
+            reward += 0.1 * delta_progress * yaw_alignment
             reward += 0.5 * yaw_alignment
             reward += 0.2 * np.exp(-abs(dist2route))
         else:
             reward -= 0.05  # small penalty for idling or moving backward
 
+        # Safety
+        safety_penalty = 0.0
+        for dist2actor in info["dist2actors"]: 
+            safety_penalty -= 0.003 * (100 - dist2actor)
+        reward -= safety_penalty
+
         # Smoothness
         jerk = abs(v_1 - v) + abs(delta_yaw)
         reward -= 0.005 * jerk
+        
 
         return np.clip(reward, -0.5, 1.0)
 
     def termination(self, collision, target_id):
         if collision == "pedestrian":
-            return -5.0, True, "collision"
+                return -10.0, True, "collision"   # catastrophic, worst case
         elif collision == "vehicle":
-            return -2.0, True, "collision"
+            return -6.0, True, "collision"    # still very bad
         elif collision == "target":
             if target_id == "goal":
-                return 10.0, True, "success"
+                return +10.0, True, "success" # big positive
             else:
-                return 0.6, False, "ckpt"
+                return +0.3, False, "ckpt"    # small shaping reward
         return -0.01, False, "unknown"

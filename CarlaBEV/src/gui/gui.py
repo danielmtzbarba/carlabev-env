@@ -53,13 +53,15 @@ class GUI():
             # Add actor
             if not self.add_mode:
                 self.toggle_add_mode()
-                return "add_actor"
+                return None
         
         if event.type == pygame.MOUSEBUTTONUP and self.add_mode: 
             self.add_actor(event)
+            return "add_actor"
         
         if self.add_rdm_actor_btn.handle_event(event):
-            self.add_rdm_scene()
+            self.env.reset(scene="rdm")
+            return "rdm"
 
         if self.play_btn.handle_event(event):
             if not self.play_mode:

@@ -142,7 +142,8 @@ class CarlaBEV(gym.Env):
                 actors = self._builder.get_scene_actors(rdm_id)
                 self.map.reset(actors)
         else:
-            print(scene)
+            self.map.reset() 
+            self.map.reset(scene)
 
         # Camera
         self.camera = Camera(self.map.hero, resolution=(self.size, self.size))

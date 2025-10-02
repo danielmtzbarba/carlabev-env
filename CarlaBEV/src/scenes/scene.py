@@ -32,7 +32,7 @@ class Scene(object):
         }
         #
         self.planner_ped = GraphPlanner(os.path.join(asset_path, "Town01/town01.pkl"))
-        self.planner_car = GraphPlanner(os.path.join(asset_path, "Town01/town01-vehicles-100.pkl"))
+        self.planner_car = GraphPlanner(os.path.join(asset_path, "Town01/town01-vehicles-2lanes-100.pkl"))
         #
         self.planner = {
             "vehicle": self.planner_car,
@@ -52,7 +52,7 @@ class Scene(object):
                         window_size=self.size,
                         route=self.agent_route,
                         color=(0, 0, 0),
-                        target_speed=int(50 / self._scale),
+                        target_speed=int(30 / self._scale),
                         car_size=32,
                     )
 
@@ -89,9 +89,20 @@ class Scene(object):
 
     def add_actor(self, actor_type: str, start_node, end_node):
         Ditto = Pedestrian if actor_type.lower() == "pedestrian" else Vehicle
-        actor = Ditto(start_node=start_node, end_node=end_node, map_size=self.size)
-        self._actors[actor_type.lower()].append(actor)
-        self._idx += 1 
+
+        try:
+            actor = Ditto(start_node=start_node, end_node=end_node, map_size=self.size)
+            actor, path = find_route(self.planner, actor, lane=None)
+            if len(path[0]) > 5:
+                if actor_type == "Agent":
+                    self._actors["agent"] = path
+                else:
+                    self._actors[actor_type.lower()].append(actor)
+                self._idx += 1 
+
+        except Exception as e:
+            print(f"[ERROR] Could not add {actor_type}. Cause: {e}")
+
         return actor
         
     def add_rdm_scene(self, max_retries=20):
@@ -222,3 +233,7 @@ class Scene(object):
     @property
     def target_position(self):
         return self._actors["target"][self.num_targets].position
+    
+    @property
+    def curr_actors(self):
+        return self._actors

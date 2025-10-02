@@ -36,25 +36,6 @@ class SceneDesigner(GUI):
         self.draw_gui()
         self.draw_fov()
         pygame.display.flip()
-    
-    def add_rdm_scene(self):
-        scene_dict= {   
-            "Agent": 1,
-            "Vehicle": 1,
-            "Pedestrian": 1
-        }
-        self.env.map.reset()
-        for actor_type in scene_dict.keys():
-            for i in range(scene_dict[actor_type]):
-                node1 = get_random_node(self.env.map.planner, actor_type) 
-                node2 = get_random_node(self.env.map.planner, actor_type) 
-                try:
-                    actor = self.env.map.add_actor(actor_type.lower(), node1, node2)
-                    find_route(self.env.map.planner, actor, lane=None)
-                except Exception as e:
-                    continue
-
-        self.loaded_scene = self.env.map.get_scene_df(self.scene_name.text)
 
     def add_actor(self, event):
         lane = None
@@ -69,12 +50,17 @@ class SceneDesigner(GUI):
             if isinstance(node, Node):
                 node.color = cfg.red 
                 actor = self.env.map.add_actor(actor_type, self.current_start, node)
-                find_route(self.env.map.planner, actor, lane)
-                self.listbox.add_actor(actor_type, str(actor.id))
-                self.toggle_add_mode()
+                try:
+                    find_route(self.env.map.planner, actor, lane)
+                    self.listbox.add_actor(actor_type, str(actor.id))
+                    self.toggle_add_mode()
+                except Exception as e:
+                    print(e)
+                    
     
     def play_scene(self):
-        self.loaded_scene = self.env.map.get_scene_df(self.scene_name.text)
+        self.loaded_scene = self.env.map.curr_actors
+        self.env.map.reset(self.loaded_scene)
         self.toggle_play_mode()
 
     def save_scene(self, scene_id):
@@ -87,18 +73,22 @@ class SceneDesigner(GUI):
 
     def toggle_play_mode(self):
         self.play_mode = not self.play_mode
+        if not self.play_mode:
+            self.env.map.reset()
 
 
 # Main loop
 def main(size: int = 128):
     env = CarlaBEV(size=size, render_mode="rgb_array")
     env.reset(scene="rdm")
+    env.map.reset()
     #
     keys_held = init_key_tracking()
     pygame.init()
     app = SceneDesigner(env=env)
     # 
     running = True
+    total_reward = 0
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -114,8 +104,8 @@ def main(size: int = 128):
             
             flag = app.handle_event(event)
 
-            if flag:
-                observation, info = env.reset(scene=app.loaded_scene)
+            if flag == "rdm":
+                observation, info = env.reset(scene="rdm")
                 total_reward = 0
         
         if app.play_mode:
@@ -130,7 +120,10 @@ def main(size: int = 128):
             if terminated:
                 ret = info["termination"]["return"]
                 length = info["termination"]["length"]
-                observation, info = env.reset()
+                if app.loaded_scene != None:
+                    observation, info = env.reset(scene=app.loaded_scene)
+                else:
+                    observation, info = env.reset("rdm")
                 total_reward = 0
 
         app.render(env)

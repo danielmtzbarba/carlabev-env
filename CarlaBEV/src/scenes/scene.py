@@ -2,7 +2,7 @@ import os
 import pygame
 import numpy as np
 import pandas as pd
-
+from random import choice
 from CarlaBEV.src.planning import cubic_spline_planner
 from CarlaBEV.src.planning.graph_planner import GraphPlanner
 
@@ -13,37 +13,44 @@ from CarlaBEV.src.actors.pedestrian import Pedestrian
 
 from CarlaBEV.envs.utils import asset_path, load_map
 from CarlaBEV.src.gui.settings import Settings as cfg
-from CarlaBEV.src.scenes.utils import * 
+from CarlaBEV.src.scenes.utils import *
+
 
 class Scene(object):
     cols = ["scene_id", "class", "start", "goal", "rx", "ry"]
 
     def __init__(self, size, screen) -> None:
         self.screen = screen
-        self.size = size  
+        self.size = size
         self._scale = int(1024 / size)
         self._const = size / 4
 
-        self.Agent = DiscreteAgent 
-        self._actors = {
-            'agent': [],
-            'vehicle': [],
-            'pedestrian': []
-        }
+        self.Agent = DiscreteAgent
+        self._actors = {"agent": [], "vehicle": [], "pedestrian": []}
         #
         self.planner_ped = GraphPlanner(os.path.join(asset_path, "Town01/town01.pkl"))
-        self.planner_car = GraphPlanner(os.path.join(asset_path, "Town01/town01-vehicles-2lanes-100.pkl"))
+        self.planner_car = GraphPlanner(
+            os.path.join(asset_path, "Town01/town01-vehicles-2lanes-100.pkl")
+        )
+        self.planner_right = GraphPlanner(
+            os.path.join(asset_path, "Town01/town01-vehicles-right-100.pkl")
+        )
+        self.planner_left = GraphPlanner(
+            os.path.join(asset_path, "Town01/town01-vehicles-left-100.pkl")
+        )
         #
         self.planner = {
             "vehicle": self.planner_car,
-            "pedestrian": self.planner_ped
+            "vehicle-L": self.planner_left,
+            "vehicle-R": self.planner_right,
+            "pedestrian": self.planner_ped,
         }
         self._idx = 0
         #
 
     def reset(self, actors=None):
         self._idx = 0
-        if actors: 
+        if actors:
             self._actors = actors
 
             for id in self._actors.keys():
@@ -52,7 +59,7 @@ class Scene(object):
                         window_size=self.size,
                         route=self.agent_route,
                         color=(0, 0, 0),
-                        target_speed=int(30 / self._scale),
+                        target_speed=int(50 / self._scale),
                         car_size=32,
                     )
 
@@ -63,14 +70,9 @@ class Scene(object):
                     actor.reset()
 
         else:
-            self._scene_id = '' 
+            self._scene_id = ""
             self._scene_data = pd.DataFrame(data=[], columns=self.cols)
-            self._actors = {
-                'agent': [],
-                'vehicle': [],
-                'pedestrian': [],
-                'target': []
-            }
+            self._actors = {"agent": [], "vehicle": [], "pedestrian": [], "target": []}
 
     def draw_scene(self):
         for actor_type, actors in self._actors.items():
@@ -98,22 +100,22 @@ class Scene(object):
                     self._actors["agent"] = path
                 else:
                     self._actors[actor_type.lower()].append(actor)
-                self._idx += 1 
+                self._idx += 1
 
         except Exception as e:
             print(f"[ERROR] Could not add {actor_type}. Cause: {e}")
 
         return actor
-        
+
     def add_rdm_scene(self, max_retries=20):
-        scene_dict = {   
+        scene_dict = {
             "Agent": 1,
-            "Vehicle": 15,
-            "Pedestrian": 15,
+            "Vehicle": 50,
+            "Pedestrian": 0,
         }
 
         actors = {
-            "agent": None,        # agent stores path, not object
+            "agent": None,  # agent stores path, not object
             "vehicle": [],
             "pedestrian": [],
             "target": [],
@@ -126,21 +128,27 @@ class Scene(object):
         success = False
         while not success and retries < max_retries:
             try:
-                node1 = get_random_node(self.planner, "Agent")
-                node2 = get_random_node(self.planner, "Agent")
-                agent = Vehicle(start_node=node1, end_node=node2, map_size=self.size)  # or special Agent class?
+                node1 = get_random_node(self.planner, "agent", "R")
+                node2 = get_random_node(self.planner, "agent", "R")
+                agent = Vehicle(
+                    start_node=node1, end_node=node2, map_size=self.size
+                )  # or special Agent class?
 
-                agent, path = find_route(self.planner, agent, lane=None)
+                agent, path = find_route(self.planner, agent, lane="R")
                 if len(path[0]) > 5:
                     actors["agent"] = path
                     success = True
 
             except Exception as e:
                 retries += 1
-                print(f"[CRITICAL] Failed to generate agent route (attempt {retries}): {e}")
+                print(
+                    f"[CRITICAL] Failed to generate agent route (attempt {retries}): {e}"
+                )
 
         if not success:
-            raise RuntimeError(f"Could not generate valid agent route after {max_retries} attempts.")
+            raise RuntimeError(
+                f"Could not generate valid agent route after {max_retries} attempts."
+            )
 
         # --------------------
         # Stage 2: Other actors
@@ -156,11 +164,13 @@ class Scene(object):
                 success = False
                 while not success and retries < max_retries:
                     try:
-                        node1 = get_random_node(self.planner, actor_type)
-                        node2 = get_random_node(self.planner, actor_type)
-                        actor = Ditto(start_node=node1, end_node=node2, map_size=self.size)
-
-                        actor, path = find_route(self.planner, actor, lane=None)
+                        lane = choice(["L", "R"])
+                        node1 = get_random_node(self.planner, actor_type, lane)
+                        node2 = get_random_node(self.planner, actor_type, lane)
+                        actor = Ditto(
+                            start_node=node1, end_node=node2, map_size=self.size
+                        )
+                        actor, path = find_route(self.planner, actor, lane=lane)
                         if len(path[0]) > 5:
                             actors[actor_type.lower()].append(actor)
                             success = True
@@ -169,7 +179,9 @@ class Scene(object):
                         retries += 1
 
                 if not success:
-                    print(f"[ERROR] Could not add {actor_type} after {max_retries} retries. Skipping.")
+                    print(
+                        f"[ERROR] Could not add {actor_type} after {max_retries} retries. Skipping."
+                    )
 
         # --------------------
         # Stage 3: Reset scene
@@ -186,10 +198,10 @@ class Scene(object):
                 df.loc[i] = data
                 rx = df.at[i, "rx"]  # .at is safer for a single cell
                 ry = df.at[i, "ry"]
-                df.at[i, "rx"] = [8*int(x) for x in rx]
-                df.at[i, "ry"] = [8*int(y) for y in ry]
+                df.at[i, "rx"] = [8 * int(x) for x in rx]
+                df.at[i, "ry"] = [8 * int(y) for y in ry]
                 i += 1
-                                
+
         self._scene_data = df
         return self._scene_data
 
@@ -233,7 +245,7 @@ class Scene(object):
     @property
     def target_position(self):
         return self._actors["target"][self.num_targets].position
-    
+
     @property
     def curr_actors(self):
         return self._actors

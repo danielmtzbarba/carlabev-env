@@ -13,22 +13,6 @@ class Tiles(Enum):
     target = 6
 
 
-class RewardNormalizer:
-    def __init__(self, clip_range=(-1, 1), decay=0.99):
-        self.mean = 0.0
-        self.var = 1.0
-        self.decay = decay
-        self.clip_range = clip_range
-
-    def normalize(self, reward):
-        # Update running mean and variance
-        self.mean = self.decay * self.mean + (1 - self.decay) * reward
-        self.var = self.decay * self.var + (1 - self.decay) * (reward - self.mean) ** 2
-        std = np.sqrt(self.var) + 1e-8
-        normalized = (reward - self.mean) / std
-        return np.clip(normalized, *self.clip_range)
-
-
 class RewardFn(object):
     tiles_to_color = {
         Tiles.obstacle.value: np.array([150, 150, 150]),
@@ -43,7 +27,6 @@ class RewardFn(object):
     def __init__(self, max_actions=2000) -> None:
         self._k: int = 0
         self.max_actions: int = max_actions
-        self._normalizer = RewardNormalizer()
 
     def reset(self):
         self._k = 0
@@ -65,7 +48,6 @@ class RewardFn(object):
         elif collision is not None:
             reward, terminated, cause = self.termination(collision, target_id)
         else:
-            # reward += self._normalizer.normalize(self.non_terminal(tile, info))
             reward += self.non_terminal(tile, info)
 
         return reward, terminated, cause
@@ -100,9 +82,9 @@ class RewardFn(object):
             yaw_error = np.arctan2(np.sin(desired_yaw - yaw), np.cos(desired_yaw - yaw))
             yaw_alignment = np.cos(yaw_error)
 
-            reward += 0.1 * delta_progress * yaw_alignment
-            reward += 0.5 * yaw_alignment
-            reward += 0.2 * np.exp(-abs(dist2route))
+            reward += 0.2 * delta_progress * yaw_alignment
+            reward += 0.3 * yaw_alignment
+            reward += 0.1 * np.exp(-abs(dist2route))
         else:
             reward -= 0.05  # small penalty for idling or moving backward
 

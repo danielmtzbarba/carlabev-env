@@ -1,7 +1,8 @@
 from enum import Enum
 import numpy as np
 
-from CarlaBEV.src.control.utils import lateral_error 
+from CarlaBEV.src.control.utils import lateral_error
+
 
 class Tiles(Enum):
     obstacle = 0
@@ -24,7 +25,7 @@ class RewardFn(object):
         Tiles.target.value: np.array([0, 255, 0]),
     }
 
-    def __init__(self, max_actions=2000) -> None:
+    def __init__(self, max_actions=5000) -> None:
         self._k: int = 0
         self.max_actions: int = max_actions
 
@@ -38,7 +39,7 @@ class RewardFn(object):
         if self._k >= self.max_actions:
             reward, terminated, cause = 0.0, True, "max_actions"
             return reward, terminated, cause
-        
+
         if info["env"]["dist2wp"] > 25:
             reward, terminated, cause = -0.5, True, "out_of_bounds"
             return reward, terminated, cause
@@ -69,7 +70,7 @@ class RewardFn(object):
         distance_t_1 = info["env"]["dist2goal_t_1"]
         set_point = info["env"]["set_point"]
         xs, ys, _ = info["env"]["nextwps"]
-        wps = np.array([xs, ys]).T  
+        wps = np.array([xs, ys]).T
 
         # Lateral error
         dist2route = lateral_error(x, y, wps, signed=True)
@@ -90,25 +91,24 @@ class RewardFn(object):
 
         # Safety
         safety_penalty = 0.0
-        for dist2actor in info["dist2actors"]: 
+        for dist2actor in info["dist2actors"]:
             safety_penalty -= 0.003 * (100 - dist2actor)
         reward -= safety_penalty
 
         # Smoothness
         jerk = abs(v_1 - v) + abs(delta_yaw)
         reward -= 0.005 * jerk
-        
 
         return np.clip(reward, -0.5, 1.0)
 
     def termination(self, collision, target_id):
         if collision == "pedestrian":
-                return -10.0, True, "collision"   # catastrophic, worst case
+            return -10.0, True, "collision"  # catastrophic, worst case
         elif collision == "vehicle":
-            return -6.0, True, "collision"    # still very bad
+            return -6.0, True, "collision"  # still very bad
         elif collision == "target":
             if target_id == "goal":
-                return +10.0, True, "success" # big positive
+                return +10.0, True, "success"  # big positive
             else:
-                return +0.3, False, "ckpt"    # small shaping reward
+                return +0.3, False, "ckpt"  # small shaping reward
         return -0.01, False, "unknown"

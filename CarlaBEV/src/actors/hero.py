@@ -5,6 +5,7 @@ import math
 from CarlaBEV.src.control.stanley_controller import Controller
 from CarlaBEV.src.gui.settings import Settings as cfg
 
+
 class Hero(pygame.sprite.Sprite):
     def __init__(self, window_size, color=(0, 7, 175), car_size=32):
         pygame.sprite.Sprite.__init__(self)
@@ -20,7 +21,7 @@ class Hero(pygame.sprite.Sprite):
 
     def _setup(self):
         center = self.window_center
-        self.fov_rect= pygame.Rect((center, center, self.w, self.l))
+        self.fov_rect = pygame.Rect((center, center, self.w, self.l))
         self.rect = pygame.Rect((self.x0, self.y0, self.w, self.l))
         # movement
         self.x = self.rect.x + cfg.offx
@@ -28,7 +29,8 @@ class Hero(pygame.sprite.Sprite):
 
     def draw(self, display_fov, display):
         pygame.draw.rect(display_fov, self.color, self.fov_rect)
-#        pygame.draw.rect(display, self.color, self.rect)
+
+    #        pygame.draw.rect(display, self.color, self.rect)
 
     @property
     def position(self):
@@ -52,13 +54,13 @@ class DiscreteAgent(Controller, Hero):
     ):
         Controller.__init__(self, target_speed=target_speed)
         Hero.__init__(self, window_size, color, car_size)
-        #
+
         xs, ys = route[0], route[1]
         self.x0 = int(xs[0])
         self.y0 = int(ys[0])
         self.acc = 0.0
         self._setup()
-        #
+
         self.set_route(xs, ys)
         _, self.target_idx = self.stanley_control()
 
@@ -67,46 +69,50 @@ class DiscreteAgent(Controller, Hero):
 
         _, self.target_idx = self.stanley_control()
 
-        # === Combine acceleration and braking ===
-        if action[2] > 0:  # brake
-            target_acc = self.brake(action[2])
-        else:
-            target_acc = self.accelerate(action[0])
+        # === Compute acceleration and braking ===
+        acc_val = self.accelerate(action[0])
+        brake_val = self.brake(action[2])
 
-        # === Apply low-pass filter to smooth acceleration ===
-        alpha = 0.2  # smoothing factor (0 = no update, 1 = instant)
+        # Total longitudinal acceleration
+        target_acc = acc_val - brake_val
+
+        # === Smooth acceleration (low-pass filter) ===
+        alpha = 0.2
         self.acc = (1 - alpha) * self.acc + alpha * target_acc
 
-        # === Steering remains discrete ===
+        # === Apply steering ===
         self.turn(action[1])
 
-        # === Apply smoothed acceleration ===
-        self.update(-1 * self.acc, 0)
+        # === Update physics ===
+        self.update(self.acc, 0)
 
-        # === Update rendering ===
+        # === Friction & velocity stabilization ===
+        self.v *= 0.98
+        if abs(self.v) < 0.05:
+            self.v = 0.0
+
+        # === Render update ===
         self.rect.center = (round(self.x) + self._offx, round(self.y) + self._offy)
+        # natural drag proportional to speed
+        self.v *= 0.985
 
     def accelerate(self, amount):
-        """Return target acceleration based on gas input"""
-        return amount * 1.0 * self.scale  # positive accel
+        """Return positive forward acceleration"""
+        return amount * 1.0 * self.scale  # tweak 1.0 to 0.8–1.2 for feel
 
     def brake(self, amount):
-        """Return target acceleration based on brake input"""
-        return -amount * 2.0 * self.scale  # negative accel
+        speed_factor = np.clip(abs(self.v) / 5.0, 0.3, 1.0)
+        return amount * 0.6 * self.scale * speed_factor
 
     def turn(self, angle_degrees):
-        """
-        Adjust the angle the car is heading only if it's moving.
-        Turn the car realistically — allow turning at low speed, but reduced.
-        """
+        """Turn realistically, depending on speed."""
         if abs(self.v) < 0.1:
-            return  # No turning allowed when car is stationary
+            return  # no turn if not moving
 
-        min_turn_scale = 0.4  # allow some turning even when nearly stopped
-        max_turn_scale = 1.2  # allow a slight boost to turning at higher speeds
+        min_turn_scale = 0.4
+        max_turn_scale = 1.2
         turn_scale = np.clip(self.v / 2.0, min_turn_scale, max_turn_scale)
         self.yaw += math.radians(angle_degrees * turn_scale)
-        return
 
 
 class ContinuousAgent(Controller, Hero):
@@ -133,7 +139,7 @@ class ContinuousAgent(Controller, Hero):
     def step(self, action):
         """Sprite update function, calcualtes any new position"""
         d, self.target_idx = self.stanley_control()
-        acc = self.accelerate(action[1]) - self.brake(action[2])
+        acc = self.accelerate(action[1]) - self.brake(action[2]) - 0.05 * self.vx
         delta = action[0]
         self.update(acc, delta)
 
@@ -144,5 +150,4 @@ class ContinuousAgent(Controller, Hero):
         return amount * self.scale / 2
 
     def brake(self, amount):
-        """Slow the car by half"""
-        return -amount * self.scale / 4
+        return amount * self.scale * (0.5 + 0.5 * (abs(self.vx) / self.max_speed))

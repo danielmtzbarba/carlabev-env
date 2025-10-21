@@ -102,7 +102,7 @@ class DiscreteAgent(Controller, Hero):
 
     def brake(self, amount):
         speed_factor = np.clip(abs(self.v) / 5.0, 0.3, 1.0)
-        return amount * 0.6 * self.scale * speed_factor
+        return -amount * 0.6 * self.scale * speed_factor
 
     def turn(self, angle_degrees):
         """Turn realistically, depending on speed."""

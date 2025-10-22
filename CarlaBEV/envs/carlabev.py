@@ -100,7 +100,7 @@ class CarlaBEV(gym.Env):
 
     def _get_obs(self):
         self._render_frame()
-        return  self._observation
+        return self._observation
 
     def _get_info(self):
         # Get the distance to the target
@@ -113,11 +113,13 @@ class CarlaBEV(gym.Env):
                 "dist2wp": self.map.hero.dist2wp,
                 "nextwps": self.map.hero.next_wps(5),
                 "set_point": self.map.hero.set_point,
-                "dist2actors": [],
+                "actors_state": [],
             },
             "hero": {
                 "state": self.map.hero.state,
                 "last_state": self.map.hero.last_state,
+                "action": None,
+                "last_action": self.last_action,
             },
             "ep": {
                 "id": self.stats.episode,
@@ -125,24 +127,29 @@ class CarlaBEV(gym.Env):
                 "length": len(self.stats),
             },
             "nn": {},
+            "collision": {
+                "collided": None,
+                "actor_id": None,
+            },
         }
 
     def reset(self, seed=None, options=None, scene="rdm"):
         super().reset(seed=seed)
+        self.last_action = 0
         self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
 
         if isinstance(scene, str):
             if scene == "rdm":
-                self.map.reset() 
-                df = self.map.add_rdm_scene()
+                self.map.reset()
+                df = self.map.add_rdm_scene(episode=self.stats.episode, max_retries=5)
             else:
                 rdm_id = choice(self._scene_ids)
                 actors = self._builder.get_scene_actors(rdm_id)
                 self.map.reset(actors)
         else:
-            self.map.reset() 
+            self.map.reset()
             self.map.reset(scene)
 
         # Camera
@@ -176,11 +183,16 @@ class CarlaBEV(gym.Env):
         #
         self._get_obs()
         info = self._get_info()
+        info["hero"]["action"] = action
 
         tile = np.array(self.map.agent_tile)[:-1]
-        actor_id, result, dist2actors = self.map.collision_check(min_dist=35)
-        info["dist2actors"] = dist2actors
-        reward, terminated, cause = self.reward_fn.step(tile, result, info, actor_id)
+        actor_id, result, actors_state = self.map.collision_check(min_dist=35)
+
+        info["collision"]["collided"] = result
+        info["collision"]["actor_id"] = actor_id
+        info["actors_state"] = actors_state
+        reward, terminated, cause = self.reward_fn.step(tile, info)
+        self.last_action = action
 
         truncated = False
         if cause == "max_actions":
@@ -204,7 +216,7 @@ class CarlaBEV(gym.Env):
 
     def render(self):
         self._render_frame()
-        return self._rgb_array 
+        return self._rgb_array
 
     def _render_frame(self):
         if self.window is None and self.render_mode == "human":
@@ -228,21 +240,21 @@ class CarlaBEV(gym.Env):
 
             # We need to ensure that human-rendering occurs at the predefined framerate.
             self.clock.tick(self.metadata["render_fps"])
-        
+
         elif self.obs_mode == "vector":
             hero = self.map.hero.state
             set_point = self.map.hero.set_point
-            dist = self.map.hero.dist2wp,
+            dist = (self.map.hero.dist2wp,)
             vector_data = np.concatenate([hero, set_point]).astype(np.float32)
             self._observation = vector_data
 
-        return self._rgb_array 
+        return self._rgb_array
 
     def close(self):
         if self.window is not None:
             pygame.display.quit()
             pygame.quit()
-    
+
     @property
     def observation(self):
         return self._observation

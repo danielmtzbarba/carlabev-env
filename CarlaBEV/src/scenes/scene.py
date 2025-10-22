@@ -107,13 +107,26 @@ class Scene(object):
 
         return actor
 
-    def add_rdm_scene(self, max_retries=20):
+    def add_rdm_scene(self, episode, max_retries=20):
+        if episode < 1000:
+            num_cars = 0
+        else:
+            # smooth logistic growth after episode 1000
+            max_vehicles = 50
+            growth_rate = 0.005
+            midpoint = 3000
+            num_cars = int(
+                max_vehicles / (1 + np.exp(-growth_rate * (episode - midpoint)))
+            )
+            num_cars = int(
+                np.clip(num_cars + np.random.randint(-3, 4), 0, max_vehicles)
+            )
+
         scene_dict = {
             "Agent": 1,
-            "Vehicle": 50,
+            "Vehicle": num_cars,
             "Pedestrian": 0,
         }
-
         actors = {
             "agent": None,  # agent stores path, not object
             "vehicle": [],
@@ -215,21 +228,48 @@ class Scene(object):
                 actor.step()
                 actor.draw(self._scene)
 
-    def collision_check(self, min_dist=20):
+    def collision_check(self, min_dist=20.0):
+        """
+        Checks for collisions and collects nearby actor states for TTC/proximity shaping.
+
+        Returns:
+            coll_id (str | None): ID of the specific actor collided, if any.
+            result (str | None): Type of collision ("vehicle", "pedestrian", etc.)
+            close_actors (list[float]): List of distances (m) to nearby actors < min_dist.
+            actors_state (list[dict]): Each dict contains:
+                {
+                    "pos": (x, y),
+                    "vel": (vx, vy),
+                    "type": "Vehicle" | "Pedestrian"
+                }
+        """
         result = None
         coll_id = None
-        close_actors = []
-        for id in self._actors.keys():
-            if id == "agent":
+        actors_state = []
+
+        for id_type, actor_list in self._actors.items():
+            if id_type == "agent":
                 continue
-            for actor in self._actors[id]:
+
+            for actor in actor_list:
                 actor_id, collision, distance = actor.isCollided(self.hero, self._const)
+
+                # --- near-distance list ---
                 if abs(distance) < min_dist:
-                    close_actors.append(distance)
+                    # --- collect actor state for TTC ---
+                    ax, ay, ayaw, av = actor.state
+                    avx = av * np.cos(ayaw)
+                    avy = av * np.sin(ayaw)
+                    actors_state.append(
+                        {"pos": (ax, ay), "vel": (avx, avy), "type": id_type}
+                    )
+
+                # --- collision detection ---
                 if collision:
-                    result = id
+                    result = id_type
                     coll_id = actor_id
-        return coll_id, result, close_actors
+
+        return coll_id, result, actors_state
 
     @property
     def agent_route(self):

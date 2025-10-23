@@ -8,6 +8,7 @@ from gymnasium.wrappers import (
 from CarlaBEV.envs.carlabev import CarlaBEV
 from CarlaBEV.wrappers.rgb_to_semantic import SemanticMaskWrapper
 
+
 def make_carlabev_env_muzero(seed, idx, capture_video, run_name, size):
     def thunk():
         if capture_video and idx == 0:
@@ -28,6 +29,7 @@ def make_carlabev_env_muzero(seed, idx, capture_video, run_name, size):
 
     return thunk
 
+
 def make_carlabev_env(seed, idx, capture_video, run_name, obs_space, size):
     def thunk():
         env = CarlaBEV(render_mode="rgb_array", obs_space=obs_space, size=size)
@@ -40,7 +42,7 @@ def make_carlabev_env(seed, idx, capture_video, run_name, obs_space, size):
         if obs_space == "bev":
             env = GrayscaleObservation(env)
             env = ResizeObservation(env, (96, 96))
-#            env = SemanticMaskWrapper(env)
+            #            env = SemanticMaskWrapper(env)
             env = FrameStackObservation(env, stack_size=4)
 
         env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -50,8 +52,8 @@ def make_carlabev_env(seed, idx, capture_video, run_name, obs_space, size):
 
     return thunk
 
-def make_carlabev_eval(run_name, obs_space, size, render=False):
 
+def make_carlabev_eval(run_name, obs_space, size, render=False):
     def thunk():
         render_mode = "rgb_array" if render else "human"
         env = CarlaBEV(render_mode=render_mode, obs_space="bev", size=size)
@@ -61,7 +63,7 @@ def make_carlabev_eval(run_name, obs_space, size, render=False):
             )
         env = GrayscaleObservation(env)
         env = ResizeObservation(env, (96, 96))
-#            env = SemanticMaskWrapper(env)
+        #            env = SemanticMaskWrapper(env)
         env = FrameStackObservation(env, stack_size=4)
 
         env = gym.wrappers.RecordEpisodeStatistics(env)
@@ -69,4 +71,4 @@ def make_carlabev_eval(run_name, obs_space, size, render=False):
 
         return env
 
-    return thunk 
+    return thunk

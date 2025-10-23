@@ -118,7 +118,7 @@ class CarlaBEV(gym.Env):
             "hero": {
                 "state": self.map.hero.state,
                 "last_state": self.map.hero.last_state,
-                "action": None,
+                "action": 0,
                 "last_action": self.last_action,
             },
             "ep": {
@@ -126,10 +126,9 @@ class CarlaBEV(gym.Env):
                 "return": self.stats.episode_return,
                 "length": len(self.stats),
             },
-            "nn": {},
             "collision": {
-                "collided": None,
-                "actor_id": None,
+                "collided": False,
+                "actor_id": 0,
             },
         }
 
@@ -169,6 +168,7 @@ class CarlaBEV(gym.Env):
         return self._observation, info
 
     def step(self, action):
+        truncated = False
         if self.discrete:
             action = self._action_to_direction[action]
         #
@@ -181,8 +181,9 @@ class CarlaBEV(gym.Env):
         #
         self._dist2goal = self.map.dist2goal()
         #
-        self._get_obs()
         info = self._get_info()
+        self._get_obs()
+        #
         info["hero"]["action"] = action
 
         tile = np.array(self.map.agent_tile)[:-1]
@@ -191,28 +192,30 @@ class CarlaBEV(gym.Env):
         info["collision"]["collided"] = result
         info["collision"]["actor_id"] = actor_id
         info["actors_state"] = actors_state
+
         reward, terminated, cause = self.reward_fn.step(tile, info)
-        self.last_action = action
-
-        truncated = False
-        if cause == "max_actions":
-            truncated = True
-            terminated = True
-
         self.stats.step(reward, cause)
 
         if cause in self.termination_causes:
+            if cause == "max_actions":
+                terminated, truncated = True, True
+
             self.stats.terminated()
             info["termination"] = self.stats.get_episode_info()
+            info_out = {"termination": info["termination"]}
+        else:
+            info_out = {}
 
         if self._current_step >= self.reward_fn.max_actions:
             print(f"[SAFETY STOP] Forcing episode end at step {self._current_step}")
             info["termination"] = self.stats.get_episode_info()
-            return self._observation, reward, True, True, info
-
+            info_out = {"termination": info["termination"]}
+            return self._observation, reward, True, True, info_out
+        #
         self._current_step += 1
-
-        return self._observation, reward, terminated, truncated, info
+        self.last_action = action
+        #
+        return self._observation, reward, terminated, truncated, info_out
 
     def render(self):
         self._render_frame()

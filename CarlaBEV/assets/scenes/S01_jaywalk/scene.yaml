@@ -1,0 +1,9 @@
+scenario_id: S05_jaywalk
+description: "Pedestrian jaywalk mid-block, occluded by parked vehicle"
+map: Town01
+weather: clear
+ego:
+  start: [180, 350]
+  goal: [400, 350]
+duration: 25.0
+dt: 0.1

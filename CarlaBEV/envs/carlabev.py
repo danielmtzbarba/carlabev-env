@@ -13,6 +13,8 @@ from CarlaBEV.src.deeprl.reward import RewardFn
 from CarlaBEV.src.deeprl.stats import Stats
 from CarlaBEV.src.scenes import SceneBuilder
 
+from CarlaBEV.src.scenes.utils import load_scenario_folder
+
 SCENE_IDS = [f"scene-{i}" for i in range(10)]
 SCENE_IDS = ["scene_1-1"]
 
@@ -144,8 +146,8 @@ class CarlaBEV(gym.Env):
                 self.map.reset()
                 df = self.map.add_rdm_scene(episode=self.stats.episode, max_retries=5)
             else:
-                rdm_id = choice(self._scene_ids)
-                actors = self._builder.get_scene_actors(rdm_id)
+                actors, meta = load_scenario_folder("scenarios/S05_jaywalk")
+                scene.reset(actors)
                 self.map.reset(actors)
         else:
             self.map.reset()

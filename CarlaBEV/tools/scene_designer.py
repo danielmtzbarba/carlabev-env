@@ -9,29 +9,35 @@ import math
 
 from CarlaBEV.envs.utils import asset_path, load_map
 
-from CarlaBEV.tools.controls import init_key_tracking, get_action_from_keys, process_events
+from CarlaBEV.tools.controls import (
+    init_key_tracking,
+    get_action_from_keys,
+    process_events,
+)
 from CarlaBEV.src.scenes.scene import Scene, Node
-from CarlaBEV.src.scenes.utils import * 
+from CarlaBEV.src.scenes.utils import *
 
 from CarlaBEV.src.gui import GUI
 from CarlaBEV.src.gui.settings import Settings as cfg
 
 from CarlaBEV.envs import CarlaBEV
+
 device = "cuda:0"
 # -----------------------------------------
+
 
 class SceneDesigner(GUI):
     def __init__(self, env):
         GUI.__init__(self)
-        self.env = env 
+        self.env = env
 
         # Actor data structure
         self.add_mode = False
         self.play_mode = False
-        self.current_start = None 
+        self.current_start = None
         #
         self.loaded_scene = None
-    
+
     def render(self, env=None):
         self.draw_gui()
         self.draw_fov()
@@ -48,7 +54,7 @@ class SceneDesigner(GUI):
         else:
             node = select_node(event, self.env.map.planner, lane, actor_type)
             if isinstance(node, Node):
-                node.color = cfg.red 
+                node.color = cfg.red
                 actor = self.env.map.add_actor(actor_type, self.current_start, node)
                 try:
                     find_route(self.env.map.planner, actor, lane)
@@ -56,8 +62,7 @@ class SceneDesigner(GUI):
                     self.toggle_add_mode()
                 except Exception as e:
                     print(e)
-                    
-    
+
     def play_scene(self):
         self.loaded_scene = self.env.map.curr_actors
         self.env.map.reset(self.loaded_scene)
@@ -81,12 +86,13 @@ class SceneDesigner(GUI):
 def main(size: int = 128):
     env = CarlaBEV(size=size, render_mode="rgb_array")
     env.reset(scene="rdm")
-    env.map.reset()
     #
     keys_held = init_key_tracking()
     pygame.init()
     app = SceneDesigner(env=env)
-    # 
+    actors, meta = load_scenario_folder("assets/scenes/S01_jaywalk/")
+    env.map.reset(actors)
+    #
     running = True
     total_reward = 0
     while running:
@@ -101,16 +107,16 @@ def main(size: int = 128):
             elif event.type == pygame.KEYUP:
                 if event.key in keys_held:
                     keys_held[event.key] = False
-            
+
             flag = app.handle_event(event)
 
             if flag == "rdm":
                 observation, info = env.reset(scene="rdm")
                 total_reward = 0
-        
+        app.loaded_scene = actors
         if app.play_mode:
             action = get_action_from_keys(keys_held)
-            action = randint(0,8)
+            action = randint(0, 8)
 
             # Step through the environment
             observation, reward, terminated, _, info = env.step(action)
@@ -120,7 +126,7 @@ def main(size: int = 128):
             if terminated:
                 ret = info["termination"]["return"]
                 length = info["termination"]["length"]
-                if app.loaded_scene != None:
+                if app.loaded_scene is not None:
                     observation, info = env.reset(scene=app.loaded_scene)
                 else:
                     observation, info = env.reset("rdm")
@@ -131,6 +137,7 @@ def main(size: int = 128):
     env.close()
     pygame.quit()
     sys.exit()
+
 
 if __name__ == "__main__":
     main()

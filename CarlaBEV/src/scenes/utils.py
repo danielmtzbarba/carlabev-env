@@ -1,5 +1,11 @@
 import pygame
+from copy import deepcopy
 import numpy as np
+
+import os
+import ast
+import yaml
+import pandas as pd
 
 from CarlaBEV.src.gui.settings import Settings as cfg
 from CarlaBEV.src.actors.vehicle import Vehicle
@@ -131,3 +137,81 @@ def build_scene(df, map_size):
             continue
         actors[class_id].append(Ditto(map_size=map_size, routeX=rx, routeY=ry))
     return actors
+
+
+def load_scene_from_csv(csv_path, size=1024, verbose=True):
+    """
+    Loads a scenario CSV file and instantiates the actors.
+
+    Returns:
+        actors (dict): {
+            "agent": (rx, ry),
+            "vehicle": [Vehicle(), ...],
+            "pedestrian": [Pedestrian(), ...],
+            "target": []
+        }
+    """
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"Scene CSV not found: {csv_path}")
+
+    df = pd.read_csv(csv_path)
+    actors = {"agent": None, "vehicle": [], "pedestrian": [], "target": []}
+
+    for _, row in df.iterrows():
+        actor_class = row["class"].strip().lower()
+        start = ast.literal_eval(row["start"])
+        goal = ast.literal_eval(row["goal"])
+        rx = ast.literal_eval(row["rx"])
+        ry = ast.literal_eval(row["ry"])
+
+        if actor_class == "agent":
+            # store only the route for Scene.Agent
+            actors["agent"] = (rx, ry)
+            if verbose:
+                print(f"[SceneLoader] Loaded Agent route: {len(rx)} points")
+
+        elif actor_class == "vehicle":
+            vehicle = Vehicle(
+                start_node=start, end_node=goal, map_size=size, routeX=rx, routeY=ry
+            )
+            actors["vehicle"].append(vehicle)
+            if verbose:
+                print(f"[SceneLoader] Vehicle added: start={start}, goal={goal}")
+
+        elif actor_class == "pedestrian":
+            ped = Pedestrian(
+                start_node=start, end_node=goal, map_size=size, routeX=rx, routeY=ry
+            )
+            actors["pedestrian"].append(ped)
+            if verbose:
+                print(f"[SceneLoader] Pedestrian added: start={start}, goal={goal}")
+
+        else:
+            print(f"[WARN] Unknown actor class '{actor_class}' — skipping.")
+
+    return actors
+
+
+def load_meta_yaml(meta_path):
+    """
+    Reads a meta.yaml file for scenario info.
+
+    Returns:
+        dict with scenario info
+    """
+    if not os.path.exists(meta_path):
+        print(f"[SceneLoader] No meta.yaml found at {meta_path}")
+        return {}
+    with open(meta_path, "r") as f:
+        meta = yaml.safe_load(f)
+    print(f"[SceneLoader] Loaded metadata for {meta.get('scenario_id', 'unknown')}")
+    return meta
+
+
+def load_scenario_folder(folder_path, size=1024):
+    csv_path = os.path.join(folder_path, "scene.csv")
+    meta_path = os.path.join(folder_path, "meta.yaml")
+
+    actors = load_scene_from_csv(csv_path, size=size)
+    meta = load_meta_yaml(meta_path)
+    return actors, meta

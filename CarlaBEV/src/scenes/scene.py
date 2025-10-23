@@ -1,17 +1,14 @@
 import os
-import pygame
 import numpy as np
 import pandas as pd
 from random import choice
-from CarlaBEV.src.planning import cubic_spline_planner
 from CarlaBEV.src.planning.graph_planner import GraphPlanner
 
 from CarlaBEV.src.actors.hero import ContinuousAgent, DiscreteAgent
 from CarlaBEV.src.actors.vehicle import Vehicle
-from CarlaBEV.src.scenes.target import Target
 from CarlaBEV.src.actors.pedestrian import Pedestrian
 
-from CarlaBEV.envs.utils import asset_path, load_map
+from CarlaBEV.envs.utils import asset_path
 from CarlaBEV.src.gui.settings import Settings as cfg
 from CarlaBEV.src.scenes.utils import *
 

@@ -59,7 +59,7 @@ def make_carlabev_eval(run_name, obs_space, size, render=False):
         env = CarlaBEV(render_mode=render_mode, obs_space="bev", size=size)
         if render_mode == "rgb_array":
             env = gym.wrappers.RecordVideo(
-                env, f"evals/{run_name}", episode_trigger=lambda x: x % 1 == 0
+                env, f"videos/{run_name}/eval", episode_trigger=lambda x: x % 1 == 0
             )
         env = GrayscaleObservation(env)
         env = ResizeObservation(env, (96, 96))

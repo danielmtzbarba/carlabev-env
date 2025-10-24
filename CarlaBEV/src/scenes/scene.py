@@ -121,13 +121,14 @@ class Scene(object):
         if episode < 1000:
             num_cars = 0
         else:
-            # smooth logistic growth after episode 1000
+            # Smooth logistic growth after episode 1000
             max_vehicles = 50
-            growth_rate = 0.005
-            midpoint = 3000
+            growth_rate = 0.01  # was 0.005 → faster growth
+            midpoint = 2500  # traffic ramps up around ep=2000
             num_cars = int(
                 max_vehicles / (1 + np.exp(-growth_rate * (episode - midpoint)))
             )
+            # small random variation, avoids static scenes
             num_cars = int(
                 np.clip(num_cars + np.random.randint(-3, 4), 0, max_vehicles)
             )

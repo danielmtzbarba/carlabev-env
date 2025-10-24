@@ -1,4 +1,5 @@
 import os
+import copy
 import numpy as np
 import pandas as pd
 from random import choice
@@ -46,27 +47,39 @@ class Scene(object):
         #
 
     def reset(self, actors=None):
+        """Resets the scene with optional preloaded actors dictionary."""
         self._idx = 0
+
         if actors:
-            self._actors = actors
+            # 🧠 Deepcopy so we don't mutate the same dict across resets
 
-            for id in self._actors.keys():
-                if id == "agent":
-                    self.hero = self.Agent(
-                        window_size=self.size,
-                        route=self.agent_route,
-                        color=(0, 0, 0),
-                        target_speed=int(50 / self._scale),
-                        car_size=32,
-                    )
+            self._actors = copy.deepcopy(actors)
 
-                    self._actors = set_targets(self._actors, self.hero.cx, self.hero.cy)
+            # Rebuild hero
+            if "agent" in self._actors and self._actors["agent"] is not None:
+                self.hero = self.Agent(
+                    window_size=self.size,
+                    route=self.agent_route,
+                    color=(0, 0, 0),
+                    target_speed=int(50 / self._scale),
+                    car_size=32,
+                )
+
+                # ✅ Only update the 'target' entry in self._actors, not overwrite everything
+                target_dict = set_targets(self._actors, self.hero.cx, self.hero.cy)
+                if "target" in target_dict:
+                    self._actors["target"] = target_dict["target"]
+
+            # Reinitialize all non-agent actors properly
+            for actor_type, actor_list in self._actors.items():
+                if actor_type == "agent":
                     continue
-
-                for actor in self._actors[id]:
-                    actor.reset()
+                for actor in actor_list:
+                    if hasattr(actor, "reset"):
+                        actor.reset()
 
         else:
+            # 🧹 Empty map reset
             self._scene_id = ""
             self._scene_data = pd.DataFrame(data=[], columns=self.cols)
             self._actors = {"agent": [], "vehicle": [], "pedestrian": [], "target": []}

@@ -85,13 +85,11 @@ class SceneDesigner(GUI):
 # Main loop
 def main(size: int = 128):
     env = CarlaBEV(size=size, render_mode="rgb_array")
-    env.reset(scene="rdm")
     #
     keys_held = init_key_tracking()
     pygame.init()
     app = SceneDesigner(env=env)
-    actors, meta = load_scenario_folder("assets/scenes/S01_jaywalk/")
-    env.map.reset(actors)
+    env.reset(scene="eval")
     #
     running = True
     total_reward = 0
@@ -113,7 +111,8 @@ def main(size: int = 128):
             if flag == "rdm":
                 observation, info = env.reset(scene="rdm")
                 total_reward = 0
-        app.loaded_scene = actors
+
+        app.loaded_scene = "notNone"
         if app.play_mode:
             action = get_action_from_keys(keys_held)
             action = randint(0, 8)
@@ -126,11 +125,9 @@ def main(size: int = 128):
             if terminated:
                 ret = info["termination"]["return"]
                 length = info["termination"]["length"]
-                if app.loaded_scene is not None:
-                    observation, info = env.reset(scene=app.loaded_scene)
-                else:
-                    observation, info = env.reset("rdm")
                 total_reward = 0
+                print(ret)
+                observation, info = env.reset(scene="eval")
 
         app.render(env)
 

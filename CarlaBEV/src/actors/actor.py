@@ -6,6 +6,7 @@ from CarlaBEV.src.gui.settings import Settings as cfg
 from CarlaBEV.src.planning.planner import Planner, scale_route
 from CarlaBEV.src.control.stanley_controller import Controller
 
+
 class Node(object):
     def __init__(self, id, position, lane=None):
         self.id, self.lane = id, lane
@@ -13,24 +14,24 @@ class Node(object):
         self._y = int(position[1])
         self.draw_x = self._x + cfg.offx
         self.draw_y = self._y + cfg.offy
-        self.btn = pygame.Rect(self.draw_x, self.draw_y,  3, 3)
-        self.color = None 
-    
+        self.btn = pygame.Rect(self.draw_x, self.draw_y, 3, 3)
+        self.color = None
+
     def reset(self):
-        self.color = None 
-    
+        self.color = None
+
     def render(self, screen, color=None):
         if color is not None:
             self.color = color
 
         if self.color is not None:
             pygame.draw.rect(screen, self.color, self.btn)
-    
+
     def clicked(self, event):
         if self.btn.collidepoint(event.pos):
-            self.color = cfg.red 
+            self.color = cfg.red
             return True
-    
+
     @property
     def scaled_pos(self):
         return [self._x, self._y]
@@ -59,14 +60,13 @@ class Actor(pygame.sprite.Sprite):
         self.end_node = end_node
         #
         if routeX and routeY:
-            self.rx = scale_route(routeX, factor=8)
-            self.ry = scale_route(routeY, factor=8)
+            self.rx = routeX
+            self.ry = routeY
         else:
-            self.rx, self.ry = [], [] 
+            self.rx, self.ry = [], []
         #
         self.path = []
         self.selected = False
-
 
     def set_route_wp(self, node_id, x, y):
         self.rx.append(x)
@@ -81,8 +81,8 @@ class Actor(pygame.sprite.Sprite):
 
     def step(self):
         self._controller.control_step()
-        self.rect.x = self._controller.x 
-        self.rect.y = self._controller.y 
+        self.rect.x = self._controller.x
+        self.rect.y = self._controller.y
 
     def draw(self, screen):
         if self.selected:
@@ -112,4 +112,15 @@ class Actor(pygame.sprite.Sprite):
 
     @property
     def data(self):
-        return [None, self.id, self.start_node.scaled_pos, self.end_node.scaled_pos, self.rx, self.ry]
+        return [
+            None,
+            self.id,
+            self.start_node.scaled_pos,
+            self.end_node.scaled_pos,
+            self.rx,
+            self.ry,
+        ]
+
+    @property
+    def state(self):
+        return self._controller.state

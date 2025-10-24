@@ -139,7 +139,7 @@ def build_scene(df, map_size):
     return actors
 
 
-def load_scene_from_csv(csv_path, size=1024, verbose=True):
+def load_scene_from_csv(csv_path, size=128, verbose=True):
     """
     Loads a scenario CSV file and instantiates the actors.
 
@@ -164,27 +164,41 @@ def load_scene_from_csv(csv_path, size=1024, verbose=True):
         rx = ast.literal_eval(row["rx"])
         ry = ast.literal_eval(row["ry"])
 
+        # Convert to Node objects (required by Vehicle/Pedestrian)
+        start_node = Node(id=0, position=start)
+        goal_node = Node(id=1, position=goal)
+
         if actor_class == "agent":
             # store only the route for Scene.Agent
             actors["agent"] = (rx, ry)
             if verbose:
-                print(f"[SceneLoader] Loaded Agent route: {len(rx)} points")
+                print(f"[SceneLoader] ✅ Loaded Agent route ({len(rx)} waypoints)")
 
         elif actor_class == "vehicle":
             vehicle = Vehicle(
-                start_node=start, end_node=goal, map_size=size, routeX=rx, routeY=ry
+                start_node=start_node,
+                end_node=goal_node,
+                map_size=size,
+                routeX=rx,
+                routeY=ry,
             )
+            vehicle.reset()  # <-- ensures .state exists
             actors["vehicle"].append(vehicle)
             if verbose:
-                print(f"[SceneLoader] Vehicle added: start={start}, goal={goal}")
+                print(f"[SceneLoader] 🚗 Vehicle added: start={start}, goal={goal}")
 
         elif actor_class == "pedestrian":
             ped = Pedestrian(
-                start_node=start, end_node=goal, map_size=size, routeX=rx, routeY=ry
+                start_node=start_node,
+                end_node=goal_node,
+                map_size=size,
+                routeX=rx,
+                routeY=ry,
             )
+            ped.reset()  # same reason
             actors["pedestrian"].append(ped)
             if verbose:
-                print(f"[SceneLoader] Pedestrian added: start={start}, goal={goal}")
+                print(f"[SceneLoader] 🚶 Pedestrian added: start={start}, goal={goal}")
 
         else:
             print(f"[WARN] Unknown actor class '{actor_class}' — skipping.")

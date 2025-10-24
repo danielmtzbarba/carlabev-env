@@ -1,3 +1,4 @@
+import os
 from enum import Enum
 from random import choice
 
@@ -141,17 +142,26 @@ class CarlaBEV(gym.Env):
         self.stats.reset()
         self.reward_fn.reset()
 
-        if isinstance(scene, str):
-            if scene == "rdm":
-                self.map.reset()
-                df = self.map.add_rdm_scene(episode=self.stats.episode, max_retries=5)
-            else:
-                actors, meta = load_scenario_folder("scenarios/S05_jaywalk")
-                scene.reset(actors)
-                self.map.reset(actors)
-        else:
-            self.map.reset()
+        # --- Case 1: Random scene generation ---
+        if isinstance(scene, str) and scene == "rdm":
+            self.map.reset()  # clear map and old actors
+            self.map.add_rdm_scene(episode=self.stats.episode, max_retries=5)
+
+        # --- Case 2: Predefined scenario ---
+        elif isinstance(scene, str):
+            # e.g., scene = "S01_jaywalk"
+            scene_path = os.path.join("assets/scenes", scene)
+            actors, meta = load_scenario_folder("assets/scenes/S01_jaywalk/")
+            self.map.reset(actors)  # instantiate correctly
+
+        # --- Case 3: Scene dict provided directly (not CSV path) ---
+        elif isinstance(scene, dict):
             self.map.reset(scene)
+
+        # --- Safety check ---
+        else:
+            print(f"[WARN] Unknown scene format: {type(scene)} → Resetting empty map.")
+            self.map.reset()
 
         # Camera
         self.camera = Camera(self.map.hero, resolution=(self.size, self.size))

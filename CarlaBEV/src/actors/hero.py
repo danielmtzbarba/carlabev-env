@@ -109,7 +109,7 @@ class DiscreteAgent(Controller, Hero):
         if abs(self.v) < 0.1:
             return  # no turn if not moving
 
-        min_turn_scale = 0.4
+        min_turn_scale = 0.3
         max_turn_scale = 1.2
         turn_scale = np.clip(self.v / 2.0, min_turn_scale, max_turn_scale)
         self.yaw += math.radians(angle_degrees * turn_scale)

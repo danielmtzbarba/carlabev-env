@@ -18,9 +18,6 @@ from CarlaBEV.src.scenes import SceneBuilder
 
 from CarlaBEV.src.scenes.utils import load_scenario_folder
 
-SCENE_IDS = [f"scene-{i}" for i in range(10)]
-SCENE_IDS = ["scene_1-1"]
-
 
 class Actions(Enum):
     nothing = 0
@@ -73,7 +70,13 @@ class CarlaBEV(gym.Env):
         "render_modes": ["human", "rgb_array"],
         "render_fps": 60,
     }
-    termination_causes = ["max_actions", "collision", "success", "out_of_bounds"]
+    termination_causes = [
+        "max_actions",
+        "collision",
+        "success",
+        "out_of_bounds",
+        "off_road",
+    ]
 
     def __init__(self, size, discrete=True, obs_space="bev", render_mode=None):
         self.cfg = config
@@ -133,9 +136,6 @@ class CarlaBEV(gym.Env):
         self.clock = None
         #
         self.map = BaseMap(config.map_name, config.size)
-        # self.map = Town01(size=self.size, AgentClass=self.Agent)
-        self._scene_ids = SCENE_IDS
-        self._builder = SceneBuilder(self._scene_ids, size)
 
     def _get_obs(self):
         self._render_frame()

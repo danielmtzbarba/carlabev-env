@@ -22,7 +22,7 @@ class Scene:
         self.screen = screen
         self.town_name = town_name
         self._scale = int(1024 / size)
-        self._const = size / 4
+        self._const = int(size / 4) + 1
 
         # --- Managers ---
         self.planners = PlannerManager(town_name)

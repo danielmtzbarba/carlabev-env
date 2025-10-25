@@ -55,6 +55,7 @@ class Actor(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         self.id = id
         self.ds = resolution
+        self.size = actor_size
 
         self.start_node = start_node
         self.end_node = end_node
@@ -75,9 +76,9 @@ class Actor(pygame.sprite.Sprite):
         self.path.append(Node(node_id, pos))
 
     def reset(self):
-        self._controller = Controller(self._target_speed)
+        self._controller = Controller(self.target_speed)
         self._controller.set_route(self.rx, self.ry, ds=self.ds)
-        self.rect = pygame.Rect((self.rx[0], self.ry[0], self._size, self._size))
+        self.rect = pygame.Rect((self.rx[0], self.ry[0], self.size, self.size))
 
     def step(self):
         self._controller.control_step()

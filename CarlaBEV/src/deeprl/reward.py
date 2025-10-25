@@ -47,12 +47,14 @@ class RewardFn(object):
             reward, terminated, cause = 0.0, True, "max_actions"
             return reward, terminated, cause
 
-        if info["env"]["dist2wp"] > 25:
+        if info["env"]["dist2wp"] > 50:
             reward, terminated, cause = -0.5, True, "out_of_bounds"
             return reward, terminated, cause
 
         if np.array_equal(tile, self.tiles_to_color[0]):  # Obstacle
             reward, terminated, cause = -1.0, True, "collision"
+        elif np.array_equal(tile, self.tiles_to_color[2]):  # Obstacle
+            reward, terminated, cause = -0.6, True, "off_road"
         elif collision is not None:
             reward, terminated, cause = self.termination(collision, target_id)
         else:
@@ -66,7 +68,7 @@ class RewardFn(object):
         _, _, yaw_1, v_1 = info["hero"]["last_state"]
         delta_yaw = yaw_1 - yaw
 
-        # Waypoints
+        # --- Waypoints / alignment ---
         distance_t = info["env"]["dist2goal"]
         distance_t_1 = info["env"]["dist2goal_t_1"]
         set_point = info["env"]["set_point"]
@@ -74,39 +76,46 @@ class RewardFn(object):
         yaw_error = np.arctan2(np.sin(desired_yaw - yaw), np.cos(desired_yaw - yaw))
         yaw_alignment = np.cos(yaw_error)
 
-        # Lateral error
+        # --- Lateral error penalty (mild)
         xs, ys, _ = info["env"]["nextwps"]
         wps = np.array([xs, ys]).T
         dist2route = lateral_error(x, y, wps, signed=True)
-        reward -= 0.02 * abs(dist2route)
+        reward -= 0.015 * abs(dist2route)
 
-        # Progress
+        # --- Progress (scaled down)
         delta_progress = distance_t_1 - distance_t
         if delta_progress > 0:
-            reward += 0.15 * delta_progress * yaw_alignment
+            reward += 0.08 * delta_progress * yaw_alignment
 
-        # Flow
+        # --- Flow (speed reward)
         if v > 0.3:
-            reward += 0.02 * np.clip(v, 0, 6) * yaw_alignment
+            reward += 0.015 * np.clip(v, 0, 6) * yaw_alignment
 
-        # Stability bonus
+        # --- Stability bonus
         if abs(dist2route) < 1.0 and abs(yaw_error) < 0.1:
-            reward += 0.05
+            reward += 0.02
 
-        # TTC safety shaping
+        # --- TTC shaping (gentle)
         hero_state = info["hero"]["state"]
         actors_state = info["actors_state"]
-        reward += compute_ttc(hero_state, actors_state, ttc_threshold=30)
+        ttc_bonus = compute_ttc(hero_state, actors_state, ttc_threshold=30)
+        reward += 0.05 * ttc_bonus
 
-        # Reverse
+        # --- Reverse penalty
         if v < -0.1:
-            reward -= 0.05 * abs(v)
+            reward -= 0.03 * abs(v)
 
-        # Smoothness
+        # --- Smoothness (slightly stronger relative)
         jerk = abs(v_1 - v) + abs(delta_yaw)
-        reward -= 0.002 * jerk
+        reward -= 0.0015 * jerk
 
-        return np.clip(reward, -1.0, 1.0)
+        # --- Small alive bias
+        reward += 0.002
+
+        # --- Compress range smoothly
+        reward = np.tanh(reward * 1.5)
+
+        return float(np.clip(reward, -1.0, 1.0))
 
     def termination(self, collision, target_id):
         if collision == "pedestrian":

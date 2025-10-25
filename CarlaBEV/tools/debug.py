@@ -1,8 +1,8 @@
 import pygame
 
+from dataclasses import dataclass
 from CarlaBEV.envs import CarlaBEV
 
-device = "cuda:0"
 
 def init_key_tracking():
     """Initializes a dictionary to track which keys are currently held."""
@@ -43,6 +43,21 @@ def get_action_from_keys(keys_held):
         return 2
 
     return 0  # No action
+
+
+@dataclass
+class EnvConfig:
+    map_name: str = "Town01"
+    obs_space: str = "bev"  # "bev" or "vector"
+    action_space: str = "discrete"  # "discrete" or "continuous"
+    size: int = 128
+    render_mode: str = None
+    max_actions: int = 5000
+    vehicle_growth_start: int = 1000
+    seed: int = 0
+    record_videos: bool = False
+    scenes_path: str = "assets/scenes"
+    reward_params: dict = None
 
 
 def main(size: int = 128):

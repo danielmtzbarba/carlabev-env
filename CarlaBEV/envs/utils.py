@@ -51,7 +51,7 @@ def map_to_rgb(image):
     return rgb_image
 
 
-def load_map(size):
+def load_map(map_name, size):
     map_path = os.path.join(asset_path, f"Town01/Town01-{size}-sem.png")
     arr = np.array(Image.open(map_path))
     arr = map_to_rgb(arr)

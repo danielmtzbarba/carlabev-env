@@ -1,6 +1,8 @@
 import os
+
+from dataclasses import dataclass
 from enum import Enum
-from random import choice
+from importlib import import_module
 
 import gymnasium as gym
 from gymnasium import spaces
@@ -8,7 +10,7 @@ import numpy as np
 import pygame
 
 from CarlaBEV.src.actors.hero import ContinuousAgent, DiscreteAgent
-from CarlaBEV.envs.map import Town01
+from CarlaBEV.envs.world import BaseMap
 from CarlaBEV.envs.camera import Camera, Follow
 from CarlaBEV.src.deeprl.reward import RewardFn
 from CarlaBEV.src.deeprl.stats import Stats
@@ -32,6 +34,38 @@ class Actions(Enum):
     brake_steer_right = 8
 
 
+@dataclass
+class EnvConfig:
+    map_name: str = "Town01"
+    obs_space: str = "bev"  # "bev" or "vector"
+    action_space: str = "discrete"  # "discrete" or "continuous"
+    size: int = 128
+    render_mode: str = None
+    max_actions: int = 5000
+    vehicle_growth_start: int = 1000
+    seed: int = 0
+    record_videos: bool = False
+    scenes_path: str = "assets/scenes"
+    reward_params: dict = None
+
+
+"""
+class CarlaBEV(gym.Env):
+    def __init__(self, config: EnvConfig):
+        self.cfg = config
+        self.map = BaseMap(config.map_name, config.size)
+        self.reward_fn = RewardFn(config.reward_params)
+        self.stats = Stats()
+        self.traffic = TrafficManager(config.vehicle_growth_start)
+
+        map_module = import_module(f"CarlaBEV.envs.map")
+        MapClass = getattr(map_module, config.map_name)
+        self.map = MapClass(size=config.size, AgentClass=self.Agent)
+"""
+
+config = EnvConfig()
+
+
 class CarlaBEV(gym.Env):
     metadata = {
         "action_space": ["discrete", "continuous"],
@@ -42,6 +76,7 @@ class CarlaBEV(gym.Env):
     termination_causes = ["max_actions", "collision", "success", "out_of_bounds"]
 
     def __init__(self, size, discrete=True, obs_space="bev", render_mode=None):
+        self.cfg = config
         # Field Of View PIXEL SIZE
         self.size = size  # The size of the square grid
         self.scale = int(1024 / size)
@@ -97,7 +132,8 @@ class CarlaBEV(gym.Env):
         self.window = None
         self.clock = None
         #
-        self.map = Town01(size=self.size, AgentClass=self.Agent)
+        self.map = BaseMap(config.map_name, config.size)
+        # self.map = Town01(size=self.size, AgentClass=self.Agent)
         self._scene_ids = SCENE_IDS
         self._builder = SceneBuilder(self._scene_ids, size)
 
@@ -144,8 +180,7 @@ class CarlaBEV(gym.Env):
 
         # --- Case 1: Random scene generation ---
         if isinstance(scene, str) and scene == "rdm":
-            self.map.reset()  # clear map and old actors
-            self.map.add_rdm_scene(episode=self.stats.episode, max_retries=5)
+            self.map.reset(episode=self.stats.episode)
 
         # --- Case 2: Predefined scenario ---
         elif isinstance(scene, str):
@@ -189,7 +224,7 @@ class CarlaBEV(gym.Env):
         #
         self.map.hero_step(action)
         self.camera.scroll()
-        self.map.step(topleft=self.camera.offset)
+        self.map.step(camera_topleft=self.camera.offset)
         #
         self._dist2goal = self.map.dist2goal()
         #

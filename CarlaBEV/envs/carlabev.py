@@ -9,12 +9,10 @@ from gymnasium import spaces
 import numpy as np
 import pygame
 
-from CarlaBEV.src.actors.hero import ContinuousAgent, DiscreteAgent
 from CarlaBEV.envs.world import BaseMap
 from CarlaBEV.envs.camera import Camera, Follow
 from CarlaBEV.src.deeprl.reward import RewardFn
 from CarlaBEV.src.deeprl.stats import Stats
-from CarlaBEV.src.scenes import SceneBuilder
 
 from CarlaBEV.src.scenes.utils import load_scenario_folder
 
@@ -31,36 +29,37 @@ class Actions(Enum):
     brake_steer_right = 8
 
 
-@dataclass
-class EnvConfig:
-    map_name: str = "Town01"
-    obs_space: str = "bev"  # "bev" or "vector"
-    action_space: str = "discrete"  # "discrete" or "continuous"
-    size: int = 128
-    render_mode: str = None
-    max_actions: int = 5000
-    vehicle_growth_start: int = 1000
-    seed: int = 0
-    record_videos: bool = False
-    scenes_path: str = "assets/scenes"
-    reward_params: dict = None
+def get_action_space(cfg):
+    # Action Space
+    if cfg.action_space == "discrete":
+        action_space = spaces.Discrete(9)
+        actions = {
+            0: np.array([0, 0, 0]),  # nothing
+            1: np.array([1, 0, 0]),  # gas
+            2: np.array([0, 0, 1]),  # brake
+            3: np.array([1, 1, 0]),  # gas + steer left
+            4: np.array([1, -1, 0]),  # gas + steer right
+            5: np.array([0, 1, 0]),  # steer left (coast)
+            6: np.array([0, -1, 0]),  # steer right (coast)
+            7: np.array([0, 1, 1]),  # brake + steer left
+            8: np.array([0, -1, 1]),  # brake + steer right
+        }
+        return action_space, actions
+
+    else:
+        return spaces.Box(
+            np.array([-1, 0, 0]).astype(np.float32),
+            np.array([+1, +1, +1]).astype(np.float32),
+        )  # steer, gas, brake
 
 
-"""
-class CarlaBEV(gym.Env):
-    def __init__(self, config: EnvConfig):
-        self.cfg = config
-        self.map = BaseMap(config.map_name, config.size)
-        self.reward_fn = RewardFn(config.reward_params)
-        self.stats = Stats()
-        self.traffic = TrafficManager(config.vehicle_growth_start)
-
-        map_module = import_module(f"CarlaBEV.envs.map")
-        MapClass = getattr(map_module, config.map_name)
-        self.map = MapClass(size=config.size, AgentClass=self.Agent)
-"""
-
-config = EnvConfig()
+def get_obs_space(cfg):
+    if cfg.obs_space == "bev":
+        return spaces.Box(
+            low=0, high=255, shape=(cfg.size, cfg.size, 3), dtype=np.uint8
+        )
+    elif cfg.obs_space == "vector":
+        return spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)
 
 
 class CarlaBEV(gym.Env):
@@ -78,64 +77,31 @@ class CarlaBEV(gym.Env):
         "off_road",
     ]
 
-    def __init__(self, size, discrete=True, obs_space="bev", render_mode=None):
+    def __init__(self, config):
         self.cfg = config
         # Field Of View PIXEL SIZE
-        self.size = size  # The size of the square grid
-        self.scale = int(1024 / size)
-        self.window_center = (int(size / 2), int(size / 2))
+        self.size = self.cfg.size  # The size of the square grid
+        self._setup()
 
-        # Observation Space
-        if obs_space == "bev":
-            self.observation_space = spaces.Box(
-                low=0, high=255, shape=(size, size, 3), dtype=np.uint8
-            )
-        elif obs_space == "vector":
-            self.observation_space = spaces.Box(
-                low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32
-            )
-
-        # Action Space
-        if discrete:
-            self.Agent = DiscreteAgent
-            self.action_space = spaces.Discrete(9)
-
-            self._action_to_direction = {
-                0: np.array([0, 0, 0]),  # nothing
-                1: np.array([1, 0, 0]),  # gas
-                2: np.array([0, 0, 1]),  # brake
-                3: np.array([1, 1, 0]),  # gas + steer left
-                4: np.array([1, -1, 0]),  # gas + steer right
-                5: np.array([0, 1, 0]),  # steer left (coast)
-                6: np.array([0, -1, 0]),  # steer right (coast)
-                7: np.array([0, 1, 1]),  # brake + steer left
-                8: np.array([0, -1, 1]),  # brake + steer right
-            }
-
-        else:
-            self.Agent = ContinuousAgent
-            self.action_space = spaces.Box(
-                np.array([-1, 0, 0]).astype(np.float32),
-                np.array([+1, +1, +1]).astype(np.float32),
-            )  # steer, gas, brake
-
-        # Experiment Stats
-        self.stats = Stats()
-
-        # Reward Function
-        self.reward_fn = RewardFn()
-
+    def _setup(self):
         # Render mode
-        assert render_mode is None or render_mode in self.metadata["render_modes"]
-        self.render_mode = render_mode
-        assert obs_space is None or obs_space in self.metadata["observation_space"]
-        self.obs_mode = obs_space
-        #
-        self.discrete = discrete
+        assert self.cfg.render_mode in self.metadata["render_modes"]
         self.window = None
         self.clock = None
-        #
-        self.map = BaseMap(config.map_name, config.size)
+        self.render_mode = self.cfg.render_mode
+        # Observation Space
+        assert self.cfg.obs_space in self.metadata["observation_space"]
+        self.obs_mode = self.cfg.obs_space
+        self.observation_space = get_obs_space(self.cfg)
+        # Action space
+        assert self.cfg.action_space in self.metadata["action_space"]
+        self.action_space, self.action_to_direction = get_action_space(self.cfg)
+        # Experiment Stats
+        self.stats = Stats()
+        # Reward Function
+        self.reward_fn = RewardFn()
+        # World
+        self.map = BaseMap(self.cfg.map_name, self.cfg.size)
 
     def _get_obs(self):
         self._render_frame()
@@ -216,8 +182,8 @@ class CarlaBEV(gym.Env):
 
     def step(self, action):
         truncated = False
-        if self.discrete:
-            action = self._action_to_direction[action]
+        if self.cfg.action_space == "discrete":
+            action = self.action_to_direction[action]
         #
         self._dist2goal_t_1 = self._dist2goal
         self._dist2wp_1 = self.map.hero.dist2wp

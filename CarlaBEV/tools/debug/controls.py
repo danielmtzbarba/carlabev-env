@@ -1,4 +1,5 @@
-import pygame 
+import pygame
+
 
 def init_key_tracking():
     """Initializes a dictionary to track which keys are currently held."""
@@ -8,6 +9,7 @@ def init_key_tracking():
         pygame.K_UP: False,
         pygame.K_DOWN: False,
     }
+
 
 def process_events(keys_held):
     """Processes pygame events to update held keys and check for quitting."""

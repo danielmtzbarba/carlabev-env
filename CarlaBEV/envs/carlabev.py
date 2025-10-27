@@ -1,6 +1,5 @@
 import os
 
-from dataclasses import dataclass
 from enum import Enum
 from importlib import import_module
 
@@ -260,7 +259,6 @@ class CarlaBEV(gym.Env):
         elif self.obs_mode == "vector":
             hero = self.map.hero.state
             set_point = self.map.hero.set_point
-            dist = (self.map.hero.dist2wp,)
             vector_data = np.concatenate([hero, set_point]).astype(np.float32)
             self._observation = vector_data
 

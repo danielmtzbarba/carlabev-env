@@ -3,8 +3,10 @@ from dataclasses import dataclass
 
 @dataclass
 class EnvConfig:
-    env_id: str = "CarlaBEV-v0"
+    seed: int = 0
+    fps: int = 60 
     size: int = 128
+    env_id: str = "CarlaBEV-v0"
     map_name: str = "Town01"
     obs_space: str = "bev"  # "bev" or "vector"
     #
@@ -12,11 +14,8 @@ class EnvConfig:
     render_mode: str = "human"
     max_actions: int = 5000
     vehicle_growth_start: int = 1000
-    seed: int = 0
     record_videos: bool = False
     scenes_path: str = "assets/scenes"
-    reward_params: dict = None
-
 
 @dataclass
 class CarlaBEVConfig:

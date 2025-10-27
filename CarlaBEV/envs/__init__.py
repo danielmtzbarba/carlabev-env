@@ -30,23 +30,22 @@ def make_carlabev_env_muzero(seed, idx, capture_video, run_name, size):
     return thunk
 
 
-def make_carlabev_env(seed, idx, capture_video, run_name, obs_space, size):
+def make_carlabev_env(idx, cfg):
     def thunk():
-        env = CarlaBEV(render_mode="rgb_array", obs_space=obs_space, size=size)
+        env = CarlaBEV(cfg.env)
 
-        if capture_video and idx == 0:
+        if cfg.capture_video and idx == 0:
             env = gym.wrappers.RecordVideo(
-                env, f"videos/{run_name}", episode_trigger=lambda x: x % 50 == 0
+                env, f"videos/{cfg.exp_name}",
+                episode_trigger=lambda x: x % cfg.capture_every == 0
             )
 
-        if obs_space == "bev":
-            env = GrayscaleObservation(env)
-            env = ResizeObservation(env, (96, 96))
-            #            env = SemanticMaskWrapper(env)
-            env = FrameStackObservation(env, stack_size=4)
+        env = GrayscaleObservation(env)
+        env = ResizeObservation(env, cfg.env.obs_size)
+        env = FrameStackObservation(env, stack_size=cfg.env.frame_stack)
 
         env = gym.wrappers.RecordEpisodeStatistics(env)
-        env.action_space.seed(seed)
+        env.action_space.seed(cfg.seed)
 
         return env
 

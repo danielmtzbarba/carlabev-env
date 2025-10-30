@@ -1,6 +1,5 @@
 import numpy as np
 
-from CarlaBEV.src.gui.settings import Settings as cfg
 from CarlaBEV.src.scenes.utils import *
 
 
@@ -27,7 +26,7 @@ class Scene:
         # --- Managers ---
         self.planners = PlannerManager(town_name)
         self.actor_manager = ActorManager(size)
-        self.generator = SceneGenerator(self.planners, map_size=self.size)
+        self.generator = SceneGenerator(self.planners, self.cfg)
         self.serializer = SceneSerializer()
         self._idx = 0
 

@@ -86,6 +86,8 @@ class RewardFn(object):
         delta_progress = distance_t_1 - distance_t
         if delta_progress > 0:
             reward += 0.08 * delta_progress * yaw_alignment
+        else:
+            reward -= 0.01
 
         # --- Flow (speed reward)
         if v > 0.3:

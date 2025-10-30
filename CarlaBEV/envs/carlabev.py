@@ -16,6 +16,7 @@ from CarlaBEV.src.deeprl.stats import Stats
 
 from CarlaBEV.src.scenes.utils import load_scenario_folder
 
+
 class CarlaBEV(gym.Env):
     metadata = {
         "action_space": ["discrete", "continuous"],
@@ -54,7 +55,7 @@ class CarlaBEV(gym.Env):
         # Reward Function
         self.reward_fn = RewardFn()
         # World
-        self.map = BaseMap(self.cfg.map_name, self.cfg.size)
+        self.map = BaseMap(self.cfg)
 
     def _get_obs(self):
         return self.render()
@@ -127,7 +128,6 @@ class CarlaBEV(gym.Env):
         self._dist2wp_1 = self.map.hero.dist2wp
 
         return self._get_obs(), self._get_info()
-    
 
     def step(self, action):
         action = self._preprocess_action(action)
@@ -135,7 +135,7 @@ class CarlaBEV(gym.Env):
         reward, terminated, info = self._compute_outcome()
         obs = self._get_obs()
         return obs, reward, terminated, False, info
-    
+
     def _preprocess_action(self, action):
         if self.cfg.action_space == "discrete":
             action = self.action_to_direction[action]
@@ -148,7 +148,7 @@ class CarlaBEV(gym.Env):
         self.map.step(camera_topleft=self.camera.offset)
         self._dist2goal_t_1 = self._dist2goal
         self._dist2goal = self.map.dist2goal()
-    
+
     def _compute_outcome(self):
         actor_id, result, actors_state = self.map.collision_check(min_dist=35)
 
@@ -159,9 +159,8 @@ class CarlaBEV(gym.Env):
 
         tile = np.array(self.map.agent_tile)[:-1]
         reward, terminated, cause = self.reward_fn.step(tile, info)
-        return reward, terminated, cause, info 
+        return reward, terminated, cause, info
 
-    
     def _check_termination(self, cause):
         terminated, truncated, info_out = False, False, {}
         if cause in self.termination_causes:
@@ -177,7 +176,7 @@ class CarlaBEV(gym.Env):
             info_out = {"termination": self.stats.get_episode_info()}
             return True, True, info_out
 
-        return terminated, truncated, info_out 
+        return terminated, truncated, info_out
 
     def step(self, action):
         self._simulate(action)
@@ -204,7 +203,6 @@ class CarlaBEV(gym.Env):
             self.renderer.render(self.map.canvas)
 
         return self._observation
-
 
     def close(self):
         if self.renderer.window is not None:

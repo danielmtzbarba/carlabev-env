@@ -13,13 +13,14 @@ class BaseMap(Scene):
     Handles map loading, cropping the FOV, rotation, and hero/world rendering.
     """
 
-    def __init__(self, map_name="Town01", size=1024, agent_class=None):
-        self.map_name = map_name
+    def __init__(self, cfg, agent_class=None):
+        self.cfg = cfg
+        self.map_name = cfg.map_name
         self.AgentClass = agent_class
-        self.size = size
+        self.size = cfg.size
 
         # --- Load map and create surfaces
-        self._map_arr, self._map_img, _ = load_map(map_name, size)
+        self._map_arr, self._map_img, _ = load_map(cfg.map_name, cfg.size)
         self._Y, self._X, _ = self._map_arr.shape
         self._scene = pygame.Surface((self._X, self._Y))
 
@@ -29,7 +30,7 @@ class BaseMap(Scene):
         self._pad = self.center[0]
 
         # --- Initialize base Scene
-        super().__init__(size=size, screen=self._map_img)
+        super().__init__(size=cfg.size, screen=self._map_img)
 
         # --- Internal state
         self._theta = 0.0

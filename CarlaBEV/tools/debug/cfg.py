@@ -4,7 +4,7 @@ from dataclasses import dataclass
 @dataclass
 class EnvConfig:
     seed: int = 0
-    fps: int = 60 
+    fps: int = 60
     size: int = 128
     env_id: str = "CarlaBEV-v0"
     map_name: str = "Town01"
@@ -13,9 +13,16 @@ class EnvConfig:
     action_space: str = "discrete"  # "discrete" or "continuous"
     render_mode: str = "human"
     max_actions: int = 5000
-    vehicle_growth_start: int = 1000
-    record_videos: bool = False
     scenes_path: str = "assets/scenes"
+
+    # Traffic generation
+    traffic_enabled: bool = True
+    max_vehicles: int = 50
+    curriculum_enabled: str = False
+    start_ep: int = 300
+    midpoint: int = 1000
+    growth_rate: float = 0.01
+
 
 @dataclass
 class CarlaBEVConfig:

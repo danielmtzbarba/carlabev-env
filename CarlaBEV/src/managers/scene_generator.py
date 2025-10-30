@@ -14,12 +14,13 @@ class SceneGenerator:
       - Predefined critical scenarios (catalogue)
     """
 
-    def __init__(self, planner_manager, map_size, config=None):
+    def __init__(self, planner_manager, config=None):
         self.planners = planner_manager
-        self.size = map_size
 
         # --- Curriculum configuration ---
-        cfg = config or {}
+        cfg = config.__dict__ or {}
+        self.size = cfg.get("map_size", 128)
+        self.traffic_enabled = cfg.get("traffic_enabled", True)
         self.curriculum_enabled = cfg.get("curriculum_enabled", False)
         self.start_ep = cfg.get("start_ep", 300)
         self.max_v = cfg.get("max_vehicles", 50)
@@ -34,10 +35,11 @@ class SceneGenerator:
         Generates a randomized traffic scene with configurable curriculum.
         Returns actor dictionary compatible with Scene.reset().
         """
-        if self.curriculum_enabled:
-            num_cars = self._vehicle_schedule(episode)
-        else:
-            num_cars = self.max_v
+        if self.traffic_enabled:
+            if self.curriculum_enabled:
+                num_cars = self._vehicle_schedule(episode)
+            else:
+                num_cars = self.max_v
 
         actors = {"agent": None, "vehicle": [], "pedestrian": [], "target": []}
 
@@ -51,7 +53,8 @@ class SceneGenerator:
                 if len(path[0]) > 5:
                     actors["agent"] = path
                     break
-            except Exception:
+            except Exception as e:
+                print(e)
                 continue
 
         # 2️⃣ Background vehicles

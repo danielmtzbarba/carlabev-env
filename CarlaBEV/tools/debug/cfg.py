@@ -9,6 +9,8 @@ class EnvConfig:
     env_id: str = "CarlaBEV-v0"
     map_name: str = "Town01"
     obs_space: str = "bev"  # "bev" or "vector"
+    obs_size = (96, 96)
+    frame_stack = 4
     #
     action_space: str = "discrete"  # "discrete" or "continuous"
     render_mode: str = "human"

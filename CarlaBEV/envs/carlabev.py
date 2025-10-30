@@ -129,13 +129,6 @@ class CarlaBEV(gym.Env):
 
         return self._get_obs(), self._get_info()
 
-    def step(self, action):
-        action = self._preprocess_action(action)
-        self._simulate(action)
-        reward, terminated, info = self._compute_outcome()
-        obs = self._get_obs()
-        return obs, reward, terminated, False, info
-
     def _preprocess_action(self, action):
         if self.cfg.action_space == "discrete":
             action = self.action_to_direction[action]

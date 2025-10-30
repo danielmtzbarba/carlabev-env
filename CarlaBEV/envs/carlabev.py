@@ -164,6 +164,8 @@ class CarlaBEV(gym.Env):
             if cause == "max_actions":
                 truncated = True
 
+            return terminated, truncated, info_out
+
         if self._current_step >= self.reward_fn.max_actions:
             print(f"[SAFETY STOP] Forcing episode end at step {self._current_step}")
             info_out = {"termination": self.stats.get_episode_info()}
@@ -174,10 +176,8 @@ class CarlaBEV(gym.Env):
     def step(self, action):
         self._simulate(action)
         reward, terminated, cause, info = self._compute_outcome()
-        terminated, truncated, info_out = self._check_termination(cause)
-        if cause == "ckpt":
-            cause = None
         self.stats.step(reward, cause)
+        terminated, truncated, info_out = self._check_termination(cause)
         self.last_action = action
         self._current_step += 1
         return self._get_obs(), reward, terminated, truncated, info_out

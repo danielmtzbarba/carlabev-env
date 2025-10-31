@@ -33,18 +33,18 @@ class RewardFn(object):
         max_actions: int = 5000,
         # ---- sidewalk/off-road handling ----
         sidewalk_step_penalty: float = -0.15,  # base per-step penalty when on sidewalk
-        sidewalk_penalty_scale: float = -0.01,  # extra penalty * consecutive_offroad_steps
-        offroad_terminate_after: int = 40,  # terminate if off-road persists this many steps
+        sidewalk_penalty_scale: float = -0.015,  # extra penalty * consecutive_offroad_steps
+        offroad_terminate_after: int = 100,  # terminate if off-road persists this many steps
         zero_speed_reward_offroad: bool = True,
         zero_progress_reward_offroad: bool = True,
         # ---- shaping weights ----
-        k_lat_quadratic: float = 0.007,  # lateral error penalty ~ k * e^2
-        k_progress: float = 0.08,  # progress * alignment
-        k_flow: float = 0.012,  # speed * alignment
-        k_align_bonus: float = 0.015,  # small bonus when very well aligned/on-route
+        k_lat_quadratic: float = 0.009,  # lateral error penalty ~ k * e^2
+        k_progress: float = 0.06,  # progress * alignment
+        k_flow: float = 0.009,  # speed * alignment
+        k_align_bonus: float = 0.012,  # small bonus when very well aligned/on-route
         k_reverse: float = 0.03,  # reverse penalty scale
         k_smooth: float = 0.0015,  # jerk penalty scale
-        k_ttc: float = 0.05,  # ttc shaping scale (expects compute_ttc in [-1, +1]-ish)
+        k_ttc: float = 0.08,  # ttc shaping scale (expects compute_ttc in [-1, +1]-ish)
         alive_bias: float = 0.0015,  # tiny survival bias
         # ---- limits ----
         max_speed_for_flow: float = 6.0,

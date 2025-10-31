@@ -189,9 +189,9 @@ class RewardFn(object):
 
     def termination(self, collision, target_id):
         if collision == "pedestrian":
-            return -10.0, True, "collision"
+            return -15.0, True, "collision"
         elif collision == "vehicle":
-            return -6.0, True, "collision"
+            return -10.0, True, "collision"
         elif collision == "target":
             if target_id == "goal":
                 return +10.0, True, "success"

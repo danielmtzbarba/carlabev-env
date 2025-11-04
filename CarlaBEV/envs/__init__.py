@@ -6,7 +6,7 @@ from gymnasium.wrappers import (
 )
 
 from CarlaBEV.envs.carlabev import CarlaBEV
-from CarlaBEV.wrappers.rgb_to_semantic import SemanticMaskWrapper
+from CarlaBEV.wrappers.rgb_to_semantic import SemanticMaskWrapper, FlattenStackedFrames
 
 
 def make_carlabev_env_muzero(seed, idx, capture_video, run_name, size):
@@ -29,45 +29,50 @@ def make_carlabev_env_muzero(seed, idx, capture_video, run_name, size):
 
     return thunk
 
+def wrap_env(cfg, env, capture=False, eval=False):
+    if capture:
+        base_dir = f"videos/{cfg.exp_name}"
+        save_dir = f"{base_dir}/eval"if eval else base_dir 
+        every = 1 if eval else cfg.capture_every
 
-def make_carlabev_env(idx, cfg):
+        env = gym.wrappers.RecordVideo(env, save_dir, episode_trigger=lambda x: x % every == 0)
+
+    env = ResizeObservation(env, cfg.env.obs_size)
+
+    if cfg.env.masked:
+        env = SemanticMaskWrapper(env)
+    else:
+        env = GrayscaleObservation(env)
+
+    env = FrameStackObservation(env, stack_size=cfg.env.frame_stack)
+    if cfg.env.masked:
+        env = FlattenStackedFrames(env)
+
+    env = gym.wrappers.RecordEpisodeStatistics(env)
+
+    seed = cfg.seed
+    if eval:
+        seed = 999
+    env.action_space.seed(seed)
+
+    return env
+
+def make_carlabev_env(idx, cfg, eval=False):
     def thunk():
-        env = CarlaBEV(cfg.env)
-
+        capture = False
         if cfg.capture_video and idx == 0:
-            env = gym.wrappers.RecordVideo(
-                env,
-                f"videos/{cfg.exp_name}",
-                episode_trigger=lambda x: x % cfg.capture_every == 0,
-            )
+            capture = True
 
-        env = GrayscaleObservation(env)
-        env = ResizeObservation(env, cfg.env.obs_size)
-        env = FrameStackObservation(env, stack_size=cfg.env.frame_stack)
-
-        env = gym.wrappers.RecordEpisodeStatistics(env)
-        env.action_space.seed(cfg.seed)
-
-        return env
-
-    return thunk
-
-
-def make_carlabev_eval(cfg):
-    def thunk():
         env = CarlaBEV(cfg.env)
-        if cfg.capture_video:
-            env = gym.wrappers.RecordVideo(
-                env, f"videos/{cfg.exp_name}/eval", episode_trigger=lambda x: x % 1 == 0
-            )
-        env = GrayscaleObservation(env)
-        env = ResizeObservation(env, cfg.env.obs_size)
-        #            env = SemanticMaskWrapper(env)
-        env = FrameStackObservation(env, stack_size=cfg.env.frame_stack)
-
-        env = gym.wrappers.RecordEpisodeStatistics(env)
-        env.action_space.seed(999)
-
+        env = wrap_env(cfg, env, capture, eval)
         return env
-
     return thunk
+
+def make_env(cfg, eval=False):
+    num_envs = 1 if eval else cfg.num_envs
+    envs = gym.vector.SyncVectorEnv(
+        [
+            make_carlabev_env(i, cfg, eval) for i in range(num_envs)
+        ]
+    )
+    return envs

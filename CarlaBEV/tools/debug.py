@@ -1,7 +1,7 @@
 import pygame
 import tyro
 
-from CarlaBEV.envs import CarlaBEV
+from CarlaBEV.envs import make_env
 from CarlaBEV.tools.debug.controls import (
     init_key_tracking,
     process_events,
@@ -22,9 +22,10 @@ sim_logger, train_logger = create_loggers(cfg)
 def main(size: int = 128):
     pygame.init()
     keys_held = init_key_tracking()
-    env = CarlaBEV(cfg.env, logger=sim_logger)
+    env = make_env(cfg)
+    print("Observation space:", env.observation_space)
 
-    observation, info = env.reset(seed=42, scene="rdm")
+    observation, info = env.reset()
     total_reward = 0
     running = True
 
@@ -33,12 +34,12 @@ def main(size: int = 128):
         action = get_action_from_keys(keys_held)
 
         # Step through the environment
-        observation, reward, terminated, _, info = env.step(action)
+        observation, reward, terminated, _, info = env.step([action])
         total_reward += reward
 
         # Reset if episode ends
         if terminated:
-            observation, info = env.reset(scene="rdm")
+            observation, info = env.reset()
             total_reward = 0
 
     env.close()

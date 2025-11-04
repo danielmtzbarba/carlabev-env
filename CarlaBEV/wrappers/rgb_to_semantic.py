@@ -70,3 +70,22 @@ class SemanticMaskWrapper(gym.ObservationWrapper):
             np.ndarray: (6, H, W) semantic mask.
         """
         return rgb_to_semantic_mask(observation)
+
+
+class FlattenStackedFrames(gym.ObservationWrapper):
+    """
+    Merge frame and channel dimensions: (num_frames, num_channels, H, W) → (num_frames * num_channels, H, W)
+    """
+    def __init__(self, env):
+        super().__init__(env)
+        obs_shape = env.observation_space.shape  # e.g. (4, 6, 96, 96)
+        assert len(obs_shape) == 4, f"Unexpected shape: {obs_shape}"
+        num_frames, num_channels, h, w = obs_shape
+        merged_shape = (num_frames * num_channels, h, w)
+        self.observation_space = gym.spaces.Box(
+            low=0.0, high=1.0, shape=merged_shape, dtype=np.float32
+        )
+
+    def observation(self, obs):
+        # merge the first two dims: (frames, channels, H, W) → (frames*channels, H, W)
+        return obs.reshape(-1, *obs.shape[2:])

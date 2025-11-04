@@ -1,8 +1,0 @@
-env: EnvConfig(seed=0, fps=60, size=128, env_id='CarlaBEV-v0', map_name='Town01', obs_space='bev', action_space='discrete', render_mode='human', max_actions=5000, scenes_path='assets/scenes', traffic_enabled=True, max_vehicles=50, curriculum_enabled=False, start_ep=300, midpoint=1000, growth_rate=0.01)
-logging: LoggerConfig(enabled=True, dir='~/Data/results/carlabev/runs/')
-exp_name: cnn-ppo-carlabev-debug
-seed: 1
-cuda: True
-save_model: True
-capture_video: True
-torch_deterministic: True

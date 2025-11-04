@@ -7,16 +7,22 @@ from CarlaBEV.tools.debug.controls import (
     process_events,
     get_action_from_keys,
 )
+
+from CarlaBEV.src.deeprl.logger import create_loggers
 from CarlaBEV.tools.debug.cfg import CarlaBEVConfig
 
 
 cfg = tyro.cli(CarlaBEVConfig)
 
 
+# Assuming cfg.exp_name and cfg.logging.enabled are defined
+sim_logger, train_logger = create_loggers(cfg)
+
+
 def main(size: int = 128):
     pygame.init()
     keys_held = init_key_tracking()
-    env = CarlaBEV(cfg.env)
+    env = CarlaBEV(cfg.env, logger=sim_logger)
 
     observation, info = env.reset(seed=42, scene="rdm")
     total_reward = 0
@@ -32,9 +38,6 @@ def main(size: int = 128):
 
         # Reset if episode ends
         if terminated:
-            ret = info["termination"]["return"]
-            length = info["termination"]["length"]
-            print(info["termination"]["episode"], ret, ret / length)
             observation, info = env.reset(scene="rdm")
             total_reward = 0
 

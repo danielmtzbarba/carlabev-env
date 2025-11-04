@@ -2,6 +2,12 @@ from dataclasses import dataclass
 
 
 @dataclass
+class LoggerConfig:
+    enabled: bool = True
+    dir: str = "~/Data/results/carlabev/runs/"
+
+
+@dataclass
 class EnvConfig:
     seed: int = 0
     fps: int = 60
@@ -29,6 +35,7 @@ class EnvConfig:
 @dataclass
 class CarlaBEVConfig:
     env: EnvConfig
+    logging: LoggerConfig
     exp_name: str = "cnn-ppo-carlabev-debug"
     seed: int = 1
     cuda: bool = True

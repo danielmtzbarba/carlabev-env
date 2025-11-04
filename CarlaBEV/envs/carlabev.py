@@ -1,6 +1,5 @@
+from copy import deepcopy
 import os
-
-from importlib import import_module
 
 import gymnasium as gym
 import numpy as np
@@ -8,7 +7,7 @@ import pygame
 
 from CarlaBEV.envs.world import BaseMap
 from CarlaBEV.envs.camera import Camera, Follow
-from CarlaBEV.envs.spaces import Actions, get_obs_space, get_action_space
+from CarlaBEV.envs.spaces import get_obs_space, get_action_space
 from CarlaBEV.envs.renderer import Renderer
 
 from CarlaBEV.src.deeprl.reward import RewardFn
@@ -32,8 +31,9 @@ class CarlaBEV(gym.Env):
         "off_road",
     ]
 
-    def __init__(self, config):
+    def __init__(self, config, logger=None):
         self.cfg = config
+        self.logger = logger
         # Field Of View PIXEL SIZE
         self.size = self.cfg.size  # The size of the square grid
         self._setup()
@@ -78,11 +78,6 @@ class CarlaBEV(gym.Env):
                 "last_state": self.map.hero.last_state,
                 "action": 0,
                 "last_action": self.last_action,
-            },
-            "ep": {
-                "id": self.stats.episode,
-                "return": self.stats.episode_return,
-                "length": len(self.stats),
             },
             "collision": {
                 "collided": False,
@@ -157,19 +152,20 @@ class CarlaBEV(gym.Env):
     def _check_termination(self, cause):
         terminated, truncated, info_out = False, False, {}
         if cause in self.termination_causes:
-            self.stats.terminated()
+            episode_info = deepcopy(self.stats.get_episode_info())
+
             terminated = True
-            info_out = {"termination": self.stats.get_episode_info()}
+            self.stats.terminated()
+
+            info_out = {"termination": episode_info}
 
             if cause == "max_actions":
                 truncated = True
 
-            return terminated, truncated, info_out
+            if self.logger:
+                self.logger.log_episode(episode_info)
 
-        if self._current_step >= self.reward_fn.max_actions:
-            print(f"[SAFETY STOP] Forcing episode end at step {self._current_step}")
-            info_out = {"termination": self.stats.get_episode_info()}
-            return True, True, info_out
+            return terminated, truncated, info_out
 
         return terminated, truncated, info_out
 
@@ -177,6 +173,9 @@ class CarlaBEV(gym.Env):
         self._simulate(action)
         reward, terminated, cause, info = self._compute_outcome()
         self.stats.step(reward, cause)
+
+        if self.logger:
+            self.logger.log_step({})
         terminated, truncated, info_out = self._check_termination(cause)
         self.last_action = action
         self._current_step += 1

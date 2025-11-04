@@ -3,7 +3,7 @@ from dataclasses import dataclass
 @dataclass
 class LoggerConfig:
     enabled: bool = True
-    dir: str = "~/Data/results/carlabev/runs/"
+    dir: str = "results/carlabev/runs/"
 
 @dataclass
 class EnvConfig:

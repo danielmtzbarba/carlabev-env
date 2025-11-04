@@ -21,10 +21,10 @@ class SceneGenerator:
         cfg = config.__dict__ or {}
         self.size = cfg.get("map_size", 128)
         self.traffic_enabled = cfg.get("traffic_enabled", True)
-        self.curriculum_enabled = cfg.get("curriculum_enabled", False)
-        self.start_ep = cfg.get("start_ep", 300)
+        self.curriculum_enabled = cfg.get("curriculum_enabled", True)
+        self.start_ep = cfg.get("start_ep", 1)
         self.max_v = cfg.get("max_vehicles", 50)
-        self.mid = cfg.get("midpoint", 1000)
+        self.mid = cfg.get("midpoint", 10)
         self.growth_rate = cfg.get("growth_rate", 0.01)
 
     # =========================================================

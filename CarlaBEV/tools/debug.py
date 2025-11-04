@@ -16,7 +16,7 @@ cfg = tyro.cli(CarlaBEVConfig)
 
 
 # Assuming cfg.exp_name and cfg.logging.enabled are defined
-sim_logger, train_logger = create_loggers(cfg)
+#sim_logger, train_logger = create_loggers(cfg)
 
 
 def main(size: int = 128):

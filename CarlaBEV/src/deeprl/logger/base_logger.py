@@ -51,22 +51,22 @@ class BaseLogger:
             if isinstance(v, (int, float)):
                 self.log_scalar(f"sim/{k}", v, step)
 
-    def log_episode(self, info, idx):
+    def log_episode(self, info):
         if not self.enabled:
             return
 
         data = info["episode_info"]
         # Console output
         self.console.print(
-            f"Ep {data["episode"][idx]} | Return: [green]{data["return"][idx]:.2f}[/green] | "
-            f"Len: {data["length"][idx]} | Num Vehicles: {info["scene"]["num_vehicles"][idx]} | "
-            f"Cause: {data["termination"][idx]}"
+            f"Ep {data["episode"]} | Return: [green]{data["return"]:.2f}[/green] | "
+            f"Len: {data["length"]} | Num Vehicles: {info["scene"]["num_vehicles"]} | "
+            f"Cause: {data["termination"]}"
         )
 
         # Write to TensorBoard
         for k, v in info.items():
             if isinstance(v, (int, float)):
-                self.log_scalar(f"sim/{k}", v, info["episode"][idx])
+                self.log_scalar(f"sim/{k}", v, info["episode"])
 
 
 

@@ -18,6 +18,10 @@ cfg = tyro.cli(CarlaBEVConfig)
 # Assuming cfg.exp_name and cfg.logging.enabled are defined
 sim_logger = create_loggers(cfg)
 
+def get_base_env(env):
+    while hasattr(env, "env"):
+        env = env.env
+    return env
 
 def main(size: int = 128):
     pygame.init()
@@ -38,7 +42,8 @@ def main(size: int = 128):
 
         for i, ended  in enumerate(terminated):
             if ended:
-                sim_logger.log_episode(info, i)
+                info_i = get_base_env(env.envs[i]).current_info
+                sim_logger.log_episode(info_i)
                 observation, info = env.reset()
 
     env.close()

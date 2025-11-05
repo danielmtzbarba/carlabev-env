@@ -43,9 +43,11 @@ class RewardFn(object):
         k_flow: float = 0.012,  # speed * alignment
         k_align_bonus: float = 0.015,  # small bonus when very well aligned/on-route
         k_reverse: float = 0.03,  # reverse penalty scale
-        k_smooth: float = 0.0015,  # jerk penalty scale
         k_ttc: float = 0.05,  # ttc shaping scale (expects compute_ttc in [-1, +1]-ish)
         alive_bias: float = 0.0015,  # tiny survival bias
+        k_smooth: float = 0.0008,  # jerk penalty scale
+        k_steer_smooth: float = 0.005,  # penalty on steering movement
+        k_steer_jerk: float = 0.015,    # penalty on oscillation / rapid reversals
         # ---- limits ----
         max_speed_for_flow: float = 6.0,
         lat_clip: float = 4.0,  # clip |dist2route| to avoid huge penalties
@@ -70,6 +72,8 @@ class RewardFn(object):
         self.k_smooth = k_smooth
         self.k_ttc = k_ttc
         self.alive_bias = alive_bias
+        self.k_steer_jerk = k_steer_jerk
+        self.k_steer_smooth = k_steer_smooth
 
         self.max_speed_for_flow = max_speed_for_flow
         self.lat_clip = lat_clip
@@ -82,6 +86,7 @@ class RewardFn(object):
 
     def reset(self):
         self._k = 0
+        self._last_delta_yaw = 0
         self._consecutive_offroad = 0
 
     def step(self, info):
@@ -167,7 +172,6 @@ class RewardFn(object):
         r = 0.0
         x, y, yaw, v = info["hero"]["state"]
         _, _, yaw_1, v_1 = info["hero"]["last_state"]
-        delta_yaw = yaw_1 - yaw
 
         # waypoints / alignment
         distance_t = info["scene"]["dist2goal"]
@@ -209,8 +213,20 @@ class RewardFn(object):
             r -= self.k_reverse * abs(v)
 
         # smoothness
-        jerk = abs(v_1 - v) + abs(delta_yaw)
-        r -= self.k_smooth * jerk
+        delta_yaw = yaw_1 - yaw
+        steer_magnitude = abs(delta_yaw)
+        
+        # === NEW comfort term ===
+        # Penalize steering magnitude (keeps vehicle steady on straight roads)
+        r -= self.k_steer_smooth * steer_magnitude
+        # Penalize oscillation (yaw rate change direction shifts → wiggling)
+        # Keep a small buffer of previous yaw deltas in env or store last in RewardFn
+        steer_jerk = abs(delta_yaw - self._last_delta_yaw)
+        r-= self.k_steer_jerk * steer_jerk
+        self._last_delta_yaw = delta_yaw
+        #
+        speed_jerk = abs(v_1 - v) + abs(delta_yaw)
+        r -= self.k_smooth * speed_jerk
 
         # tiny alive bias to prevent freezing at zero
         r += self.alive_bias
@@ -227,7 +243,7 @@ class RewardFn(object):
                 "align_bonus": float(self.k_align_bonus if e < self.lat_small and abs(yaw_error) < self.yaw_small else 0.0),
                 "ttc_bonus": float(self.k_ttc * compute_ttc(hero_state, actors_state, ttc_threshold=30)),
                 "reverse_penalty": float(-self.k_reverse * abs(v) if v < -0.1 else 0.0),
-                "jerk_penalty": float(-self.k_smooth * jerk),
+                "jerk_penalty": float(-self.k_smooth * speed_jerk),
                 "alive_bias": float(self.alive_bias),
                 "offroad_steps": self._consecutive_offroad,
                 "offroad_mask": offroad_mask,

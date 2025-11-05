@@ -63,6 +63,7 @@ class CarlaBEV(gym.Env):
 
     def reset(self, seed=None, options=None, scene="rdm"):
         super().reset(seed=seed)
+        self.current_info = {}
         self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
@@ -116,7 +117,8 @@ class CarlaBEV(gym.Env):
         terminated, truncated, info_out = self._check_termination(cause)
         info["episode_info"] = {} if not terminated else info_out["episode_info"]
         self._current_step += 1
-        return self._get_obs(), reward, terminated, truncated, info
+        self.current_info = info
+        return self._get_obs(), reward, terminated, truncated, info_out
 
     def render(self):
         self._observation = np.transpose(

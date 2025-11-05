@@ -6,7 +6,6 @@ import numpy as np
 import pygame
 
 from CarlaBEV.envs.world import BaseMap
-from CarlaBEV.envs.camera import Camera, Follow
 from CarlaBEV.envs.spaces import get_obs_space, get_action_space
 from CarlaBEV.envs.renderer import Renderer
 
@@ -31,9 +30,8 @@ class CarlaBEV(gym.Env):
         "off_road",
     ]
 
-    def __init__(self, config, logger=None):
+    def __init__(self, config):
         self.cfg = config
-        self.logger = logger
         # Field Of View PIXEL SIZE
         self.size = self.cfg.size  # The size of the square grid
         self._setup()
@@ -61,29 +59,7 @@ class CarlaBEV(gym.Env):
         return self.render()
 
     def _get_info(self):
-        # Get the distance to the target
-        return {
-            "env": {
-                "dist2goal_t0": self._dist2goal_t0,
-                "dist2goal_t_1": self._dist2goal_t_1,
-                "dist2goal": self._dist2goal,
-                "dist2wp_1": self._dist2wp_1,
-                "dist2wp": self.map.hero.dist2wp,
-                "nextwps": self.map.hero.next_wps(5),
-                "set_point": self.map.hero.set_point,
-                "actors_state": [],
-            },
-            "hero": {
-                "state": self.map.hero.state,
-                "last_state": self.map.hero.last_state,
-                "action": 0,
-                "last_action": self.last_action,
-            },
-            "collision": {
-                "collided": False,
-                "actor_id": 0,
-            },
-        }
+        return {}
 
     def reset(self, seed=None, options=None, scene="rdm"):
         super().reset(seed=seed)
@@ -111,17 +87,7 @@ class CarlaBEV(gym.Env):
         else:
             print(f"[WARN] Unknown scene format: {type(scene)} → Resetting empty map.")
             self.map.reset()
-
-        # Camera
-        self.camera = Camera(self.map.hero, resolution=(self.size, self.size))
-        follow = Follow(self.camera, self.map.hero)
-        self.camera.setmethod(follow)
         #
-        self._dist2goal_t0 = self.map.dist2goal()
-        self._dist2goal_t_1 = self.map.dist2goal()
-        self._dist2goal = self.map.dist2goal()
-        self._dist2wp_1 = self.map.hero.dist2wp
-
         return self._get_obs(), self._get_info()
 
     def _preprocess_action(self, action):
@@ -131,22 +97,11 @@ class CarlaBEV(gym.Env):
 
     def _simulate(self, action):
         action = self._preprocess_action(action)
-        self.map.hero_step(action)
-        self.camera.scroll()
-        self.map.step(camera_topleft=self.camera.offset)
-        self._dist2goal_t_1 = self._dist2goal
-        self._dist2goal = self.map.dist2goal()
+        self.map.step(action)
 
     def _compute_outcome(self):
-        actor_id, result, actors_state = self.map.collision_check(min_dist=35)
-
-        info = self._get_info()
-        info["collision"]["collided"] = result
-        info["collision"]["actor_id"] = actor_id
-        info["actors_state"] = actors_state
-
-        tile = np.array(self.map.agent_tile)[:-1]
-        reward, terminated, cause = self.reward_fn.step(tile, info)
+        info = self.map.collision_check(min_dist=35)
+        reward, terminated, cause = self.reward_fn.step(info)
         return reward, terminated, cause, info
 
     def _check_termination(self, cause):
@@ -162,9 +117,6 @@ class CarlaBEV(gym.Env):
             if cause == "max_actions":
                 truncated = True
 
-            if self.logger:
-                self.logger.log_episode(episode_info)
-
             return terminated, truncated, info_out
 
         return terminated, truncated, info_out
@@ -173,9 +125,6 @@ class CarlaBEV(gym.Env):
         self._simulate(action)
         reward, terminated, cause, info = self._compute_outcome()
         self.stats.step(reward, cause)
-
-        if self.logger:
-            self.logger.log_step({})
         terminated, truncated, info_out = self._check_termination(cause)
         self.last_action = action
         self._current_step += 1

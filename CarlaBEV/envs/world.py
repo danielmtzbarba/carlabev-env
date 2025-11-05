@@ -67,36 +67,26 @@ class BaseMap(Scene):
     # =====================================================
     # --- Simulation Step ---
     # =====================================================
-    def step(self, camera_topleft):
+    def step(self, action):
         """Update scene and render the cropped, rotated FOV."""
-        self._scene_step()
-
+        self._scene_step(action)
+        self.draw_fov()
+    
+    def draw_fov(self):
         # Crop around ego vehicle
-        fov = self.crop_fov(camera_topleft)
+        fov = self.crop_fov(self.camera.offset)
         rotated_fov, rect = self.rotate_fov(fov)
-
         # Blit rotated FOV onto camera surface
         self._fov_surface.fill((0, 0, 0))
         self._fov_surface.blit(rotated_fov, rect)
-
         # Store agent tile (for reward)
         self._agent_tile = self._fov_surface.get_at(self.center)
-
         # Draw ego
         self.hero.draw(self.canvas, self.map_surface)
 
-    def hero_step(self, action):
-        """Advance hero agent one step and update heading."""
-        self.hero.step(action)
-        self._theta = self.hero.yaw
-
     # =====================================================
-    # --- Metrics & Properties ---
+    # --- Properties ---
     # =====================================================
-    def dist2goal(self):
-        """Euclidean distance to target."""
-        return np.linalg.norm(self.hero.position - self.target_position)
-
     @property
     def canvas(self):
         return self._fov_surface
@@ -107,4 +97,4 @@ class BaseMap(Scene):
 
     @property
     def agent_tile(self):
-        return self._agent_tile
+        return np.array(self._agent_tile)[:-1]

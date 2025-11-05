@@ -77,21 +77,23 @@ class RewardFn(object):
         self.lat_small = lat_small
 
         # internal counters
+        self._k = 0
         self._consecutive_offroad = 0
 
     def reset(self):
         self._k = 0
         self._consecutive_offroad = 0
 
-    def step(self, tile, info):
+    def step(self, info):
         self._k += 1
         reward, terminated, cause = -0.01, False, None  # small step cost
+        tile = info["collision"]["tile"]
 
         # time / bounds
         if self._k >= self.max_actions:
             return 0.0, True, "max_actions"
 
-        if info["env"]["dist2wp"] > 50:
+        if info["hero"]["dist2wp"] > 50:
             return -0.5, True, "out_of_bounds"
 
         # collisions (tile obstacle or env collision signal)
@@ -139,15 +141,15 @@ class RewardFn(object):
         delta_yaw = yaw_1 - yaw
 
         # waypoints / alignment
-        distance_t = info["env"]["dist2goal"]
-        distance_t_1 = info["env"]["dist2goal_t_1"]
-        set_point = info["env"]["set_point"]
+        distance_t = info["scene"]["dist2goal"]
+        distance_t_1 = info["scene"]["dist2goal_t_1"]
+        set_point = info["hero"]["set_point"]
         desired_yaw = set_point[2]
         yaw_error = np.arctan2(np.sin(desired_yaw - yaw), np.cos(desired_yaw - yaw))
         yaw_alignment = np.cos(yaw_error)  # [-1, 1]
 
         # lateral error (quadratic, clipped)
-        xs, ys, _ = info["env"]["nextwps"]
+        xs, ys, _ = info["hero"]["next_wps"]
         wps = np.array([xs, ys]).T
         dist2route = lateral_error(x, y, wps, signed=True)
         e = np.clip(abs(dist2route), 0.0, self.lat_clip)
@@ -170,7 +172,7 @@ class RewardFn(object):
 
         # TTC shaping (kept gentle)
         hero_state = info["hero"]["state"]
-        actors_state = info["actors_state"]
+        actors_state = info["collision"]["actors_state"]
         r += self.k_ttc * compute_ttc(hero_state, actors_state, ttc_threshold=30)
 
         # reverse penalty

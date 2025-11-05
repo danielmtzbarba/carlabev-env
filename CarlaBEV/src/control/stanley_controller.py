@@ -255,3 +255,13 @@ class Controller(State):
             self.cy[self.target_idx :],
             self.cyaw[self.target_idx :],
         )
+    
+    @property
+    def controller_info(self):
+        return {
+            "state": self.state,
+            "last_state": self.last_state,
+            "dist2wp": self.dist2wp,
+            "set_point": self.set_point,
+            "next_wps": self.next_wps(5)
+        }

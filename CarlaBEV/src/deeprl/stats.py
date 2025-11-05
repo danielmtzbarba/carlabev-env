@@ -6,19 +6,31 @@ import os
 
 class EpisodeStats:
     def __init__(self):
-        self.rewards, self.speeds, self.progress, self.ttc = [], [], [], []
+        self.rewards = []
+        self.speeds = []
+        self.progress = []
+        self.ttc = []
         self.cause = None
 
-    def step(self, reward, cause=None, speed=None, progress=None, ttc=None):
-        self.rewards.append(reward)
-        if cause:
-            self.cause = cause
-        if speed is not None:
-            self.speeds.append(speed)
-        if progress is not None:
-            self.progress.append(progress)
-        if ttc is not None:
-            self.ttc.append(ttc)
+    def step(self, info):
+        # reward
+        r = info["reward"]["reward"]
+        self.rewards.append(r)
+
+        # termination cause (if exists)
+        c = info["reward"]["cause"]
+        if c is not None:
+            self.cause = c
+
+        # extract optional metrics if available
+        v = info["hero"]["state"][3]     # vehicle speed
+        self.speeds.append(v)
+
+        if "progress" in info["reward"]:
+            self.progress.append(info["reward"]["progress"])
+
+        if "ttc" in info["reward"]:
+            self.ttc.append(info["reward"]["ttc"])
 
     @property
     def episode_return(self):
@@ -46,13 +58,15 @@ class Stats:
     def reset(self):
         self.current = EpisodeStats()
 
-    def step(self, reward, cause=None, **kwargs):
-        self.current.step(reward, cause, **kwargs)
+    def step(self, info):
+        self.current.step(info)
 
     def terminated(self):
+        summary = self.get_episode_info()
         self.history.append(self.current)
         self.episode += 1
-        self.current = EpisodeStats()
+        self.reset()
+        return summary
 
     # --- Aggregated metrics ---
     def _count(self, name):
@@ -88,9 +102,10 @@ class Stats:
             "unfinished_rate": self.unfinished_rate,
             "mean_speed": self.current.mean_speed,
             "mean_ttc": self.current.mean_ttc,
+            "mean_progress": self.current.mean_progress,
         }
 
-    def export(self, path="episodes.json"):
+    def export(self, path="runs/episodes.json"):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         data = [self._serialize(ep, idx) for idx, ep in enumerate(self.history)]
         with open(path, "w") as f:

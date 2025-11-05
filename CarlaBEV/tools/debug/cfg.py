@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 @dataclass
 class LoggerConfig:
-    enabled: bool = True
-    dir: str = "results/carlabev/runs/"
+    enabled: bool = True 
+    dir: str = "/home/danielmtz/Data/results/carlabev/debug/"
 
 @dataclass
 class EnvConfig:

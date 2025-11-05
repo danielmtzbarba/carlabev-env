@@ -16,7 +16,7 @@ cfg = tyro.cli(CarlaBEVConfig)
 
 
 # Assuming cfg.exp_name and cfg.logging.enabled are defined
-#sim_logger, train_logger = create_loggers(cfg)
+sim_logger = create_loggers(cfg)
 
 
 def main(size: int = 128):
@@ -35,12 +35,14 @@ def main(size: int = 128):
 
         # Step through the environment
         observation, reward, terminated, _, info = env.step([action])
-        total_reward += reward
 
-        # Reset if episode ends
-        if terminated:
-            observation, info = env.reset()
-            total_reward = 0
+        for i, ended  in enumerate(terminated):
+            if ended:
+                sim_logger.log_episode(info, i)
+                observation, info = env.reset()
+            
+
+
 
     env.close()
 

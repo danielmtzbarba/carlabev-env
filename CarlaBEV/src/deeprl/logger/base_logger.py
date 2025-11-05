@@ -6,7 +6,6 @@ from datetime import datetime
 from rich.console import Console
 from torch.utils.tensorboard import SummaryWriter
 
-
 class BaseLogger:
     """Common interface for all logging modules (sim + training)."""
 
@@ -18,7 +17,7 @@ class BaseLogger:
             return
 
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.log_dir = os.path.join(log_dir, exp_name + "_" + ts)
+        self.log_dir = os.path.join(log_dir, exp_name)
         os.makedirs(self.log_dir, exist_ok=True)
         self.writer = SummaryWriter(self.log_dir)
 
@@ -44,3 +43,47 @@ class BaseLogger:
     def close(self):
         if self.writer:
             self.writer.close()
+
+    def log_step(self, data, step=None):
+        if not self.enabled:
+            return
+        for k, v in data.items():
+            if isinstance(v, (int, float)):
+                self.log_scalar(f"sim/{k}", v, step)
+
+    def log_episode(self, info, idx):
+        if not self.enabled:
+            return
+
+        data = info["episode_info"]
+        # Console output
+        self.console.print(
+            f"Ep {data["episode"][idx]} | Return: [green]{data["return"][idx]:.2f}[/green] | "
+            f"Len: {data["length"][idx]} | Cause: {data["termination"][idx]}"
+        )
+
+        # Write to TensorBoard
+        for k, v in info.items():
+            if isinstance(v, (int, float)):
+                self.log_scalar(f"sim/{k}", v, info["episode"][idx])
+
+
+
+    def log_learning(self, step, **kwargs):
+        for k, v in kwargs.items():
+            if v is not None:
+                self.log_scalar(f"train/{k}", v, step)
+
+    def log_evaluation(self, results_dict, global_step=None):
+        if not self.enabled:
+            return
+        table = Table(
+            title=f"Evaluation @ step {global_step}", header_style="bold cyan"
+        )
+        table.add_column("Metric")
+        table.add_column("Value", justify="right")
+
+        for k, v in results_dict.items():
+            table.add_row(k, f"{v:.3f}" if isinstance(v, float) else str(v))
+            self.log_scalar(f"eval/{k}", v, global_step)
+        self.console.print(table)

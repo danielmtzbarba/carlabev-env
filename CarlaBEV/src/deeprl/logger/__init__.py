@@ -36,20 +36,4 @@ def create_loggers(cfg):
     )
     base_logger.log_dir = exp_dir  # ensure correct directory name
 
-    # Share writer and log_dir with child loggers
-    sim_logger = SimLogger(exp_name=exp_name, enabled=cfg.logging.enabled)
-    sim_logger.writer = base_logger.writer
-    sim_logger.log_dir = exp_dir
-
-    train_logger = TrainLogger(config=cfg, enabled=cfg.logging.enabled)
-    train_logger.writer = base_logger.writer
-    train_logger.log_dir = exp_dir
-
-    # Optional: write simple hyperparameter file
-    with open(os.path.join(exp_dir, "hyperparams.txt"), "w") as f:
-        for k, v in vars(cfg).items():
-            f.write(f"{k}: {v}\n")
-
-    base_logger.msg(f"[LogManager] Unified loggers created at: {exp_dir}")
-
-    return sim_logger, train_logger
+    return base_logger 

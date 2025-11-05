@@ -89,50 +89,79 @@ class RewardFn(object):
         reward, terminated, cause = -0.01, False, None  # small step cost
         tile = info["collision"]["tile"]
 
-        # time / bounds
+        reward_details = {
+            "base_reward": reward,
+        }
+        # --- time limit ---
         if self._k >= self.max_actions:
-            return 0.0, True, "max_actions"
+            reward, terminated, cause = 0.0, True, "max_actions"
 
-        if info["hero"]["dist2wp"] > 50:
-            return -0.5, True, "out_of_bounds"
+        # --- out of bounds ---
+        elif info["hero"]["dist2wp"] > 50:
+            reward, terminated, cause = -0.5, True, "out_of_bounds"
 
-        # collisions (tile obstacle or env collision signal)
-        if np.array_equal(tile, self.tiles_to_color[Tiles.obstacle.value]):
-            return -1.0, True, "collision"
+        # --- collision by map tile ---
+        elif np.array_equal(tile, self.tiles_to_color[Tiles.obstacle.value]):
+            reward, terminated, cause = -1.0, True, "collision"
 
-        collision = info["collision"]["collided"]
-        target_id = info["collision"]["actor_id"]
-        if collision is not None:
-            return self.termination(collision, target_id)
+        # --- collision by dynamic actor ---
+        elif info["collision"]["collided"] is not None:
+            collision = info["collision"]["collided"]
+            target_id = info["collision"]["actor_id"]
+            reward, terminated, cause = self.termination(collision, target_id)
 
-        # sidewalk handling (stronger + persistent)
-        on_sidewalk = np.array_equal(tile, self.tiles_to_color[Tiles.sidewalk.value])
-        if on_sidewalk:
-            self._consecutive_offroad += 1
-            # escalating penalty while off-road
-            reward += (
-                self.sidewalk_step_penalty
-                + self.sidewalk_penalty_scale * self._consecutive_offroad
-            )
-
-            # optionally kill progress/speed rewards while off-road
-            offroad_mask = True
+        # --- normal step ---
         else:
-            # reset counter as soon as we come back
-            self._consecutive_offroad = 0
-            offroad_mask = False
+            # -------------------------------
+            # OFFROAD / SIDEWALK HANDLING
+            # -------------------------------
+            on_sidewalk = np.array_equal(tile, self.tiles_to_color[Tiles.sidewalk.value])
 
-        # hard terminate if we insist off-road too long
-        if (
-            self.offroad_terminate_after
-            and self._consecutive_offroad >= self.offroad_terminate_after
-        ):
-            return reward - 0.5, True, "off_road"
+            if on_sidewalk:
+                self._consecutive_offroad += 1
+                reward += (
+                    self.sidewalk_step_penalty
+                    + self.sidewalk_penalty_scale * self._consecutive_offroad
+                )
+                offroad_mask = True
+            else:
+                self._consecutive_offroad = 0
+                offroad_mask = False
 
-        # add continuous shaping only after sidewalk check
-        reward += self.non_terminal(info, offroad_mask)
+            reward_details["offroad_mask"] = offroad_mask
+            reward_details["offroad_steps"] = self._consecutive_offroad
 
-        return float(np.clip(reward, -1.0, 1.0)), terminated, cause
+            # terminate after too long off-road
+            if (
+                self.offroad_terminate_after
+                and self._consecutive_offroad >= self.offroad_terminate_after
+            ):
+                reward -= 0.5
+                terminated = True
+                cause = "off_road"
+
+            else:
+                # -------------------------------
+                # CONTINUOUS SHAPING (normal reward)
+                # -------------------------------
+                shaping, shaping_details = self.non_terminal(info, offroad_mask)
+                reward += shaping
+                reward_details.update(shaping_details)
+
+            # clip reward finally
+            reward = float(np.clip(reward, -1.0, 1.0))
+
+        # finalize dict
+        reward_details.update({
+            "reward": reward,
+            "terminated": terminated,
+            "cause": cause,
+        })
+
+        # attach for external logging
+        info["reward"] = reward_details
+
+        return reward, terminated, cause, info 
 
     def non_terminal(self, info, offroad_mask: bool):
         r = 0.0
@@ -187,7 +216,26 @@ class RewardFn(object):
         r += self.alive_bias
 
         # mild squashing to avoid outliers (lighter than before)
-        return float(np.tanh(r * 1.2))
+        reward_components = {
+                "lat_err": float(e),
+                "yaw_error": float(yaw_error),
+                "yaw_alignment": float(yaw_alignment),
+                "delta_progress": float(distance_t_1 - distance_t),
+                "speed": float(v),
+                "flow_term": float(self.k_flow * min(v, self.max_speed_for_flow) * max(0.0, yaw_alignment)),
+                "progress_term": float(self.k_progress * (distance_t_1 - distance_t) * max(0.0, yaw_alignment)),
+                "align_bonus": float(self.k_align_bonus if e < self.lat_small and abs(yaw_error) < self.yaw_small else 0.0),
+                "ttc_bonus": float(self.k_ttc * compute_ttc(hero_state, actors_state, ttc_threshold=30)),
+                "reverse_penalty": float(-self.k_reverse * abs(v) if v < -0.1 else 0.0),
+                "jerk_penalty": float(-self.k_smooth * jerk),
+                "alive_bias": float(self.alive_bias),
+                "offroad_steps": self._consecutive_offroad,
+                "offroad_mask": offroad_mask,
+        }
+        total = float(np.tanh(r * 1.2))
+        reward_components["reward"] = total
+
+        return total, reward_components
 
     def termination(self, collision, target_id):
         if collision == "pedestrian":

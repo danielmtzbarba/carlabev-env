@@ -63,7 +63,6 @@ class CarlaBEV(gym.Env):
 
     def reset(self, seed=None, options=None, scene="rdm"):
         super().reset(seed=seed)
-        self.last_action = 0
         self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
@@ -101,34 +100,23 @@ class CarlaBEV(gym.Env):
 
     def _compute_outcome(self):
         info = self.map.collision_check(min_dist=35)
-        reward, terminated, cause = self.reward_fn.step(info)
-        return reward, terminated, cause, info
+        reward, terminated, cause, info = self.reward_fn.step(info)
+        return reward, cause, info
 
     def _check_termination(self, cause):
-        terminated, truncated, info_out = False, False, {}
         if cause in self.termination_causes:
-            episode_info = deepcopy(self.stats.get_episode_info())
-
-            terminated = True
-            self.stats.terminated()
-
-            info_out = {"termination": episode_info}
-
-            if cause == "max_actions":
-                truncated = True
-
-            return terminated, truncated, info_out
-
-        return terminated, truncated, info_out
+            episode_summary = self.stats.terminated()
+            return True, (cause == "max_actions"), {"episode_info": episode_summary}
+        return False, False, {}
 
     def step(self, action):
         self._simulate(action)
-        reward, terminated, cause, info = self._compute_outcome()
-        self.stats.step(reward, cause)
+        reward, cause, info = self._compute_outcome()
+        self.stats.step(info)
         terminated, truncated, info_out = self._check_termination(cause)
-        self.last_action = action
+        info["episode_info"] = {} if not terminated else info_out["episode_info"]
         self._current_step += 1
-        return self._get_obs(), reward, terminated, truncated, info_out
+        return self._get_obs(), reward, terminated, truncated, info
 
     def render(self):
         self._observation = np.transpose(

@@ -25,16 +25,16 @@ class EnvConfig:
     # Traffic generation
     traffic_enabled: bool = True
     max_vehicles: int = 50
-    curriculum_enabled: str = False
-    start_ep: int = 300
-    midpoint: int = 1000
-    growth_rate: float = 0.01
+    curriculum_enabled: str = True 
+    start_ep: int = 200
+    midpoint: int = 800 
+    growth_rate: float = 0.07
 
 
 @dataclass
 class PPOConfig:
     # PPO core
-    total_timesteps: int = 30_000_000
+    total_timesteps: int = 10_000_000
     learning_rate: float = 3e-4  # slightly higher, tune if unstable
     num_envs: int = 14  # match CPUs available
     num_steps: int = 256  # rollout length per env → buffer size = 3072

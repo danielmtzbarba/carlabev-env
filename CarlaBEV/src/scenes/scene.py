@@ -144,6 +144,7 @@ class Scene:
             "scene": {
                 "dist2goal": self._dist2goal,
                 "dist2goal_t_1": self._dist2goal_t_1,
+                "num_vehicles": self.actor_manager.num_vehicles
                 },
             "collision": {
                 "tile": self.agent_tile

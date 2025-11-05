@@ -91,3 +91,7 @@ class ActorManager:
             else:
                 for actor in v:
                     actor.draw(surface)
+    
+    @property
+    def num_vehicles(self):
+        return len(self.actors["vehicle"])

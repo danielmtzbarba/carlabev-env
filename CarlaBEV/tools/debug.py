@@ -40,9 +40,6 @@ def main(size: int = 128):
             if ended:
                 sim_logger.log_episode(info, i)
                 observation, info = env.reset()
-            
-
-
 
     env.close()
 

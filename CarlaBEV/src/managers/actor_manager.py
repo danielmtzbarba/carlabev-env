@@ -73,13 +73,13 @@ class ActorManager:
                 if hasattr(actor, "reset"):
                     actor.reset()
 
-    def step_all(self):
+    def step_all(self, t=0.0, dt=0.05):
         """Step all non-hero actors."""
         for k, v in self.actors.items():
             if k == "agent":
                 continue
             for actor in v:
-                actor.step()
+                actor.step(t, dt)
 
     def draw_all(self, surface):
         """Draw all actors on given pygame surface."""

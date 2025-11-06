@@ -33,6 +33,8 @@ class Scene:
         self._idx = 0
 
         # --- hero agent placeholder ---
+        self._t = 0.0
+        self._dt = 0.1
         self.hero = None
 
     # =====================================================
@@ -41,6 +43,7 @@ class Scene:
     def reset_scene(self, episode, actors=None):
         """Reset the scene with optional actor data."""
         self._idx = 0
+        self._t = 0.0
 
         if actors:
             self.actor_manager.load(actors)
@@ -70,9 +73,10 @@ class Scene:
             self.reset_scene(episode, actors)
 
     def _scene_step(self, action):
+        self._t += self._dt
         self.hero_step(action)
         self._scene.blit(self._map_img, (0, 0))
-        self.actor_manager.step_all()
+        self.actor_manager.step_all(self._t, self._dt)
         self.actor_manager.draw_all(self.map_surface)
 
         self._dist2goal_t_1 = self._dist2goal

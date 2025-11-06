@@ -74,32 +74,6 @@ class SceneGenerator:
         return actors
 
     # =========================================================
-    # --- Specific Scenario: Lead Brake Example ---
-    # =========================================================
-    def generate_lead_brake(self):
-        """Example critical scenario: ego follows braking lead car."""
-        actors = {"agent": None, "vehicle": [], "pedestrian": [], "target": []}
-
-        # Ego vehicle route (northbound)
-        rx = [850, 850, 850, 850, 850, 850]
-        ry = [1080, 1060, 1040, 1020, 1000, 980]
-        actors["agent"] = (rx, ry)
-
-        # Lead vehicle braking
-        rx_v = [850, 850, 850, 850, 850]
-        ry_v = [940, 930, 920, 915, 912]
-        v = Vehicle(
-            start_node=[850, 940],
-            end_node=[850, 912],
-            map_size=self.size,
-            routeX=rx_v,
-            routeY=ry_v,
-        )
-        actors["vehicle"].append(v)
-
-        return actors
-
-    # =========================================================
     # --- Traffic Scheduling ---
     # =========================================================
     def _vehicle_schedule(self, episode):

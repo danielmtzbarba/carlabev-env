@@ -67,7 +67,13 @@ class CarlaBEV(gym.Env):
         self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
-
+            
+        try:
+            scene = options["scene"]
+            num_vehicles = options["num_vehicles"]
+        except Exception as e:
+            pass
+        
         # --- Case 1: Random scene generation ---
         if isinstance(scene, str) and scene == "rdm":
             self.map.reset(episode=self.stats.episode)
@@ -81,7 +87,7 @@ class CarlaBEV(gym.Env):
 
         # --- Case 3: Scene dict provided directly (not CSV path) ---
         elif isinstance(scene, dict):
-            self.map.reset(scene)
+            self.map.reset(episode=self.stats.episode, actors=scene)
 
         # --- Safety check ---
         else:

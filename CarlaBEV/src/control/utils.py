@@ -1,6 +1,9 @@
-import numpy as np
-from scipy.spatial.transform import Rotation as Rot
 import math
+import numpy as np
+
+from scipy.signal import savgol_filter
+from scipy.interpolate import splprep, splev
+from scipy.spatial.transform import Rotation as Rot
 
 
 def rot_mat_2d(angle):
@@ -193,3 +196,82 @@ def lateral_error(px, py, waypoints, signed=False):
         if abs(e) < abs(min_error):
             min_error = e
     return min_error
+
+def smooth_and_compute(ax, ay, window=9, poly=3):
+    """
+    Input:
+      ax, ay : 1D arrays (raw path coordinates)
+      window : odd window length for Savitzky-Golay (will be clamped)
+      poly   : polynomial order for Savitzky-Golay
+
+    Returns:
+      cx, cy : smoothed coordinates (same length as inputs after dedup)
+      cyaw   : tangent angles (radians), array same length
+      ck     : curvature array same length
+      s      : cumulative arc-length (meters or units of ax/ay)
+    """
+    ax = np.asarray(ax, dtype=float)
+    ay = np.asarray(ay, dtype=float)
+    if ax.size != ay.size:
+        raise ValueError("ax and ay must have same length")
+
+    # remove consecutive duplicate points
+    d = np.hypot(np.diff(ax), np.diff(ay))
+    mask = np.concatenate(([True], d > 1e-9))
+    ax = ax[mask]; ay = ay[mask]
+
+    if len(ax) < 2:
+        raise ValueError("Need at least 2 unique points")
+
+    # ensure window is valid (odd and <= len)
+    if window % 2 == 0:
+        window += 1
+    if window > len(ax):
+        window = len(ax) if len(ax) % 2 == 1 else len(ax)-1
+    if window < 3:
+        window = 3
+
+    poly = min(poly, window-1)
+
+    # Smooth coordinates (if path too short fallback to raw)
+    if len(ax) >= window:
+        cx = savgol_filter(ax, window_length=window, polyorder=poly)
+        cy = savgol_filter(ay, window_length=window, polyorder=poly)
+    else:
+        cx, cy = ax.copy(), ay.copy()
+
+    # compute cumulative arc-length s
+    dx_local = np.diff(cx)
+    dy_local = np.diff(cy)
+    seg_len = np.hypot(dx_local, dy_local)
+    s = np.concatenate(([0.0], np.cumsum(seg_len)))
+    total_len = s[-1]
+    if total_len <= 1e-9:
+        # degenerate: all points essentially same after smoothing
+        dx_ds = np.zeros_like(cx)
+        dy_ds = np.zeros_like(cy)
+        cyaw = np.zeros_like(cx)
+        ck = np.zeros_like(cx)
+        return cx, cy, cyaw, ck, s
+
+    # derivatives w.r.t arc-length s using numpy.gradient
+    # np.gradient(y, x) approximates dy/dx
+    # gradient preserves original array length
+    dx_ds = np.gradient(cx, s)
+    dy_ds = np.gradient(cy, s)
+
+    # yaw is tangent direction
+    cyaw = np.unwrap(np.arctan2(dy_ds, dx_ds))
+
+    # second derivatives
+    d2x_ds2 = np.gradient(dx_ds, s)
+    d2y_ds2 = np.gradient(dy_ds, s)
+
+    denom = (dx_ds**2 + dy_ds**2)
+    # avoid division by zero (tiny denom -> set curvature to 0)
+    small = denom < 1e-9
+    denom_safe = np.where(small, 1.0, denom)  # avoid nan
+    ck = (dx_ds * d2y_ds2 - dy_ds * d2x_ds2) / (denom_safe**1.5)
+    ck[small] = 0.0
+
+    return cx, cy, cyaw, ck, s

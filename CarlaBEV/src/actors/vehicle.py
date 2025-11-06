@@ -9,6 +9,7 @@ class Vehicle(Actor):
         end_node=None,
         routeX=None,
         routeY=None,
+        behavior=None,
         target_speed=32,
     ):
         self._map_size = map_size
@@ -23,4 +24,5 @@ class Vehicle(Actor):
             resolution=1.0,
             routeX=routeX,
             routeY=routeY,
+            behavior=behavior
         )

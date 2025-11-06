@@ -22,7 +22,7 @@ class Target(pygame.sprite.Sprite):
             self.lenght,
         )
 
-    def step(self):
+    def step(self, t, dt):
         pass
 
     def isCollided(self, hero, offset):

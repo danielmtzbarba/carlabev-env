@@ -59,6 +59,7 @@ class ActorManager:
 
     def load(self, actors_dict):
         """Load actors from a prebuilt dictionary (used when loading from CSV)."""
+        self.clear()
         self.actors = copy.deepcopy(actors_dict)
 
     # ======================================================
@@ -91,7 +92,7 @@ class ActorManager:
             else:
                 for actor in v:
                     actor.draw(surface)
-    
+
     @property
     def num_vehicles(self):
         return len(self.actors["vehicle"])

@@ -67,13 +67,13 @@ class CarlaBEV(gym.Env):
         self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
-            
+
         try:
             scene = options["scene"]
             num_vehicles = options["num_vehicles"]
         except Exception as e:
-            pass
-        
+            num_vehicles = self.cfg.max_vehicles
+
         # --- Case 1: Random scene generation ---
         if isinstance(scene, str) and scene == "rdm":
             self.map.reset(episode=self.stats.episode)

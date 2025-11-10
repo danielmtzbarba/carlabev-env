@@ -13,7 +13,6 @@ from CarlaBEV.tools.debug.cfg import CarlaBEVConfig
 
 
 cfg = tyro.cli(CarlaBEVConfig)
-from  CarlaBEV.src.scenes.scenarios.lead_brake import LeadBrakeScenario
 
 
 # Assuming cfg.exp_name and cfg.logging.enabled are defined
@@ -29,10 +28,12 @@ def main(size: int = 128):
     keys_held = init_key_tracking()
     envs = make_env(cfg)
     print("Observation space:", envs.observation_space)
-
-    scenario = LeadBrakeScenario(map_size=128)
-    actors_dict = scenario.sample()
-    observation, info = envs.reset(options={"scene":actors_dict})
+    options={
+        "scene":"lead_brake",
+        "num_vehicles": 25
+    }
+    envs.unwrapped.options = options
+    observation, info = envs.reset(options=options)
     total_reward = 0
     running = True
 
@@ -42,16 +43,17 @@ def main(size: int = 128):
 
         # Step through the environment
         observation, reward, terminated, _, info = envs.step([action])
-
         for i, ended  in enumerate(terminated):
             if ended:
-                ended_env = get_base_env(envs.envs[i])
-                info_i = ended_env.current_info
-                sim_logger.log_episode(info_i)
+                sim_logger.log_episode(info["final_info"][i])
                 # === Reset the finished env ===
-                #
-                actors_dict = scenario.sample()
-                ended_env.reset(scene=actors_dict)
+                options={
+                    "scene": "lead_brake",
+                    "num_vehicles": 25
+                }
+                envs.call("set_optionsxd", options=options)
+                observation, info = envs.reset(options=options)
+                envs.reset_at(i)
 
     envs.close()
 

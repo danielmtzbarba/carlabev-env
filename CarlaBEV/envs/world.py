@@ -39,9 +39,9 @@ class BaseMap(Scene):
     # =====================================================
     # --- Scene Control ---
     # =====================================================
-    def reset(self, episode, actors=None):
+    def reset(self, actors=None):
         """Reset scene and reload actors."""
-        super().reset_scene(episode, actors)
+        self.reset_scene(actors)
         self._theta = 0.0
         self._scene.blit(self._map_img, (0, 0))
 

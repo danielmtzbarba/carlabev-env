@@ -3,14 +3,10 @@ import numpy as np
 from CarlaBEV.src.scenes.utils import *
 
 from CarlaBEV.envs.camera import Camera, Follow
-from CarlaBEV.src.managers.planner_manager import PlannerManager
 from CarlaBEV.src.managers.actor_manager import ActorManager
 from CarlaBEV.src.scenes.utils import set_targets
 
-from CarlaBEV.src.managers.scene_generator import SceneGenerator
 from CarlaBEV.src.managers.scene_serializer import SceneSerializer
-
-
 
 
 class Scene:
@@ -26,9 +22,7 @@ class Scene:
         self._const = int(size / 4) + 1
 
         # --- Managers ---
-        self.planners = PlannerManager(town_name)
         self.actor_manager = ActorManager(size)
-        self.generator = SceneGenerator(self.planners, self.cfg)
         self.serializer = SceneSerializer()
         self._idx = 0
 
@@ -40,37 +34,38 @@ class Scene:
     # =====================================================
     # --- Scene lifecycle
     # =====================================================
-    def reset_scene(self, episode, actors=None):
+    def reset_scene(self, actors=None):
         """Reset the scene with optional actor data."""
         self._idx = 0
         self._t = 0.0
-
         if actors:
-            self.actor_manager.load(actors)
-            if self.actor_manager.actors.get("agent"):
-                self.hero = self.actor_manager.spawn_hero(
-                    route=self.agent_route,
-                    scale=self._scale,
-                )
-                self._actors = set_targets(
-                    self.actor_manager.actors, self.hero.cx, self.hero.cy
-                )
-                self.actor_manager.reset_all()
-
-                # Camera
-                self.camera = Camera(self.hero, resolution=(self.size, self.size))
-                follow = Follow(self.camera, self.hero)
-                self.camera.setmethod(follow)
-
-                # Metrics
-                self._dist2goal_t0 = self.dist2goal()
-                self._dist2goal_t_1 = self.dist2goal()
-                self._dist2goal = self.dist2goal()
-                self._dist2wp_1 = self.hero.dist2wp
+            self.load_scene(actors)
         else:
-            self.actor_manager.clear()
-            actors = self.generator.generate_random(episode)
-            self.reset_scene(episode, actors)
+            self.actor_manager.reset_all()
+
+        # Metrics
+        self._dist2goal_t0 = self.dist2goal()
+        self._dist2goal_t_1 = self.dist2goal()
+        self._dist2goal = self.dist2goal()
+        self._dist2wp_1 = self.hero.dist2wp
+
+    def load_scene(self, actors):
+        self.actor_manager.load(actors)
+        if self.actor_manager.actors.get("agent"):
+            self.hero = self.actor_manager.spawn_hero(
+                route=self.agent_route,
+                scale=self._scale,
+            )
+            self._actors = set_targets(
+                self.actor_manager.actors, self.hero.cx, self.hero.cy
+            )
+            self.actor_manager.reset_all()
+
+            # Camera
+            self.camera = Camera(self.hero, resolution=(self.size, self.size))
+            follow = Follow(self.camera, self.hero)
+            self.camera.setmethod(follow)
+        return True 
 
     def _scene_step(self, action):
         self._t += self._dt

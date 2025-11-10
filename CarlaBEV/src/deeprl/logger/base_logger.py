@@ -59,7 +59,7 @@ class BaseLogger:
         # Console output
         self.console.print(
             f"Ep {data["episode"]} | Return: [green]{data["return"]:.2f}[/green] | "
-            f"Len: {data["length"]} | Num Vehicles: {info["scene"]["num_vehicles"]} | "
+            f"Len: {data["length"]} | Num Vehicles: {data["num_vehicles"]} | "
             f"Cause: {data["termination"]}"
         )
 

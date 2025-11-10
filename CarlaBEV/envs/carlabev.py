@@ -12,6 +12,8 @@ from CarlaBEV.envs.renderer import Renderer
 from CarlaBEV.src.deeprl.reward import RewardFn
 from CarlaBEV.src.deeprl.stats import Stats
 
+
+from CarlaBEV.src.managers.scene_generator import SceneGenerator
 from CarlaBEV.src.scenes.utils import load_scenario_folder
 
 
@@ -54,46 +56,27 @@ class CarlaBEV(gym.Env):
         self.reward_fn = RewardFn()
         # World
         self.map = BaseMap(self.cfg)
+        self.scene_generator = SceneGenerator(self.cfg)
+        self.options = None
 
     def _get_obs(self):
         return self.render()
 
     def _get_info(self):
         return {}
+    
+    def set_optionsxd(self, options):
+        self.options = options
 
-    def reset(self, seed=None, options=None, scene="rdm"):
+    def reset(self, *, seed: int | None = None, options: dict | None = None, **kwargs):
         super().reset(seed=seed)
         self.current_info = {}
         self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
-
-        try:
-            scene = options["scene"]
-            num_vehicles = options["num_vehicles"]
-        except Exception as e:
-            num_vehicles = self.cfg.max_vehicles
-
-        # --- Case 1: Random scene generation ---
-        if isinstance(scene, str) and scene == "rdm":
-            self.map.reset(episode=self.stats.episode)
-
-        # --- Case 2: Predefined scenario ---
-        elif isinstance(scene, str):
-            # e.g., scene = "S01_jaywalk"
-            scene_path = os.path.join("assets/scenes", scene)
-            actors, meta = load_scenario_folder("assets/scenes/S01_jaywalk/")
-            self.map.reset(actors)  # instantiate correctly
-
-        # --- Case 3: Scene dict provided directly (not CSV path) ---
-        elif isinstance(scene, dict):
-            self.map.reset(episode=self.stats.episode, actors=scene)
-
-        # --- Safety check ---
-        else:
-            print(f"[WARN] Unknown scene format: {type(scene)} → Resetting empty map.")
-            self.map.reset()
-        #
+        # Load scene
+        actors = self.scene_generator.build_scene(self.options)
+        self.map.reset(actors)
         return self._get_obs(), self._get_info()
 
     def _preprocess_action(self, action):
@@ -113,6 +96,7 @@ class CarlaBEV(gym.Env):
     def _check_termination(self, cause):
         if cause in self.termination_causes:
             episode_summary = self.stats.terminated()
+            episode_summary["num_vehicles"] = self.current_info["scene"]["num_vehicles"]
             return True, (cause == "max_actions"), {"episode_info": episode_summary}
         return False, False, {}
 
@@ -121,10 +105,10 @@ class CarlaBEV(gym.Env):
         reward, cause, info = self._compute_outcome()
         self.stats.step(info)
         terminated, truncated, info_out = self._check_termination(cause)
-        info["episode_info"] = {} if not terminated else info_out["episode_info"]
-        self._current_step += 1
         self.current_info = info
+        info["episode_info"] = {} if not terminated else info_out["episode_info"]
         return self._get_obs(), reward, terminated, truncated, info_out
+        self._current_step += 1
 
     def render(self):
         self._observation = np.transpose(

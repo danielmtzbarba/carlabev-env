@@ -88,4 +88,4 @@ class FlattenStackedFrames(gym.ObservationWrapper):
 
     def observation(self, obs):
         # merge the first two dims: (frames, channels, H, W) → (frames*channels, H, W)
-        return obs.reshape(-1, *obs.shape[2:])
+        return np.asarray(obs).reshape(-1, *obs.shape[2:])

@@ -86,7 +86,7 @@ class SceneGenerator:
         for attempt in range(max_retries):
             _, path = get_actor("agent", "R", self.planners.all)
             if path is not None:
-                actors["agent"] = path
+                actors["agent"] = (path[0], path[1], 0.0)
                 break
 
         # 2️⃣ Background vehicles

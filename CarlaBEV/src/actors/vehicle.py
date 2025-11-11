@@ -21,7 +21,6 @@ class Vehicle(Actor):
             end_node,
             id=0,
             actor_size=int(32 / self._scale),
-            resolution=1.0,
             routeX=routeX,
             routeY=routeY,
             behavior=behavior

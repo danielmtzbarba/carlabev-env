@@ -29,11 +29,12 @@ class LeadBrakeScenario(Scenario):
 
         # --- Construct lead route (same lane, ahead) ---
         lead_ry_start = ego_ry[0] - lead_gap
-        lead_rx = [x] * 6
+        lead_rx = [x - 1] * 6
         lead_ry = [lead_ry_start - i * 3 for i in range(6)]
 
         # --- Wrap lead behavior ---
         behavior = LeadBrakeBehavior(start_brake_t=brake_delay, dec_rate=brake_strength)
+        v=100.0
 
         veh = Vehicle(
             map_size=128,
@@ -44,7 +45,7 @@ class LeadBrakeScenario(Scenario):
         )
 
         return {
-            "agent": (ego_rx, ego_ry),
+            "agent": (ego_rx, ego_ry, ego_speed),
             "vehicle": [veh],
             "pedestrian": [],
             "target": [],

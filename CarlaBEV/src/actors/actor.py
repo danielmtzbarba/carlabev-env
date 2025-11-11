@@ -47,14 +47,12 @@ class Actor(pygame.sprite.Sprite):
         end_node=None,
         id=0,
         actor_size=1,
-        resolution=1.0,
         routeX=None,
         routeY=None,
         behavior=None
     ):
         pygame.sprite.Sprite.__init__(self)
         self.id = id
-        self.ds = resolution
         self.size = actor_size
         self.behavior = behavior
 
@@ -79,7 +77,7 @@ class Actor(pygame.sprite.Sprite):
     def reset(self):
         # initialize controller at target speed
         self._controller = Controller(self.target_speed)
-        self._controller.set_route(self.rx, self.ry, ds=self.ds)
+        self._controller.set_route(self.rx, self.ry)
 
         if self.behavior:
             self.behavior.reset(self)

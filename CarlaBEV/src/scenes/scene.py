@@ -52,8 +52,10 @@ class Scene:
     def load_scene(self, actors):
         self.actor_manager.load(actors)
         if self.actor_manager.actors.get("agent"):
+            cx, cy, v = self.agent_route
             self.hero = self.actor_manager.spawn_hero(
-                route=self.agent_route,
+                route = (cx, cy),
+                initial_speed=v,
                 scale=self._scale,
             )
             self._actors = set_targets(
@@ -125,8 +127,8 @@ class Scene:
     @property
     def agent_route(self):
         """Return hero route as (cx, cy)."""
-        cx, cy = self.actor_manager.actors["agent"]
-        return np.array(cx, dtype=np.int32), np.array(cy, dtype=np.int32)
+        cx, cy, v = self.actor_manager.actors["agent"]
+        return np.array(cx, dtype=np.int32), np.array(cy, dtype=np.int32), v 
 
     @property
     def curr_actors(self):

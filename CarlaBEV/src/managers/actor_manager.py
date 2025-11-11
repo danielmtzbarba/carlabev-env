@@ -23,11 +23,12 @@ class ActorManager:
     # ======================================================
     # --- Creation ---
     # ======================================================
-    def spawn_hero(self, route, scale):
+    def spawn_hero(self, route, initial_speed, scale):
         """Spawn the main agent (hero vehicle)."""
         hero = DiscreteAgent(
             window_size=self.size,
             route=route,
+            initial_speed=initial_speed,
             color=(0, 0, 0),
             target_speed=int(50 / scale),
             car_size=32,

@@ -49,6 +49,7 @@ class DiscreteAgent(Controller, Hero):
         route,
         window_size,
         target_speed=0.0,
+        initial_speed=0.0,
         color=(0, 7, 175),
         car_size=32,
     ):
@@ -61,7 +62,7 @@ class DiscreteAgent(Controller, Hero):
         self.acc = 0.0
         self._setup()
 
-        self.set_route(xs, ys)
+        self.set_route(xs, ys, initial_speed)
         _, self.target_idx = self.stanley_control()
 
     def step(self, action):

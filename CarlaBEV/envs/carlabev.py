@@ -65,17 +65,14 @@ class CarlaBEV(gym.Env):
     def _get_info(self):
         return {}
     
-    def set_optionsxd(self, options):
-        self.options = options
-
-    def reset(self, *, seed: int | None = None, options: dict | None = None, **kwargs):
+    def reset(self, seed=0, options={}):
         super().reset(seed=seed)
         self.current_info = {}
         self._current_step = 0
         self.stats.reset()
         self.reward_fn.reset()
         # Load scene
-        actors = self.scene_generator.build_scene(self.options)
+        actors = self.scene_generator.build_scene(options)
         self.map.reset(actors)
         return self._get_obs(), self._get_info()
 
@@ -107,8 +104,8 @@ class CarlaBEV(gym.Env):
         terminated, truncated, info_out = self._check_termination(cause)
         self.current_info = info
         info["episode_info"] = {} if not terminated else info_out["episode_info"]
-        return self._get_obs(), reward, terminated, truncated, info_out
         self._current_step += 1
+        return self._get_obs(), reward, terminated, truncated, info_out
 
     def render(self):
         self._observation = np.transpose(

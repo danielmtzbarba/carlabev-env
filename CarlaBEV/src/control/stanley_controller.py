@@ -32,14 +32,13 @@ class Controller(State):
     def set_target_speed(self, target_speed):
         self._target_speed = target_speed
 
-    def set_route(self, ax, ay, ds=2.0):
+    def set_route(self, ax, ay, v0=0.0):
         """Stanley steering control on a cubic spline."""
-#        cx, cy, cyaw = smooth_path_mavg(ax, ay)
         cx, cy, cyaw, ck, s = smooth_and_compute(ax, ay, window=11, poly=3)
 
         self.x, self.y = cx[0] + randint(-1, 1), cy[0] + randint(-1, 1)
         self.cx, self.cy = cx, cy
-        self.v = 0.0
+        self.v = v0
         self.cyaw = cyaw
         self.target_idx, _ = self.calc_target_index()
         self.yaw = self.cyaw[self.target_idx]

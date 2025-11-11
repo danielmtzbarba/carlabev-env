@@ -1,8 +1,8 @@
 import gymnasium as gym
 from gymnasium.wrappers import (
-    GrayScaleObservation,
+    GrayscaleObservation,
     ResizeObservation,
-    FrameStack,
+    FrameStackObservation,
 )
 
 from CarlaBEV.envs.carlabev import CarlaBEV
@@ -21,7 +21,7 @@ def make_carlabev_env_muzero(seed, idx, capture_video, run_name, size):
 
         env = ResizeObservation(env, (64, 64))
         env = SemanticMaskWrapper(env)
-        env = FrameStack(env, num_stack=4)
+        env = FrameStackObservation(env, stack_size=4)
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env.action_space.seed(seed)
 
@@ -42,9 +42,9 @@ def wrap_env(cfg, env, capture=False, eval=False):
     if cfg.env.masked:
         env = SemanticMaskWrapper(env)
     else:
-        env = GrayScaleObservation(env)
+        env = GrayscaleObservation(env)
 
-    env = FrameStack(env, num_stack=cfg.env.frame_stack)
+    env = FrameStackObservation(env, stack_size=4)
     if cfg.env.masked:
         env = FlattenStackedFrames(env)
 
@@ -73,6 +73,6 @@ def make_env(cfg, eval=False):
     envs = gym.vector.SyncVectorEnv(
         [
             make_carlabev_env(i, cfg, eval) for i in range(num_envs)
-        ]
+        ], autoreset_mode=gym.vector.AutoresetMode.DISABLED
     )
     return envs

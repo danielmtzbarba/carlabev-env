@@ -7,6 +7,7 @@ from CarlaBEV.src.actors.pedestrian import Pedestrian
 from CarlaBEV.src.planning.graph_planner import GraphPlanner
 from CarlaBEV.envs.utils import asset_path
 from  CarlaBEV.src.scenes.scenarios.lead_brake import LeadBrakeScenario
+from  CarlaBEV.src.scenes.scenarios.jaywalk import JaywalkScenario 
 
 
 class PlannerManager:
@@ -56,6 +57,7 @@ class SceneGenerator:
     
         self.scenarios = {
             "lead_brake": LeadBrakeScenario(map_size=128),
+            "jaywalk": JaywalkScenario(map_size=128)
         }
 
     def build_scene(self, options):
@@ -68,7 +70,8 @@ class SceneGenerator:
 
         # --- Case 2: Predefined scenario ---
         elif isinstance(scene, str):
-            return self.scenarios[scene].sample()
+            level = choice([1, 2, 3, 4])
+            return self.scenarios[scene].sample(level)
 
     # =========================================================
     # --- Randomized Curriculum Scene ---

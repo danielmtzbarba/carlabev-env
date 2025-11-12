@@ -59,7 +59,7 @@ class Actor(pygame.sprite.Sprite):
         self.start_node = start_node
         self.end_node = end_node
         #
-        if routeX and routeY:
+        if routeX is not None and routeY is not None:
             self.rx = routeX
             self.ry = routeY
         else:

@@ -111,9 +111,9 @@ def set_targets(actors_dict, rx, ry):
     n = len(rx) - 1
     for i, (x, y) in enumerate(zip(rx, ry)):
         if i < n:
-            id, size = i, 5
+            id, size = i, 2
         else:
-            id, size = "goal", 10
+            id, size = "goal", 4
         actors_dict["target"].append(Target(id=id, target_pos=(x, y), size=size))
     return actors_dict
 

@@ -14,23 +14,22 @@ class Hero(pygame.sprite.Sprite):
         self.color = color
         #
         self.w = int(car_size / self.scale)
-        self.l = 2 * self.w
+        self.l = self.w
         # Visual Offset Bug
-        self._offx = -2 * 16
-        self._offy = -2 * 16
+        self._offx = -32
+        self._offy = -32
 
     def _setup(self):
         center = self.window_center
         self.fov_rect = pygame.Rect((center, center, self.w, self.l))
         self.rect = pygame.Rect((self.x0, self.y0, self.w, self.l))
         # movement
-        self.x = self.rect.x + cfg.offx
-        self.y = self.rect.y + cfg.offy
+        self.x = self.rect.x 
+        self.y = self.rect.y
 
     def draw(self, display_fov, display):
         pygame.draw.rect(display_fov, self.color, self.fov_rect)
-
-    #        pygame.draw.rect(display, self.color, self.rect)
+        #pygame.draw.rect(display, self.color, self.rect)
 
     @property
     def position(self):
@@ -88,7 +87,7 @@ class DiscreteAgent(Controller, Hero):
         self.update(self.acc, 0)
 
         # === Friction & velocity stabilization ===
-        self.v *= 0.98
+        self.v *= 0.9999
         if abs(self.v) < 0.05:
             self.v = 0.0
 

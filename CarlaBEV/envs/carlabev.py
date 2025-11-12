@@ -73,6 +73,7 @@ class CarlaBEV(gym.Env):
         self.reward_fn.reset()
         # Load scene
         actors = self.scene_generator.build_scene(options)
+        self.num_vehicles = len(actors["vehicle"])
         self.map.reset(actors)
         return self._get_obs(), self._get_info()
 
@@ -93,7 +94,7 @@ class CarlaBEV(gym.Env):
     def _check_termination(self, cause):
         if cause in self.termination_causes:
             episode_summary = self.stats.terminated()
-            episode_summary["num_vehicles"] = self.current_info["scene"]["num_vehicles"]
+            episode_summary["num_vehicles"] = self.num_vehicles
             return True, (cause == "max_actions"), {"episode_info": episode_summary}
         return False, False, {}
 

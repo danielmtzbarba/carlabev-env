@@ -2,7 +2,7 @@ import numpy as np
 import random
 
 class Scenario:
-    def __init__(self, name, map_size):
+    def __init__(self, name, map_size=128):
         self.name = name
         self.map_size = map_size
 

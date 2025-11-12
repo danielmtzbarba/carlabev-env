@@ -26,7 +26,7 @@ class Controller(State):
         super().__init__()
         self.time = 0.0
         self._target_speed = target_speed
-        self.max_steer = np.radians(35.0)  # [rad] max steering angle
+        self.max_steer = np.radians(30.0)  # [rad] max steering angle
         self.L = 2.9  # [m] Wheel base of vehicle
     
     def set_target_speed(self, target_speed):

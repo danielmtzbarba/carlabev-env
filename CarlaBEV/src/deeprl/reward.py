@@ -37,17 +37,17 @@ class RewardFn(object):
         zero_progress_reward_offroad: bool = True,
         # ---- shaping weights (re-balanced) ----
         k_lat_quadratic: float = 0.004,  # was 0.007 (less harsh lateral penalty)
-        k_progress: float = 0.12,  # was 0.08 (more credit for progress)
-        k_flow: float = 0.018,  # was 0.012 (more credit for good speed)
-        k_align_bonus: float = 0.03,  # was 0.015 (bigger bonus when well-aligned)
+        k_progress: float = 0.06,  # was 0.08 (more credit for progress)
+        k_flow: float = 0.010,  # was 0.012 (more credit for good speed)
+        k_align_bonus: float = 0.02,  # was 0.015 (bigger bonus when well-aligned)
         k_reverse: float = 0.03,  # unchanged
-        k_ttc: float = 0.06,  # was 0.05 (slightly stronger safety shaping)
+        k_ttc: float = 0.03,  # was 0.05 (slightly stronger safety shaping)
         alive_bias: float = 0.0025,  # was 0.0015 (more survival bias)
         k_smooth: float = 0.0006,  # was 0.0008 (slightly lighter speed jerk penalty)
         k_steer_smooth: float = 0.003,  # was 0.005 (less harsh steering penalty)
         k_steer_jerk: float = 0.01,  # was 0.015 (less harsh oscillation penalty)
         # ---- route deviation shaping ----
-        k_route_dev: float = 0.004,  # new: penalty based on dist2wp when far
+        k_route_dev: float = 0.006,  # new: penalty based on dist2wp when far
         route_dev_start: float = 8.0,  # start penalizing when far from route
         # ---- limits ----
         max_speed_for_flow: float = 6.0,

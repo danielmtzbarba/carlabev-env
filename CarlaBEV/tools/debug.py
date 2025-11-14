@@ -30,7 +30,7 @@ def main(size: int = 128):
     envs = make_env(cfg)
     print("Observation space:", envs.observation_space)
     options={
-        "scene": "jaywalk",
+        "scene": "rdm",
         "num_vehicles": 25,
         "reset_mask": np.array([True],dtype=bool)
     }
@@ -49,7 +49,7 @@ def main(size: int = 128):
                 sim_logger.log_episode(info["episode_info"], i)
                 # === Reset the finished env ===
                 options={
-                    "scene": "jaywalk",
+                    "scene": "rdm",
                     "num_vehicles": 25,
                     "reset_mask": np.logical_or(terminated, trunks)
                 }

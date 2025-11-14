@@ -10,6 +10,7 @@ from CarlaBEV.envs.spaces import get_obs_space, get_action_space
 from CarlaBEV.envs.renderer import Renderer
 
 from CarlaBEV.src.deeprl.reward import RewardFn
+from CarlaBEV.src.deeprl.carl_reward_fn import CaRLRewardFn
 from CarlaBEV.src.deeprl.stats import Stats
 
 
@@ -53,7 +54,9 @@ class CarlaBEV(gym.Env):
         # Experiment Stats
         self.stats = Stats()
         # Reward Function
-        self.reward_fn = RewardFn()
+        #self.reward_fn = RewardFn()
+        self.reward_fn = CaRLRewardFn()
+
         # World
         self.map = BaseMap(self.cfg)
         self.scene_generator = SceneGenerator(self.cfg)

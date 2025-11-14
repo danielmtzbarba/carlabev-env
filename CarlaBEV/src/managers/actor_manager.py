@@ -4,6 +4,19 @@ from CarlaBEV.src.actors.pedestrian import Pedestrian
 from CarlaBEV.src.actors.hero import DiscreteAgent
 
 
+def compute_route_length(route):
+    """Compute full geometric path length from route (rx, ry)."""
+    rx, ry = route
+    assert len(rx) == len(ry), "Route coordinates mismatch!"
+
+    dist = 0.0
+    for i in range(1, len(rx)):
+        dx = rx[i] - rx[i - 1]
+        dy = ry[i] - ry[i - 1]
+        dist += (dx*dx + dy*dy) ** 0.5
+
+    return dist
+
 class ActorManager:
     """Handles creation, lifecycle, and updates of all scene actors."""
 
@@ -13,6 +26,7 @@ class ActorManager:
 
     def clear(self):
         """Reset actor registry to empty."""
+        self.route_length = 0.0
         self.actors = {
             "agent": None,
             "vehicle": [],
@@ -33,6 +47,7 @@ class ActorManager:
             target_speed=int(50 / scale),
             car_size=32,
         )
+        self.route_length = compute_route_length(route)
         self.actors["agent"] = hero
         return hero
 

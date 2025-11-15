@@ -54,7 +54,7 @@ class CarlaBEV(gym.Env):
         # Experiment Stats
         self.stats = Stats()
         # Reward Function
-        #self.reward_fn = RewardFn()
+        # self.reward_fn = RewardFn()
         self.reward_fn = CaRLRewardFn()
 
         # World
@@ -67,17 +67,18 @@ class CarlaBEV(gym.Env):
 
     def _get_info(self):
         return {}
-    
+
     def reset(self, seed=0, options={}):
         super().reset(seed=seed)
         self.current_info = {}
         self._current_step = 0
         self.stats.reset()
-        self.reward_fn.reset()
         # Load scene
         actors = self.scene_generator.build_scene(options)
         self.num_vehicles = len(actors["vehicle"])
         self.map.reset(actors)
+        rx, ry = self.map.route
+        self.reward_fn.reset(rx, ry)
         return self._get_obs(), self._get_info()
 
     def _preprocess_action(self, action):

@@ -19,7 +19,7 @@ class Scene:
         self.screen = screen
         self.town_name = town_name
         self._scale = int(1024 / size)
-#        self._const = int(size / 4) + 1
+        #        self._const = int(size / 4) + 1
         self._const = 35
 
         # --- Managers ---
@@ -54,8 +54,9 @@ class Scene:
         self.actor_manager.load(actors)
         if self.actor_manager.actors.get("agent"):
             cx, cy, v = self.agent_route
+            self.route = (cx, cy)
             self.hero = self.actor_manager.spawn_hero(
-                route = (cx, cy),
+                route=(cx, cy),
                 initial_speed=v,
                 scale=self._scale,
             )
@@ -68,7 +69,7 @@ class Scene:
             self.camera = Camera(self.hero, resolution=(self.size, self.size))
             follow = Follow(self.camera, self.hero)
             self.camera.setmethod(follow)
-        return True 
+        return True
 
     def _scene_step(self, action):
         self._t += self._dt
@@ -111,12 +112,12 @@ class Scene:
                 if collision:
                     result = id_type
                     coll_id = actor_id
-        
-        info["collision"]["collided"] = result
-        info["collision"]["actor_id"] = coll_id 
-        info["collision"]["actors_state"] = actors_state 
 
-        return info 
+        info["collision"]["collided"] = result
+        info["collision"]["actor_id"] = coll_id
+        info["collision"]["actors_state"] = actors_state
+
+        return info
 
     # =====================================================
     # --- Utilities
@@ -129,7 +130,7 @@ class Scene:
     def agent_route(self):
         """Return hero route as (cx, cy)."""
         cx, cy, v = self.actor_manager.actors["agent"]
-        return np.array(cx, dtype=np.int32), np.array(cy, dtype=np.int32), v 
+        return np.array(cx, dtype=np.int32), np.array(cy, dtype=np.int32), v
 
     @property
     def curr_actors(self):
@@ -138,7 +139,7 @@ class Scene:
     @property
     def target_position(self):
         return self.actor_manager.actors["target"][-1].position
-    
+
     @property
     def scene_info(self):
         return {
@@ -148,9 +149,7 @@ class Scene:
                 "dist2goal_t_1": self._dist2goal_t_1,
                 "num_vehicles": self.actor_manager.num_vehicles,
                 "route_length": self.actor_manager.route_length,
-                "speed_limit": 30,
-                },
-            "collision": {
-                "tile": self.agent_tile
-            }
+                "speed_limit": 35,
+            },
+            "collision": {"tile": self.agent_tile},
         }

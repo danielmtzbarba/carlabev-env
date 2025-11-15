@@ -31,9 +31,7 @@ def create_loggers(cfg):
     os.makedirs(exp_dir, exist_ok=True)
 
     # Initialize base logger first (shared writer + folder)
-    base_logger = BaseLogger(
-        exp_name=exp_name, log_dir=log_root, enabled=cfg.logging.enabled
-    )
+    base_logger = BaseLogger(exp_name=exp_name, log_dir=log_root, enabled=True)
     base_logger.log_dir = exp_dir  # ensure correct directory name
 
-    return base_logger 
+    return base_logger

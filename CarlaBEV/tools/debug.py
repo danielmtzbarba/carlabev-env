@@ -10,32 +10,33 @@ from CarlaBEV.tools.debug.controls import (
 )
 
 from CarlaBEV.src.deeprl.logger import create_loggers
-from CarlaBEV.tools.debug.cfg import CarlaBEVConfig
+from CarlaBEV.tools.debug.cfg import ArgsCarlaBEV
 
 
-cfg = tyro.cli(CarlaBEVConfig)
+cfg = tyro.cli(ArgsCarlaBEV)
 
 
 # Assuming cfg.exp_name and cfg.logging.enabled are defined
 sim_logger = create_loggers(cfg)
+
 
 def get_base_env(env):
     while hasattr(env, "env"):
         env = env.env
     return env
 
+
 def main(size: int = 128):
     pygame.init()
     keys_held = init_key_tracking()
     envs = make_env(cfg)
     print("Observation space:", envs.observation_space)
-    options={
+    options = {
         "scene": "rdm",
         "num_vehicles": 25,
-        "reset_mask": np.array([True],dtype=bool)
+        "reset_mask": np.array([True], dtype=bool),
     }
     observation, info = envs.reset(options=options)
-    total_reward = 0
     running = True
 
     while running:
@@ -44,14 +45,14 @@ def main(size: int = 128):
 
         # Step through the environment
         observation, reward, terminated, trunks, info = envs.step([action])
-        for i, ended  in enumerate(terminated):
+        for i, ended in enumerate(terminated):
             if ended:
                 sim_logger.log_episode(info["episode_info"], i)
                 # === Reset the finished env ===
-                options={
+                options = {
                     "scene": "rdm",
                     "num_vehicles": 25,
-                    "reset_mask": np.logical_or(terminated, trunks)
+                    "reset_mask": np.logical_or(terminated, trunks),
                 }
                 observation, info = envs.reset(options=options)
 

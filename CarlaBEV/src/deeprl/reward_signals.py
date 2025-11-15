@@ -41,41 +41,72 @@ def compute_ttc(hero_state, actors_state, ttc_threshold=8.0):
         return -np.exp(-min_ttc / ttc_threshold)
     return 0.0
 
-#CaRL
 
-def compute_ttc_raw(hero_state, actors_state):
+# CaRL
+def compute_ttc_raw(hero_state, actors_state, dt=0.1, meters_per_pixel=0.625):
     """
-    Extract the raw minimum TTC value from your logic,
-    without shaping or exponentials.
+    Raw Time-To-Collision (TTC) in seconds using CaRL logic.
+    No shaping. Returns min TTC across all actors.
     """
-    hx, hy, hyaw, hv = hero_state
-    hvx = hv * np.cos(hyaw)
-    hvy = hv * np.sin(hyaw)
+
+    hx, hy, hyaw, hv_px = hero_state
+
+    # Convert hero position to meters
+    hx_m = hx * meters_per_pixel
+    hy_m = hy * meters_per_pixel
+
+    # Convert hero speed: px/step → m/s
+    hv_m = hv_px * meters_per_pixel / dt
+    hvx_m = hv_m * np.cos(hyaw)
+    hvy_m = hv_m * np.sin(hyaw)
+
     min_ttc = np.inf
 
     for actor in actors_state:
-        (ax, ay) = actor["pos"]
-        (avx, avy) = actor["vel"]
+        (ax_px, ay_px) = actor["pos"]
+        (avx_px, avy_px) = actor["vel"]
 
-        rx, ry = ax - hx, ay - hy
-        rvx, rvy = avx - hvx, avy - hvy
+        # Convert actor position to meters
+        ax_m = ax_px * meters_per_pixel
+        ay_m = ay_px * meters_per_pixel
 
+        # Convert actor velocity to m/s
+        avx_m = avx_px * meters_per_pixel / dt
+        avy_m = avy_px * meters_per_pixel / dt
+
+        # Relative position and velocity
+        rx = ax_m - hx_m
+        ry = ay_m - hy_m
+        rvx = avx_m - hvx_m
+        rvy = avy_m - hvy_m
+
+        # Relative speed (projected onto the line of sight)
         rel_speed = (rvx * rx + rvy * ry) / (np.linalg.norm([rx, ry]) + 1e-6)
-        if rel_speed >= 0:
-            continue  # actor moving away
 
+        # If moving apart or parallel → skip
+        if rel_speed >= 0:
+            continue
+
+        # Constant-velocity TTC
         ttc = abs(np.linalg.norm([rx, ry]) / rel_speed)
         min_ttc = min(min_ttc, ttc)
 
     return min_ttc
 
-def carl_ttc_penalty(hero_state, actors_state, threshold=1.0):
+
+def carl_ttc_penalty(
+    hero_state, actors_state, threshold=1.0, dt=0.1, meters_per_pixel=0.625
+):
     """
-    Returns p_ttc ∈ {1.0, 0.5} following CaRL soft penalty rules.
+    CaRL soft TTC penalty:
+        p_ttc = 1.0 (safe)
+        p_ttc = 0.5 (TTC < threshold)
     """
-    ttc = compute_ttc_raw(hero_state, actors_state)
+    ttc = compute_ttc_raw(
+        hero_state, actors_state, dt=dt, meters_per_pixel=meters_per_pixel
+    )
 
     if ttc < threshold:
-        return 0.5, ttc     # TTC violation → penalty factor 0.5
+        return 0.5, ttc  # TTC violation
     else:
-        return 1.0, ttc     # Safe → no penalty reduction
+        return 1.0, ttc  # Safe

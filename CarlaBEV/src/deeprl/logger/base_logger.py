@@ -6,6 +6,7 @@ from datetime import datetime
 from rich.console import Console
 from torch.utils.tensorboard import SummaryWriter
 
+
 class BaseLogger:
     """Common interface for all logging modules (sim + training)."""
 
@@ -67,8 +68,6 @@ class BaseLogger:
         for k, v in info.items():
             if isinstance(v, (int, float)):
                 self.log_scalar(f"sim/{k}", v, info["episode"])
-
-
 
     def log_learning(self, step, **kwargs):
         for k, v in kwargs.items():

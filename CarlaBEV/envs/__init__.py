@@ -29,13 +29,16 @@ def make_carlabev_env_muzero(seed, idx, capture_video, run_name, size):
 
     return thunk
 
+
 def wrap_env(cfg, env, capture=False, eval=False):
     if capture:
         base_dir = f"videos/{cfg.exp_name}"
-        save_dir = f"{base_dir}/eval"if eval else base_dir 
+        save_dir = f"{base_dir}/eval" if eval else base_dir
         every = 1 if eval else cfg.capture_every
 
-        env = gym.wrappers.RecordVideo(env, save_dir, episode_trigger=lambda x: x % every == 0)
+        env = gym.wrappers.RecordVideo(
+            env, save_dir, episode_trigger=lambda x: x % every == 0
+        )
 
     env = ResizeObservation(env, cfg.env.obs_size)
 
@@ -57,6 +60,7 @@ def wrap_env(cfg, env, capture=False, eval=False):
 
     return env
 
+
 def make_carlabev_env(idx, cfg, eval=False):
     def thunk():
         capture = False
@@ -66,13 +70,14 @@ def make_carlabev_env(idx, cfg, eval=False):
         env = CarlaBEV(cfg.env)
         env = wrap_env(cfg, env, capture, eval)
         return env
+
     return thunk
+
 
 def make_env(cfg, eval=False):
     num_envs = 1 if eval else cfg.num_envs
     envs = gym.vector.SyncVectorEnv(
-        [
-            make_carlabev_env(i, cfg, eval) for i in range(num_envs)
-        ], autoreset_mode=gym.vector.AutoresetMode.DISABLED
+        [make_carlabev_env(i, cfg, eval) for i in range(num_envs)],
+        autoreset_mode=gym.vector.AutoresetMode.DISABLED,
     )
     return envs

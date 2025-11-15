@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class LoggerConfig:
-    enabled: bool = True 
-    dir: str = "/home/danielmtz/Data/results/carlabev/debug/"
+    enabled: bool = True
+    dir: str = "debug_log/"
+
 
 @dataclass
 class EnvConfig:
@@ -14,9 +16,9 @@ class EnvConfig:
     map_name: str = "Town01"
     obs_space: str = "bev"  # "bev" or "vector"
     obs_size: tuple = (96, 96)
-    masked: bool = True 
+    masked: bool = True
     frame_stack: int = 4
-    #
+
     action_space: str = "discrete"  # "discrete" or "continuous"
     render_mode: str = "human"
     max_actions: int = 5000
@@ -25,9 +27,10 @@ class EnvConfig:
     # Traffic generation
     traffic_enabled: bool = True
     max_vehicles: int = 50
-    curriculum_enabled: str = True 
-    start_ep: int = 200
-    midpoint: int = 800 
+    # Curriculum
+    curriculum_enabled: bool = False
+    start_ep: int = 100
+    midpoint: int = 200
     growth_rate: float = 0.07
 
 
@@ -35,8 +38,8 @@ class EnvConfig:
 class PPOConfig:
     # PPO core
     total_timesteps: int = 10_000_000
-    learning_rate: float = 3e-4  # slightly higher, tune if unstable
-    num_envs: int = 14  # match CPUs available
+    learning_rate: float = 3.5e-4  # slightly higher, tune if unstable
+    num_envs: int = 1  # match CPUs available
     num_steps: int = 256  # rollout length per env → buffer size = 3072
     anneal_lr: bool = True
     gamma: float = 0.995
@@ -49,7 +52,7 @@ class PPOConfig:
     ent_coef: float = 0.003
     vf_coef: float = 0.7
     max_grad_norm: float = 0.4
-    target_kl: float = 0.02  # small KL target helps stabilize
+    target_kl: float = 0.015  # small KL target helps stabilize
 
     # Computed at runtime
     batch_size: int = 0
@@ -57,27 +60,27 @@ class PPOConfig:
     num_iterations: int = 0
 
     # Decay configuration
-    ent_coef_start: float = 0.03
-    ent_coef_end: float = 0.005
-    vf_coef_start: float = 0.7
-    vf_coef_end: float = 0.5
+    ent_coef_start: float = 0.05
+    ent_coef_end: float = 0.01
+    vf_coef_start: float = 0.6
+    vf_coef_end: float = 0.4
     clip_coef_start: float = 0.2
     clip_coef_end: float = 0.1
     decay_schedule: str = "linear"
 
+
 @dataclass
-class CarlaBEVConfig:
-    exp_name: str = "cnn-ppo-carlabev-debug"
+class ArgsCarlaBEV:
+    env: EnvConfig
+    logging: LoggerConfig
+    ppo: object = PPOConfig
+    exp_name: str = "carlabev-debug"
     num_envs: int = 1
     cuda: bool = True
     seed: int = 1
 
-    env: object = EnvConfig
-    ppo: object = PPOConfig
-    logging: object = LoggerConfig
-
-    capture_video: bool = False 
-    capture_every: int = 25
+    capture_video: bool = False
+    capture_every: int = 50
     save_model: bool = True
-    save_every: bool = 50
+    save_every: int = 100
     torch_deterministic: bool = True

@@ -239,7 +239,6 @@ class CaRLRewardFn:
         # Convert both to m/s
         speed_mps = speed_kmh * (3600.0 / 1000.0)
         speed_limit_mps = speed_limit * (1000.0 / 3600.0)
-        print(speed_mps, speed_limit_mps)
         overspeed_mps = max(speed_mps - speed_limit_mps, 0.0)
 
         # Convert overspeed back to km/h for penalty formula

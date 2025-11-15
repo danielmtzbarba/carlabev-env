@@ -311,16 +311,17 @@ class CaRLRewardFn:
         #        print(p_factors)
 
         # Optional console logging
-        print(
-            f"[CaRL] step={self._step_count} RC_t={RC_t:.4f} "
-            f"reward={reward:.4f} P_t={P_t:.4f} "
-            f"off_lane={p_factors['off_lane']:.2f} "
-            f"lane_center={p_factors['lane_center']:.2f} "
-            f"speed={p_factors['speed']:.2f} "
-            f"ttc={p_factors['ttc']:.2f} "
-            f"comfort={p_factors['comfort']:.2f} "
-            f"dist2route={dist2route:.3f} overspeed={overspeed_mps:.3f} ttc={ttc}"
-        )
+        if False:
+            print(
+                f"[CaRL] step={self._step_count} RC_t={RC_t:.4f} "
+                f"reward={reward:.4f} P_t={P_t:.4f} "
+                f"off_lane={p_factors['off_lane']:.2f} "
+                f"lane_center={p_factors['lane_center']:.2f} "
+                f"speed={p_factors['speed']:.2f} "
+                f"ttc={p_factors['ttc']:.2f} "
+                f"comfort={p_factors['comfort']:.2f} "
+                f"dist2route={dist2route:.3f} overspeed={overspeed_mps:.3f} ttc={ttc}"
+            )
 
         return reward, terminated, cause, info
 

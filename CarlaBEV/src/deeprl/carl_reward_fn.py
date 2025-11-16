@@ -215,21 +215,25 @@ class CaRLRewardFn:
         # -------------------------
         p_factors = {}
 
-        # 3.1 distance to route center
+        # 3.2 distance to route center
         xs, ys, _ = info["hero"]["next_wps"]
         wps = np.array([xs, ys]).T
         dist2route = lateral_error(x, y, wps, signed=True)
         dist_m = abs(dist2route) * meters_per_pixel
 
-        if dist_m <= 0.0:
+        # Lane penalty tighter and smoother
+        if dist_m <= 0.5 * lane_half_width_m:
             p_route = 1.0
         else:
-            p_route = max(0.2, 1.0 - dist_m / lane_half_width_m)
+            # fallback linear decay from 0.5*lane_w to full lane_w
+            p_route = max(
+                0.0, 1.0 - ((dist_m - 0.5 * lane_half_width_m) / lane_half_width_m)
+            )
+
         p_factors["lane_center"] = float(p_route)
 
-        # 3.2 off-lane
-        far_from_route = dist_m > (1.5 * lane_half_width_m)
-        off_lane = self._is_off_lane(tile) or far_from_route
+        # Strict off-lane logic: reward = 0 early
+        off_lane = dist_m > (1.1 * lane_half_width_m)
         p_factors["off_lane"] = 0.0 if off_lane else 1.0
 
         # 3.3 speeding

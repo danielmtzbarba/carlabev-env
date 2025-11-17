@@ -229,3 +229,71 @@ def load_scenario_folder(folder_path, size=1024):
     actors = load_scene_from_csv(csv_path, size=size)
     meta = load_meta_yaml(meta_path)
     return actors, meta
+
+def find_route_in_range(
+    planner,
+    actor_type,
+    lane,
+    min_dist_meters=30.0,  # minimum route length in meters
+    max_dist_meters=50.0,  # maximum route length in meters
+    max_attempts=100,
+    scale=8  # pixel scaling factor, e.g. raw pos / scale
+):
+    """
+    Create a route for `actor` within a valid distance range.
+    Tries multiple random start/end node pairs until a route in
+    the target distance is found or attempts are exhausted.
+
+    Args:
+        planner: dict with differently-laned planners, e.g.:
+                 planner["vehicle-0"], planner["pedestrian"] etc.
+        actor: an object with attributes {id, start_node, end_node, size}
+        lane: lane index or "sidewalk" for pedestrians
+        min_dist_meters, max_dist_meters: distance constraints
+        max_attempts: how many attempts before fallback
+        scale: scale factor to convert pixel pos -> BEV coords
+
+    Returns:
+        actor: with updated route assigned via actor.set_route_wp(...)
+        (rx, ry): list of float BEV coords of the route
+    """
+    planner_id = "pedestrian" if actor_type == "pedestrian" else f"vehicle-{lane}"
+    lane_planner = planner[planner_id]
+
+    for attempt in range(max_attempts):
+        # Sample random nodes as start/end of route
+        start_node = get_random_node(planner, actor_type, lane)
+        end_node = get_random_node(planner, actor_type, lane)
+
+        # Skip if identical nodes
+        if start_node.id == end_node.id:
+            continue
+
+        path, _ = lane_planner.find_path(start_node.id, end_node.id, actor_type)
+
+        if not path or len(path) < 2:
+            continue  # no valid path found
+
+        # Compute route waypoints
+        rx, ry = [], []
+        total_dist_px = 0.0
+        for prev, curr in zip(path[:-1], path[1:]):
+            n1_pos = lane_planner.G.nodes[prev]["pos"]
+            n2_pos = lane_planner.G.nodes[curr]["pos"]
+            px1, py1 = n1_pos[0] / scale, n1_pos[1] / scale
+            px2, py2 = n2_pos[0] / scale, n2_pos[1] / scale
+            dist_px = np.hypot(px2 - px1, py2 - py1)
+            total_dist_px += dist_px
+            rx.append(px2)
+            ry.append(py2)
+
+        # Check if route is within the range
+        if min_dist_meters <= total_dist_px <= max_dist_meters:
+            # Assign route to actor
+            actor = Vehicle(start_node=start_node, end_node=end_node, map_size=128)
+            return actor, (rx, ry), total_dist_px
+
+    # Fallback: no route within range
+#    print(f"[WARN] No valid route found within {min_dist_meters}-{max_dist_meters}m after {max_attempts} attempts.")
+    actor = Vehicle(start_node=start_node, end_node=end_node, map_size=128)
+    return actor, (rx, ry), total_dist_px

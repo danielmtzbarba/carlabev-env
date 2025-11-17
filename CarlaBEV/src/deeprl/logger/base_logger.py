@@ -58,10 +58,11 @@ class BaseLogger:
 
         data = info
         # Console output
+        #
         self.console.print(
             f"Ep {data["episode"][idx]} | Return: [green]{data["return"][idx]:.2f}[/green] | "
-            f"Len: {data["length"][idx]} | Num Vehicles: {data["num_vehicles"][idx]} | "
-            f"Cause: {data["termination"][idx]}"
+            f"len_route: {int(data["len_ego_route"][idx])} | num_veh: {data["num_vehicles"][idx]} | "
+            f"len_steps: {data["length"][idx]} | cause: {data["termination"][idx]} | "
         )
 
         # Write to TensorBoard

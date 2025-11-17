@@ -74,7 +74,8 @@ class CarlaBEV(gym.Env):
         self._current_step = 0
         self.stats.reset()
         # Load scene
-        actors = self.scene_generator.build_scene(options)
+        actors, len_route = self.scene_generator.build_scene(options)
+        self.len_ego_route = len_route
         self.num_vehicles = len(actors["vehicle"])
         self.map.reset(actors)
         rx, ry = self.map.route
@@ -99,6 +100,7 @@ class CarlaBEV(gym.Env):
         if cause in self.termination_causes:
             episode_summary = self.stats.terminated()
             episode_summary["num_vehicles"] = self.num_vehicles
+            episode_summary["len_ego_route"] = self.len_ego_route
             return True, (cause == "max_actions"), {"episode_info": episode_summary}
         return False, False, {}
 

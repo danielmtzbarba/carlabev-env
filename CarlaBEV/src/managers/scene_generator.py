@@ -1,13 +1,14 @@
 import os
 import numpy as np
 from random import choice
-from CarlaBEV.src.scenes.utils import get_random_node, find_route
+from CarlaBEV.src.scenes.utils import get_random_node, find_route, find_route_in_range
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.actors.pedestrian import Pedestrian
 from CarlaBEV.src.planning.graph_planner import GraphPlanner
 from CarlaBEV.envs.utils import asset_path
 from  CarlaBEV.src.scenes.scenarios.lead_brake import LeadBrakeScenario
 from  CarlaBEV.src.scenes.scenarios.jaywalk import JaywalkScenario 
+
 
 
 class PlannerManager:
@@ -63,10 +64,11 @@ class SceneGenerator:
     def build_scene(self, options):
         scene = options.get("scene", "rdm")
         num_vehicles = options.get("num_vehicles", self.cfg.get("max_vehicles", 25))
+        dist_range = options.get("route_dist_range", self.cfg.get("route_dist_range", [30, 100]))
 
         # --- Case 1: Random scene generation ---
         if isinstance(scene, str) and scene == "rdm":
-            return self.generate_random(num_vehicles)
+            return self.generate_random(num_vehicles, dist_range)
 
         # --- Case 2: Predefined scenario ---
         elif isinstance(scene, str):
@@ -76,7 +78,7 @@ class SceneGenerator:
     # =========================================================
     # --- Randomized Curriculum Scene ---
     # =========================================================
-    def generate_random(self, num_cars, max_retries=20):
+    def generate_random(self, num_cars, dist_range, max_retries=20):
         """
         Generates a randomized traffic scene with configurable curriculum.
         Returns actor dictionary compatible with Scene.reset().
@@ -87,7 +89,9 @@ class SceneGenerator:
 
         # 1️⃣ Agent route
         for attempt in range(max_retries):
-            _, path = get_actor("agent", "R", self.planners.all)
+            
+            _, path, len_route = find_route_in_range(self.planners.all, "agent", 'R',
+                                          dist_range[0], dist_range[1])
             if path is not None:
                 actors["agent"] = (path[0], path[1], 0.0)
                 break
@@ -101,7 +105,7 @@ class SceneGenerator:
             actors["vehicle"].append(veh)
 
         # (Optional future) pedestrians, traffic lights, etc.
-        return actors
+        return actors, len_route
 
 
 def get_actor(actor_type, lane, planners):

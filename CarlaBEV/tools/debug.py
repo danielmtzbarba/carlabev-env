@@ -34,6 +34,7 @@ def main(size: int = 128):
     options = {
         "scene": "rdm",
         "num_vehicles": 25,
+        "route_dist_range": [30, 100], 
         "reset_mask": np.array([True], dtype=bool),
     }
     observation, info = envs.reset(options=options)
@@ -49,9 +50,11 @@ def main(size: int = 128):
             if ended:
                 sim_logger.log_episode(info["episode_info"], i)
                 # === Reset the finished env ===
+                #
                 options = {
                     "scene": "rdm",
                     "num_vehicles": 25,
+                    "route_dist_range": [30, 130], 
                     "reset_mask": np.logical_or(terminated, trunks),
                 }
                 observation, info = envs.reset(options=options)

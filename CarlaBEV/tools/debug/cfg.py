@@ -23,6 +23,7 @@ class EnvConfig:
     render_mode: str = "human"
     max_actions: int = 5000
     scenes_path: str = "assets/scenes"
+    reward_type: str = "carl"
 
     # Traffic generation
     traffic_enabled: bool = True

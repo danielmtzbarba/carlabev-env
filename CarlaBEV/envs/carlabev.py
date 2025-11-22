@@ -54,8 +54,10 @@ class CarlaBEV(gym.Env):
         # Experiment Stats
         self.stats = Stats()
         # Reward Function
-        # self.reward_fn = RewardFn()
-        self.reward_fn = CaRLRewardFn()
+        if self.cfg.reward_type == "carl":
+            self.reward_fn = CaRLRewardFn()
+        else:
+            self.reward_fn = RewardFn()
 
         # World
         self.map = BaseMap(self.cfg)
@@ -79,7 +81,12 @@ class CarlaBEV(gym.Env):
         self.num_vehicles = len(actors["vehicle"])
         self.map.reset(actors)
         rx, ry = self.map.route
-        self.reward_fn.reset(rx, ry)
+
+        if self.cfg.reward_type == "carl":
+            self.reward_fn.reset(rx, ry)
+        else:
+            self.reward_fn.reset()
+
         return self._get_obs(), self._get_info()
 
     def _preprocess_action(self, action):

@@ -2,6 +2,8 @@ import pygame
 import numpy as np
 import tyro
 
+from random import choice
+
 from CarlaBEV.envs import make_env
 from CarlaBEV.tools.debug.controls import (
     init_key_tracking,
@@ -32,9 +34,10 @@ def main(size: int = 128):
     envs = make_env(cfg)
     print("Observation space:", envs.observation_space)
     options = {
-        "scene": "rdm",
+        # "scene": "rdm",
+        "scene": choice(["lead_brake", "jaywalk"]),
         "num_vehicles": 25,
-        "route_dist_range": [30, 100], 
+        "route_dist_range": [30, 100],
         "reset_mask": np.array([True], dtype=bool),
     }
     observation, info = envs.reset(options=options)
@@ -52,9 +55,10 @@ def main(size: int = 128):
                 # === Reset the finished env ===
                 #
                 options = {
-                    "scene": "rdm",
+                    # "scene": "rdm",
+                    "scene": choice(["lead_brake", "jaywalk"]),
                     "num_vehicles": 25,
-                    "route_dist_range": [30, 130], 
+                    "route_dist_range": [30, 130],
                     "reset_mask": np.logical_or(terminated, trunks),
                 }
                 observation, info = envs.reset(options=options)

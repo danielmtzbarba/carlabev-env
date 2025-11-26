@@ -230,6 +230,7 @@ def load_scenario_folder(folder_path, size=1024):
     meta = load_meta_yaml(meta_path)
     return actors, meta
 
+
 def find_route_in_range(
     planner,
     actor_type,
@@ -237,7 +238,7 @@ def find_route_in_range(
     min_dist_meters=30.0,  # minimum route length in meters
     max_dist_meters=50.0,  # maximum route length in meters
     max_attempts=100,
-    scale=8  # pixel scaling factor, e.g. raw pos / scale
+    scale=8,  # pixel scaling factor, e.g. raw pos / scale
 ):
     """
     Create a route for `actor` within a valid distance range.
@@ -294,6 +295,16 @@ def find_route_in_range(
             return actor, (rx, ry), total_dist_px
 
     # Fallback: no route within range
-#    print(f"[WARN] No valid route found within {min_dist_meters}-{max_dist_meters}m after {max_attempts} attempts.")
+    #    print(f"[WARN] No valid route found within {min_dist_meters}-{max_dist_meters}m after {max_attempts} attempts.")
     actor = Vehicle(start_node=start_node, end_node=end_node, map_size=128)
     return actor, (rx, ry), total_dist_px
+
+
+def compute_total_dist_px(path, scale=1):
+    total_dist_px = 0.0
+    for n1_pos, n2_pos in zip(path[:-1], path[1:]):
+        px1, py1 = n1_pos[0] / scale, n1_pos[1] / scale
+        px2, py2 = n2_pos[0] / scale, n2_pos[1] / scale
+        dist_px = np.hypot(px2 - px1, py2 - py1)
+        total_dist_px += dist_px
+    return total_dist_px

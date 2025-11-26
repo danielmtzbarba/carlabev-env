@@ -1,6 +1,7 @@
 from CarlaBEV.src.scenes.scenarios import Scenario
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.actors.pedestrian import Pedestrian
+from CarlaBEV.src.scenes.utils import compute_total_dist_px
 
 from CarlaBEV.src.actors.behavior.jaywalk import (
     CrossBehavior,
@@ -40,6 +41,7 @@ class JaywalkScenario(Scenario):
         ego_rx = [ped_x_base] * 6
         ego_ry = [ego_start_y - i * 20 for i in range(6)]
 
+        len_route = compute_total_dist_px(np.array([ego_rx, ego_ry]))
         # === Pedestrian path (cross from right to left) ===
         ped_start_x = ped_x_base + lane_width + cross_offset
         ped_end_x = ped_x_base - lane_width + cross_offset
@@ -75,7 +77,6 @@ class JaywalkScenario(Scenario):
         # --- Level 4: Add rear vehicle to increase challenge
         # ==========================================================
         if level >= 4:
-
             rear_gap = np.random.randint(10, 20)
             rear_rx = [ped_x_base] * 6
             rear_ry_start = ego_ry[0] + rear_gap
@@ -96,4 +97,4 @@ class JaywalkScenario(Scenario):
             "vehicle": vehicles,
             "pedestrian": pedestrians,
             "target": [],
-        }
+        }, len_route

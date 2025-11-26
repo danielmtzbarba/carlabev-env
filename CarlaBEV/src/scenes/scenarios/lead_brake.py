@@ -1,7 +1,9 @@
 from CarlaBEV.src.scenes.scenarios import Scenario
 from CarlaBEV.src.actors.behavior.lead_brake import LeadBrakeBehavior
 from CarlaBEV.src.actors.vehicle import Vehicle
+from CarlaBEV.src.scenes.utils import compute_total_dist_px
 import numpy as np
+
 
 class LeadBrakeScenario(Scenario):
     """
@@ -34,14 +36,16 @@ class LeadBrakeScenario(Scenario):
         # Ego path (straight northbound)
         ego_rx = [x_center] * 6
         ego_ry = [ego_start_y - i * 20 for i in range(6)]
-
+        len_route = compute_total_dist_px(np.array([ego_rx, ego_ry]))
         # Lead vehicle (same lane)
         lead_ry_start = ego_ry[0] - lead_gap
         lead_rx = [x_center - 1] * 6
         lead_ry = [lead_ry_start - i * 5 for i in range(6)]
 
         # --- Lead braking behavior ---
-        lead_behavior = LeadBrakeBehavior(start_brake_t=brake_delay, dec_rate=brake_strength)
+        lead_behavior = LeadBrakeBehavior(
+            start_brake_t=brake_delay, dec_rate=brake_strength
+        )
         lead_vehicle = Vehicle(
             map_size=self.map_size,
             routeX=lead_rx,
@@ -85,7 +89,9 @@ class LeadBrakeScenario(Scenario):
 
             # --- Rear braking behavior ---
             brake_delay = np.random.uniform(5.0, 15.0)
-            rear_behavior = LeadBrakeBehavior(start_brake_t=brake_delay, dec_rate=brake_strength)
+            rear_behavior = LeadBrakeBehavior(
+                start_brake_t=brake_delay, dec_rate=brake_strength
+            )
 
             rear_vehicle = Vehicle(
                 map_size=self.map_size,
@@ -101,4 +107,4 @@ class LeadBrakeScenario(Scenario):
             "vehicle": vehicles,
             "pedestrian": [],
             "target": [],
-        }
+        }, len_route

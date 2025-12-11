@@ -34,7 +34,7 @@ def wrap_env(cfg, env, capture=False, eval=False):
     if capture:
         base_dir = f"videos/{cfg.exp_name}"
         save_dir = f"{base_dir}/eval" if eval else base_dir
-        every = 1 if eval else cfg.capture_every
+        every = 50 if eval else cfg.capture_every
 
         env = gym.wrappers.RecordVideo(
             env, save_dir, episode_trigger=lambda x: x % every == 0
@@ -75,7 +75,7 @@ def make_carlabev_env(idx, cfg, eval=False):
 
 
 def make_env(cfg, eval=False):
-    num_envs = 1 if eval else cfg.num_envs
+    num_envs = cfg.num_envs
     envs = gym.vector.SyncVectorEnv(
         [make_carlabev_env(i, cfg, eval) for i in range(num_envs)],
         autoreset_mode=gym.vector.AutoresetMode.DISABLED,

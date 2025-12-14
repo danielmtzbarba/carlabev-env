@@ -4,9 +4,9 @@ import numpy as np
 from PIL import Image
 from dotenv import load_dotenv
 
-# Load environment variables. Assumes that project contains .env file with API keys
+# Load environment variables. Assumes that project contains .env file
 load_dotenv()
-asset_path = os.environ["ASSET_PATH"]
+asset_path = os.getenv("ASSETS_DIR")
 
 
 def get_tile_dict(id):

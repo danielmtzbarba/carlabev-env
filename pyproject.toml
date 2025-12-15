@@ -7,9 +7,19 @@ packages = ["CarlaBEV"]
 
 [project]
 name = "CarlaBEV"
-version = "0.0.1"
+version = "0.1.0"
+requires-python = ">=3.12" 
 dependencies = [
   "gymnasium",
   "pygame>=2.1.3",
+  "numpy",
+  "pandas",
   "pre-commit",
+  "dotenv",
+  "tyro",
+  "pillow",
+  "scipy",
+  "networkx",
+  "rich",
+  "opencv-python",
 ]

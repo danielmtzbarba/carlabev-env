@@ -4,8 +4,6 @@ import logging
 
 from datetime import datetime
 from rich.console import Console
-from torch.utils.tensorboard import SummaryWriter
-
 
 class BaseLogger:
     """Common interface for all logging modules (sim + training)."""
@@ -20,7 +18,6 @@ class BaseLogger:
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         self.log_dir = os.path.join(log_dir, exp_name)
         os.makedirs(self.log_dir, exist_ok=True)
-        self.writer = SummaryWriter(self.log_dir)
 
         # Basic stdout + file setup
         self.logger = logging.getLogger(exp_name)
@@ -36,10 +33,6 @@ class BaseLogger:
     def msg(self, text):
         if self.enabled:
             self.logger.info(text)
-
-    def log_scalar(self, tag, value, step=None):
-        if self.enabled and self.writer:
-            self.writer.add_scalar(tag, value, step)
 
     def close(self):
         if self.writer:

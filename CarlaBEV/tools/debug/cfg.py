@@ -17,6 +17,7 @@ class EnvConfig:
     obs_space: str = "bev"  # "bev" or "vector"
     obs_size: tuple = (96, 96)
     masked: bool = True
+    fov_masked: bool = True
     frame_stack: int = 4
 
     action_space: str = "discrete"  # "discrete" or "continuous"

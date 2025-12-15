@@ -15,6 +15,7 @@ class BaseMap(Scene):
 
     def __init__(self, cfg, agent_class=None):
         self.cfg = cfg
+        self.mask_fov = self.cfg.fov_masked
         self.map_name = cfg.map_name
         self.AgentClass = agent_class
         self.size = cfg.size
@@ -79,6 +80,9 @@ class BaseMap(Scene):
         # Blit rotated FOV onto camera surface
         self._fov_surface.fill((0, 0, 0))
         self._fov_surface.blit(rotated_fov, rect)
+        if self.mask_fov:
+            # 👇 APPLY MASK HERE
+            apply_corner_fov_mask(self._fov_surface, mask_frac=0.5)
         # Store agent tile (for reward)
         self._agent_tile = self._fov_surface.get_at(self.center)
         # Draw ego
@@ -98,3 +102,53 @@ class BaseMap(Scene):
     @property
     def agent_tile(self):
         return np.array(self._agent_tile)[:-1]
+
+
+def apply_corner_fov_mask(surface, mask_frac=0.25):
+    """
+    Apply four black triangular masks to the corners of a square surface,
+    emulating the invalid regions caused by a 90-degree rotation.
+
+    Args:
+        surface (pygame.Surface): Square FOV surface (H x W)
+        mask_frac (float): Fraction of size used for each corner mask (0.2–0.35 typical)
+
+    Returns:
+        pygame.Surface: Masked surface (in-place modification)
+    """
+    w, h = surface.get_size()
+    assert w == h, "FOV surface must be square"
+
+    m = int(w * mask_frac)
+
+    mask_color = (0, 0, 0)
+
+    # Top-left triangle
+    pygame.draw.polygon(
+        surface,
+        mask_color,
+        [(0, 0), (m, 0), (0, m)]
+    )
+
+    # Top-right triangle
+    pygame.draw.polygon(
+        surface,
+        mask_color,
+        [(w, 0), (w - m, 0), (w, m)]
+    )
+
+    # Bottom-left triangle
+    pygame.draw.polygon(
+        surface,
+        mask_color,
+        [(0, h), (0, h - m), (m, h)]
+    )
+
+    # Bottom-right triangle
+    pygame.draw.polygon(
+        surface,
+        mask_color,
+        [(w, h), (w - m, h), (w, h - m)]
+    )
+
+    return surface

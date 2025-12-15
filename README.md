@@ -3,7 +3,12 @@
 To install your new environment, run the following commands:
 
 ```{shell}
-cd CarlaBEV
-pip install -e .
+uv sync
+```
+
+Then to run the env:
+
+```{shell}
+uv run CarlaBEV/tools/debug_env.py 
 ```
 

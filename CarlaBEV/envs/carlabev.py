@@ -15,7 +15,6 @@ from CarlaBEV.src.deeprl.stats import Stats
 
 
 from CarlaBEV.src.managers.scene_generator import SceneGenerator
-from CarlaBEV.src.scenes.utils import load_scenario_folder
 
 
 class CarlaBEV(gym.Env):

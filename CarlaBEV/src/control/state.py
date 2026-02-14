@@ -44,9 +44,9 @@ class State:
         #
         self.x += self.v * np.cos(self.yaw) * self.dt
         self.y += self.v * np.sin(self.yaw) * self.dt
-        self.yaw += self.v / self.L * np.tan(delta) * self.dt
+        self.yaw += delta
+        self.yaw += self.v / self.L * np.tan(0) * self.dt
         self.v += acceleration * self.dt
-        #
         self.yaw = angle_mod(self.yaw)
         self.v = np.clip(self.v, -1 * self._target_speed, self._target_speed)
 

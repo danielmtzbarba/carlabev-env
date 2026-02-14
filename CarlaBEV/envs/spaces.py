@@ -33,9 +33,9 @@ def get_action_space(cfg):
 
     else:
         return spaces.Box(
-            np.array([-1, 0, 0]).astype(np.float32),
-            np.array([+1, +1, +1]).astype(np.float32),
-        ), None  # steer, gas, brake
+            np.array([0, -1, 0]).astype(np.float32),
+            np.array([1, +1, 1]).astype(np.float32),
+        ), None  # gas, steer, brake
 
 
 def get_obs_space(cfg):

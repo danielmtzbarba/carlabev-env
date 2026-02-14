@@ -34,8 +34,7 @@ def main(size: int = 128):
     envs = make_env(cfg)
     print("Observation space:", envs.observation_space)
     options = {
-        # "scene": "rdm",
-        "scene": choice(["lead_brake", "jaywalk"]),
+        "scene": choice(["red_light_runner"]),
         "num_vehicles": 25,
         "route_dist_range": [30, 100],
         "reset_mask": np.array([True], dtype=bool),
@@ -45,7 +44,50 @@ def main(size: int = 128):
 
     while running:
         running = process_events(keys_held)
-        action = get_action_from_keys(keys_held)
+        action_idx = get_action_from_keys(keys_held)
+        
+        # Convert to continuous if needed
+        if cfg.env.action_space == "continuous":
+             # Map discrete actions to continuous vector [steer, gas, brake]
+             # Discrete map: 
+             # 0: nothing, 1: gas, 2: brake, 3: gas+left, 4: gas+right
+             # 5: left, 6: right, 7: brake+left, 8: brake+right
+             # Continuous: [steer, gas, brake]
+             # steer: -1 (right) to 1 (left) -- Wait, let's check direction convention
+             
+             steer = 0.0
+             gas = 0.0
+             brake = 0.0
+             
+             # Logic from spaces.py (roughly)
+             # 1: gas
+             if action_idx == 1: gas = 1.0
+             # 2: brake
+             elif action_idx == 2: brake = 1.0
+             # 3: gas + steer left
+             elif action_idx == 3: 
+                 gas = 1.0
+                 steer = 1.0
+             # 4: gas + steer right
+             elif action_idx == 4:
+                 gas = 1.0
+                 steer = -1.0
+             # 5: steer left
+             elif action_idx == 5: steer = 1.0
+             # 6: steer right
+             elif action_idx == 6: steer = -1.0
+             # 7: brake + steer left
+             elif action_idx == 7:
+                 brake = 1.0
+                 steer = 1.0
+             # 8: brake + steer right
+             elif action_idx == 8:
+                 brake = 1.0
+                 steer = -1.0
+                 
+             action = np.array([gas, steer, brake], dtype=np.float32)
+        else:
+            action = action_idx
 
         # Step through the environment
         observation, reward, terminated, trunks, info = envs.step([action])
@@ -55,9 +97,8 @@ def main(size: int = 128):
                 # === Reset the finished env ===
                 #
                 options = {
-                    # "scene": "rdm",
-                    "scene": choice(["lead_brake", "jaywalk"]),
-                    "num_vehicles": 25,
+        "scene": choice(["red_light_runner"]),
+        "num_vehicles": 25,
                     "route_dist_range": [30, 130],
                     "reset_mask": np.logical_or(terminated, trunks),
                 }

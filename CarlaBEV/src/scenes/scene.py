@@ -14,16 +14,17 @@ class Scene:
 
     cols = ["scene_id", "class", "start", "goal", "rx", "ry"]
 
-    def __init__(self, size, screen, town_name="Town01"):
+    def __init__(self, size, screen, town_name="Town01", action_space="discrete"):
         self.size = size
         self.screen = screen
         self.town_name = town_name
         self._scale = int(1024 / size)
+        self.action_space = action_space
         #        self._const = int(size / 4) + 1
         self._const = 35
 
         # --- Managers ---
-        self.actor_manager = ActorManager(size)
+        self.actor_manager = ActorManager(size, action_space=self.action_space)
         self.serializer = SceneSerializer()
         self._idx = 0
 

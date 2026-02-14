@@ -1,7 +1,7 @@
 import copy
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.actors.pedestrian import Pedestrian
-from CarlaBEV.src.actors.hero import DiscreteAgent
+from CarlaBEV.src.actors.hero import DiscreteAgent, ContinuousAgent
 
 
 def compute_route_length(route):
@@ -20,8 +20,9 @@ def compute_route_length(route):
 class ActorManager:
     """Handles creation, lifecycle, and updates of all scene actors."""
 
-    def __init__(self, size: int):
+    def __init__(self, size: int, action_space: str = "discrete"):
         self.size = size
+        self.action_space = action_space
         self.clear()
 
     def clear(self):
@@ -39,14 +40,24 @@ class ActorManager:
     # ======================================================
     def spawn_hero(self, route, initial_speed, scale):
         """Spawn the main agent (hero vehicle)."""
-        hero = DiscreteAgent(
-            window_size=self.size,
-            route=route,
-            initial_speed=initial_speed,
-            color=(0, 0, 0),
-            target_speed=int(50 / scale),
-            car_size=32,
-        )
+        if self.action_space == "continuous":
+             hero = ContinuousAgent(
+                window_size=self.size,
+                route=route,
+                initial_speed=initial_speed,
+                color=(0, 0, 0),
+                target_speed=int(50 / scale),
+                car_size=32,
+            )
+        else:
+            hero = DiscreteAgent(
+                window_size=self.size,
+                route=route,
+                initial_speed=initial_speed,
+                color=(0, 0, 0),
+                target_speed=int(50 / scale),
+                car_size=32,
+            )
         self.route_length = compute_route_length(route)
         self.actors["agent"] = hero
         return hero

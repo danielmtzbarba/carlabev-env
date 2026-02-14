@@ -31,7 +31,7 @@ class BaseMap(Scene):
         self._pad = self.center[0]
 
         # --- Initialize base Scene
-        super().__init__(size=cfg.size, screen=self._map_img)
+        super().__init__(size=cfg.size, screen=self._map_img, action_space=cfg.action_space)
 
         # --- Internal state
         self._theta = 0.0

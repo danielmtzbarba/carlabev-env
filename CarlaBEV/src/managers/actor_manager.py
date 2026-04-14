@@ -33,6 +33,7 @@ class ActorManager:
             "vehicle": [],
             "pedestrian": [],
             "target": [],
+            "traffic_light": [],
         }
 
     # ======================================================
@@ -87,7 +88,8 @@ class ActorManager:
     def load(self, actors_dict):
         """Load actors from a prebuilt dictionary (used when loading from CSV)."""
         self.clear()
-        self.actors = copy.deepcopy(actors_dict)
+        for key, value in copy.deepcopy(actors_dict).items():
+            self.actors[key] = value
 
     # ======================================================
     # --- Simulation ---

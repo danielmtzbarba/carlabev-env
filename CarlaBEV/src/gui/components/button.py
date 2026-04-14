@@ -8,9 +8,10 @@ class Button:
         self.pressed = False
 
         # Colors
-        self.default_color = (50, 150, 50)    # normal
-        self.hover_color   = (70, 180, 70)    # hover
-        self.pressed_color = (30, 100, 30)    # clicked
+        self.default_color = (41, 128, 64)
+        self.hover_color   = (49, 148, 75)
+        self.pressed_color = (32, 104, 51)
+        self.text_color = (255, 255, 255)
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos):
@@ -31,7 +32,7 @@ class Button:
         else:
             color = self.default_color
 
-        pygame.draw.rect(screen, color, self.rect, border_radius=6)
-        txt_surf = self.font.render(self.text, True, (255, 255, 255))
+        pygame.draw.rect(screen, color, self.rect, border_radius=12)
+        txt_surf = self.font.render(self.text, True, self.text_color)
         txt_rect = txt_surf.get_rect(center=self.rect.center)
         screen.blit(txt_surf, txt_rect)

@@ -74,6 +74,13 @@ class BaseMap(Scene):
         self.draw_fov()
     
     def draw_fov(self):
+        if not getattr(self, "camera", None) or not getattr(self, "hero", None):
+            self._fov_surface.fill((0, 0, 0))
+            if self.mask_fov:
+                apply_corner_fov_mask(self._fov_surface, mask_frac=0.5)
+            self._agent_tile = self._fov_surface.get_at(self.center)
+            return
+
         # Crop around ego vehicle
         fov = self.crop_fov(self.camera.offset)
         rotated_fov, rect = self.rotate_fov(fov)

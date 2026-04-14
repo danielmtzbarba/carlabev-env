@@ -32,9 +32,27 @@ class RedLightRunningScenario(Scenario):
             (2446, 6757),
         ]
         
-    def sample(self, level: int = 1):
-        # Choose specific intersection for stability, e.g., index 2: (7250, 1552) -> y=7250, x=1552
-        ix_raw_y, ix_raw_x = self.intersections[2]
+    def sample(self, level: int = 1, **kwargs):
+        if "config_file" in kwargs and kwargs.get("config_file"):
+            return super().sample(level=level, **kwargs)
+        # Find the closest intersection to the clicked anchor point (which is in map coords, unscaled)
+        anchor_y = kwargs.get("anchor_y", None)
+        anchor_x = kwargs.get("anchor_x", None)
+        intersection_index = kwargs.get("intersection_index", None)
+
+        if intersection_index is not None:
+            ix_raw_y, ix_raw_x = self.intersections[int(intersection_index)]
+        elif anchor_x is not None and anchor_y is not None:
+            # We must scale the anchor to match the intersection list scale (which are raw full-rez coords)
+            anchor_raw_y = anchor_y * 8.0
+            anchor_raw_x = anchor_x * 8.0
+            distances = [np.hypot(iy - anchor_raw_y, ix - anchor_raw_x) for iy, ix in self.intersections]
+            closest_idx = np.argmin(distances)
+            ix_raw_y, ix_raw_x = self.intersections[closest_idx]
+        else:
+            # Choose specific intersection for stability, e.g., index 2
+            ix_raw_y, ix_raw_x = self.intersections[2]
+            
         ix_x = ix_raw_x / 8.0
         ix_y = ix_raw_y / 8.0
         
@@ -43,7 +61,7 @@ class RedLightRunningScenario(Scenario):
         ego_start_y = ix_y + 60 # Start 60px below intersection
         ego_rx = [ix_x] * 10
         ego_ry = [ego_start_y - i * 10 for i in range(10)]
-        ego_speed = 50.0 # moderate speed
+        ego_speed = kwargs.get("ego_speed", 50.0)
         
         len_route = compute_total_dist_px(np.array([ego_rx, ego_ry]))
 
@@ -52,7 +70,7 @@ class RedLightRunningScenario(Scenario):
         adv_start_x = ix_x - 60 # Start 60px left
         adv_rx = [adv_start_x + i * 15 for i in range(10)] # Faster?
         adv_ry = [ix_y] * 10
-        adv_speed = 60.0 # Speeding
+        adv_speed = kwargs.get("adv_speed", 60.0)
         
         adversary = Vehicle(
              map_size=self.map_size,
@@ -67,6 +85,7 @@ class RedLightRunningScenario(Scenario):
         tl_ego = TrafficLight(
             pos_x=ix_x + 10, # Slightly offset to right
             pos_y=ix_y + 10, # Below center
+            map_size=self.map_size,
             orientation='horizontal',
             signal_state=TrafficLightState.GREEN
         )
@@ -75,40 +94,15 @@ class RedLightRunningScenario(Scenario):
         tl_adv = TrafficLight(
             pos_x=ix_x - 10, # Left of center
             pos_y=ix_y - 10, # Above or aligned
+            map_size=self.map_size,
             orientation='vertical',
             signal_state=TrafficLightState.RED
         )
-        
-        # User requested TrafficLights, plural or singular? "TrafficLight object". 
-        # I'll add both to visualize the conflict.
-        # But `sample` returns dict with keys: agent, vehicle, pedestrian, target.
-        # Where do I put TrafficLight?
-        # I might need to extend the env/renderer to support 'static_actors' or similar, 
-        # OR put them in 'vehicle' list if they are Actors (but they are static).
-        # Or put them in 'target' as they are static visuals?
-        # Let's check `utils.py` `actors_dict`.
-        # It has "agent", "vehicle", "pedestrian", "target".
-        # If I put them in vehicle, they might move if behavior is not None, but TrafficLight has no behavior initially.
-        # However, Renderer iterates over these keys.
-        # Let's put in 'target' for now if they act as markers, OR hack 'vehicle'.
-        # Actually, `CarlaBEV/src/scenes/utils.py` `build_scene` and `actors_dict` implies rigid structure.
-        # Let's look at `CarlaBEV/src/renderer.py` or where `env.render` happens.
-        # It calls `scene.render()`.
-        
-        # For now, I will treat them as 'vehicle' with 0 speed? Or add a new key "traffic_light" if system allows.
-        # Let's stick to 'target' or similar to avoid them being treated as dynamic obstacles by other agents if checking collisions?
-        # Wait, TrafficLight inherits Actor.
-        # Let's try adding a new key "traffic_light" to the dict returned by sample.
-        # But `make_env` -> `World` might not know how to handle it.
-        # I need to check `CarlaBEV/src/world.py` or wherever actors are stored.
-        
-        # Let's assume I need to add them to a list that is rendered.
-        # `Scene` class usually holds lists of actors.
-        
+
         return {
             "agent": (ego_rx, ego_ry, ego_speed),
             "vehicle": [adversary],
             "pedestrian": [],
-            "target": [], # Targets are usually goals
-            "traffic_light": [tl_ego, tl_adv] # New key, risk!
+            "target": [],
+            "traffic_light": [tl_ego, tl_adv],
         }, len_route

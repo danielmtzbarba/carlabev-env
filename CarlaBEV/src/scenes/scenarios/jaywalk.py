@@ -25,17 +25,21 @@ class JaywalkScenario(Scenario):
     def __init__(self, map_size):
         super().__init__("jaywalk", map_size)
 
-    def sample(self, level: int = 1):
+    def sample(self, level: int = 1, **kwargs):
         """
         Generate randomized scenario depending on complexity level.
+        If config_file is passed, it loads explicitly.
         """
-        # --- Randomization parameters ---
-        ego_start_y = np.random.randint(900, 1000)
-        ego_speed = np.random.uniform(40.0, 70.0)
-        ped_x_base = 850  # center lane crossing
+        if "config_file" in kwargs and kwargs["config_file"]:
+            return super().sample(level=level, **kwargs)
+        # --- Customization Parameters (Fallback to Random) ---
+        ego_start_y = kwargs.get("anchor_y", np.random.randint(900, 1000))
+        ego_speed = kwargs.get("ego_speed", np.random.uniform(40.0, 70.0))
+        ped_x_base = kwargs.get("anchor_x", 850)  # center lane crossing
         lane_width = 5
-        cross_offset = np.random.uniform(-10, 10)  # pedestrian lateral jitter
-        cross_delay = np.random.uniform(2.0, 4.0)  # when pedestrian starts walking
+        cross_offset = kwargs.get("cross_offset", np.random.uniform(-10, 10))
+        cross_delay = kwargs.get("cross_delay", np.random.uniform(2.0, 4.0))
+        pedestrian_speed = kwargs.get("pedestrian_speed", np.random.uniform(1.8, 3.6))
 
         # === Ego vehicle path ===
         ego_rx = [ped_x_base] * 6
@@ -66,7 +70,7 @@ class JaywalkScenario(Scenario):
             routeX=ped_rx,
             routeY=ped_ry,
             behavior=behavior,
-            target_speed=np.random.uniform(1.8, 3.6),  # m/s pedestrian speed
+            target_speed=pedestrian_speed,
         )
 
         # --- Collect actors ---
@@ -77,11 +81,13 @@ class JaywalkScenario(Scenario):
         # --- Level 4: Add rear vehicle to increase challenge
         # ==========================================================
         if level >= 4:
-            rear_gap = np.random.randint(10, 20)
+            rear_gap = kwargs.get("rear_gap", np.random.randint(10, 20))
             rear_rx = [ped_x_base] * 6
             rear_ry_start = ego_ry[0] + rear_gap
             rear_ry = [rear_ry_start - i * 10 for i in range(6)]
-            rear_speed = ego_speed - np.random.uniform(5.0, 10.0)
+            rear_speed = kwargs.get(
+                "rear_speed", ego_speed - np.random.uniform(5.0, 10.0)
+            )
 
             rear_vehicle = Vehicle(
                 map_size=self.map_size,
@@ -97,4 +103,5 @@ class JaywalkScenario(Scenario):
             "vehicle": vehicles,
             "pedestrian": pedestrians,
             "target": [],
+            "traffic_light": [],
         }, len_route

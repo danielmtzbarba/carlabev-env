@@ -46,10 +46,16 @@ class Scene:
             self.actor_manager.reset_all()
 
         # Metrics
-        self._dist2goal_t0 = self.dist2goal()
-        self._dist2goal_t_1 = self.dist2goal()
-        self._dist2goal = self.dist2goal()
-        self._dist2wp_1 = self.hero.dist2wp
+        if self.hero is not None:
+            self._dist2goal_t0 = self.dist2goal()
+            self._dist2goal_t_1 = self.dist2goal()
+            self._dist2goal = self.dist2goal()
+            self._dist2wp_1 = self.hero.dist2wp
+        else:
+            self._dist2goal_t0 = 0.0
+            self._dist2goal_t_1 = 0.0
+            self._dist2goal = 0.0
+            self._dist2wp_1 = 0.0
 
     def load_scene(self, actors):
         self.actor_manager.load(actors)
@@ -98,7 +104,7 @@ class Scene:
         actors_state = []
         info = self.scene_info
         for id_type, actor_list in self.actor_manager.actors.items():
-            if id_type in ["agent"]:
+            if id_type in ["agent", "traffic_light"]:
                 continue
             for actor in actor_list:
                 actor_id, collision, distance = actor.isCollided(self.hero, self._const)

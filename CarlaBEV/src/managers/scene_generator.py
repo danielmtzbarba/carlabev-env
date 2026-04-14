@@ -9,6 +9,7 @@ from CarlaBEV.envs.utils import asset_path
 from  CarlaBEV.src.scenes.scenarios.lead_brake import LeadBrakeScenario
 from  CarlaBEV.src.scenes.scenarios.jaywalk import JaywalkScenario 
 from  CarlaBEV.src.scenes.scenarios.red_light_running import RedLightRunningScenario
+from CarlaBEV.src.scenes.scenarios.specs import load_scenario_config_file, scenario_config_to_options
 
 
 
@@ -65,17 +66,39 @@ class SceneGenerator:
 
     def build_scene(self, options):
         scene = options.get("scene", "rdm")
+        config_file = options.get("config_file")
         num_vehicles = options.get("num_vehicles", self.cfg.get("max_vehicles", 25))
         dist_range = options.get("route_dist_range", self.cfg.get("route_dist_range", [30, 100]))
+
+        if isinstance(scene, str) and scene.endswith(".json") and os.path.exists(scene):
+            config_file = scene
+
+        if config_file:
+            config = load_scenario_config_file(config_file)
+            scenario_id = config["scenario_id"]
+            if scenario_id not in self.scenarios:
+                raise KeyError(f"Unknown scenario '{scenario_id}' in config '{config_file}'")
+            return self.scenarios[scenario_id].sample(
+                **scenario_config_to_options(config, options)
+            )
 
         # --- Case 1: Random scene generation ---
         if isinstance(scene, str) and scene == "rdm":
             return self.generate_random(num_vehicles, dist_range)
 
         # --- Case 2: Predefined scenario ---
-        elif isinstance(scene, str):
-            level = choice([1, 2, 3, 4])
-            return self.scenarios[scene].sample(level)
+        elif isinstance(scene, str) and scene in self.scenarios:
+            level = options.get("level", choice([1, 2, 3, 4]))
+            return self.scenarios[scene].sample(level=level, **options)
+            
+        # --- Default Fallback: Empty Scene ---
+        return {
+            "agent": None,
+            "vehicle": [],
+            "pedestrian": [],
+            "target": [],
+            "traffic_light": [],
+        }, 0
 
     # =========================================================
     # --- Randomized Curriculum Scene ---
@@ -87,7 +110,13 @@ class SceneGenerator:
         """
         num_cars = num_cars if self.traffic_enabled else 0
 
-        actors = {"agent": None, "vehicle": [], "pedestrian": [], "target": []}
+        actors = {
+            "agent": None,
+            "vehicle": [],
+            "pedestrian": [],
+            "target": [],
+            "traffic_light": [],
+        }
 
         # 1️⃣ Agent route
         for attempt in range(max_retries):

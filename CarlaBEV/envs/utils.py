@@ -2,11 +2,11 @@ import os
 import pygame
 import numpy as np
 from PIL import Image
-from dotenv import load_dotenv
 
-# Load environment variables. Assumes that project contains .env file
-load_dotenv()
-asset_path = os.getenv("ASSETS_DIR")
+# Dynamically resolve asset path relative to this file's location (CarlaBEV/envs/utils.py -> CarlaBEV/assets)
+_ENVS_DIR = os.path.dirname(os.path.abspath(__file__))
+_CARLABEV_DIR = os.path.dirname(_ENVS_DIR)
+asset_path = os.path.join(_CARLABEV_DIR, "assets")
 
 
 def get_tile_dict(id):

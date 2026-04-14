@@ -1,0 +1,19 @@
+{
+  "scenario": "jaywalk_test",
+  "actors": [
+     {
+         "type": "agent",
+         "rx": [500, 500, 500, 500],
+         "ry": [950, 930, 910, 890],
+         "speed": 45.0
+     },
+     {
+         "type": "pedestrian",
+         "rx": [510, 490],
+         "ry": [915, 915],
+         "speed": 2.5,
+         "behavior": "StopReturnBehavior",
+         "behavior_kwargs": {"start_delay": 2.5}
+     }
+  ]
+}

@@ -1,19 +1,114 @@
 import numpy as np
 import random
 
+from CarlaBEV.src.scenes.scenarios.specs import (
+    load_scenario_config_file,
+    scenario_config_to_options,
+)
+
 class Scenario:
     def __init__(self, name, map_size=128):
         self.name = name
         self.map_size = map_size
 
-    def sample(self):
+    def sample(self, **kwargs):
         """
         Return a dict:
         {
-            "ego": (rx, ry, target_speed),
-            "vehicles": [ (rx_v, ry_v, behavior), ... ],
-            "pedestrians": [...],
-            "targets": [...]
+            "agent": (rx, ry, target_speed),
+            "vehicle": [ Vehicle(...) ],
+            "pedestrian": [ Pedestrian(...) ],
+            "target": [...]
         }
         """
+        config_file = kwargs.pop("config_file", None)
+        if config_file:
+            return self.load_config(config_file, **kwargs)
         raise NotImplementedError
+
+    def load_config(self, filepath, **overrides):
+        import json
+
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if "actors" not in data:
+            config = load_scenario_config_file(filepath)
+            scenario_id = config["scenario_id"]
+            if scenario_id != self.name:
+                raise ValueError(
+                    f"Config scenario '{scenario_id}' does not match loader '{self.name}'."
+                )
+            return self.sample(**scenario_config_to_options(config, overrides))
+
+        scene_dict = {
+            "agent": None,
+            "vehicle": [],
+            "pedestrian": [],
+            "target": [],
+            "traffic_light": [],
+        }
+
+        # We need to construct actors
+        from CarlaBEV.src.actors.vehicle import Vehicle
+        from CarlaBEV.src.actors.pedestrian import Pedestrian
+
+        # Load behavior modules to evaluate strings
+        import CarlaBEV.src.actors.behavior.jaywalk as jaywalk_beh
+        import CarlaBEV.src.actors.behavior.lead_brake as lead_beh
+
+        def get_behavior(name, kwargs):
+            if name == "Normal" or not name:
+                return None
+
+            # Map names to classes dynamically
+            if hasattr(jaywalk_beh, name):
+                cls = getattr(jaywalk_beh, name)
+                return cls(**kwargs)
+            elif hasattr(lead_beh, name):
+                cls = getattr(lead_beh, name)
+                return cls(**kwargs)
+            return None
+
+        for actor_data in data["actors"]:
+            atype = actor_data["type"]
+            rx = actor_data["rx"]
+            ry = actor_data["ry"]
+            speed = actor_data.get("speed", 2.0)
+
+            if atype == "agent":
+                scene_dict["agent"] = (rx, ry, speed)
+            elif atype == "vehicle":
+                beh_name = actor_data.get("behavior", "Normal")
+                beh_kwargs = actor_data.get("behavior_kwargs", {})
+                behavior = get_behavior(beh_name, beh_kwargs)
+
+                v = Vehicle(
+                    self.map_size,
+                    routeX=rx,
+                    routeY=ry,
+                            target_speed=speed, behavior=behavior)
+                scene_dict["vehicle"].append(v)
+
+            elif atype == "pedestrian":
+                beh_name = actor_data.get("behavior", "Normal")
+                beh_kwargs = actor_data.get("behavior_kwargs", {})
+                behavior = get_behavior(beh_name, beh_kwargs)
+
+                p = Pedestrian(
+                    self.map_size,
+                    routeX=rx,
+                    routeY=ry,
+                               target_speed=speed, behavior=behavior)
+                scene_dict["pedestrian"].append(p)
+
+        # len_route calculation can just use agent
+        if scene_dict.get("agent"):
+            rx, ry, _ = scene_dict["agent"]
+            from CarlaBEV.src.scenes.utils import compute_total_dist_px
+
+            len_route = compute_total_dist_px([rx, ry])
+        else:
+            len_route = 0
+
+        return scene_dict, len_route

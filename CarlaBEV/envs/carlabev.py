@@ -79,12 +79,18 @@ class CarlaBEV(gym.Env):
         self.len_ego_route = len_route
         self.num_vehicles = len(actors["vehicle"])
         self.map.reset(actors)
-        rx, ry = self.map.route
-
-        if self.cfg.reward_type == "carl":
-            self.reward_fn.reset(rx, ry)
+        
+        if actors and actors.get("agent") is not None:
+            rx, ry = self.map.route
+            if self.cfg.reward_type == "carl":
+                self.reward_fn.reset(rx, ry)
+            else:
+                self.reward_fn.reset()
         else:
-            self.reward_fn.reset()
+            if self.cfg.reward_type == "carl":
+                self.reward_fn.reset([], [])
+            else:
+                self.reward_fn.reset()
 
         return self._get_obs(), self._get_info()
 
@@ -125,10 +131,13 @@ class CarlaBEV(gym.Env):
             np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)
         )
         if self.obs_mode == "vector":
-            hero = self.map.hero.state
-            set_point = self.map.hero.set_point
-            vector_data = np.concatenate([hero, set_point]).astype(np.float32)
-            self._observation = vector_data
+            if self.map.hero is not None:
+                hero = self.map.hero.state
+                set_point = self.map.hero.set_point
+                vector_data = np.concatenate([hero, set_point]).astype(np.float32)
+                self._observation = vector_data
+            else:
+                self._observation = np.zeros(6, dtype=np.float32)
 
         if self.render_mode == "human":
             self.renderer.render(self.map.canvas)

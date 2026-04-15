@@ -82,7 +82,7 @@ class Actor(pygame.sprite.Sprite):
         if self.behavior:
             self.behavior.reset(self)
 
-        self.rect = pygame.Rect((self.rx[0], self.ry[0], self.size, self.size))
+        self.rect = pygame.Rect(0, 0, self.size, self.size)
 
     def step(self, t=0.0, dt=0.05):
         # --- APPLY BEHAVIOR FIRST ---
@@ -93,11 +93,15 @@ class Actor(pygame.sprite.Sprite):
         self._controller.set_target_speed(self.target_speed)
 
         finished = self._controller.control_step()
-        self.rect.x = self._controller.x
-        self.rect.y = self._controller.y
         return finished
 
-    def draw(self, screen):
+    def sync_rect(self, frame):
+        self.rect = frame.rect_from_world_center(
+            (self._controller.x, self._controller.y), (self.size, self.size)
+        )
+
+    def draw(self, screen, frame):
+        self.sync_rect(frame)
         if self.selected:
             self.start_node.render(screen, cfg.green)
             self.end_node.render(screen, cfg.red)
@@ -106,16 +110,11 @@ class Actor(pygame.sprite.Sprite):
 
         self.rect = pygame.draw.rect(screen, self._color, self.rect)
 
-    def isCollided(self, hero, offset):
-        offsetx = offset - hero.rect.w / 2
-        offsety = offset - hero.rect.w / 2
-        dummy_rect = pygame.Rect(
-            hero.rect.x + offsetx, hero.rect.y + offsety, hero.rect.w, hero.rect.w
-        )
-        result = dummy_rect.colliderect(self.rect)
+    def isCollided(self, hero, offset=None):
+        result = hero.rect.colliderect(self.rect)
 
         # --- Distance estimation (center-to-center) ---
-        hero_center = dummy_rect.center
+        hero_center = hero.rect.center
         obj_center = self.rect.center
         dx = hero_center[0] - obj_center[0]
         dy = hero_center[1] - obj_center[1]

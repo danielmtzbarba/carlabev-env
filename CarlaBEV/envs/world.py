@@ -3,6 +3,7 @@ import math
 import pygame
 
 from .utils import load_map
+from .transforms import SurfaceFrame
 from CarlaBEV.src.scenes.scene import Scene
 
 
@@ -24,11 +25,13 @@ class BaseMap(Scene):
         self._map_arr, self._map_img, _ = load_map(cfg.map_name, cfg.size)
         self._Y, self._X, _ = self._map_arr.shape
         self._scene = pygame.Surface((self._X, self._Y))
+        self.surface_frame = SurfaceFrame()
 
         # --- Rendering surfaces
         self.center = (self.size // 2, self.size // 2)
         self._fov_surface = pygame.Surface((self.size, self.size))
         self._pad = self.center[0]
+        self.crop_resolution = (self.size + self._pad, self.size + self._pad)
 
         # --- Initialize base Scene
         super().__init__(size=cfg.size, screen=self._map_img, action_space=cfg.action_space)
@@ -45,6 +48,10 @@ class BaseMap(Scene):
         self.reset_scene(actors)
         self._theta = 0.0
         self._scene.blit(self._map_img, (0, 0))
+        if getattr(self, "hero", None) is not None and getattr(self, "camera", None) is not None:
+            self.hero.sync_rect(self.surface_frame)
+            self.camera.scroll()
+            self.draw_fov()
 
     # =====================================================
     # --- FOV Handling ---
@@ -54,7 +61,7 @@ class BaseMap(Scene):
         self._xmin = np.clip(int(topleft.x), 0, self._X - self.size - self._pad - 1)
         self._ymin = np.clip(int(topleft.y), 0, self._Y - self.size - self._pad - 1)
         fov = self._scene.subsurface(
-            (self._xmin, self._ymin, self.size + self._pad, self.size + self._pad)
+            (self._xmin, self._ymin, self.crop_resolution[0], self.crop_resolution[1])
         )
         return fov
 
@@ -78,7 +85,7 @@ class BaseMap(Scene):
             self._fov_surface.fill((0, 0, 0))
             if self.mask_fov:
                 apply_corner_fov_mask(self._fov_surface, mask_frac=0.5)
-            self._agent_tile = self._fov_surface.get_at(self.center)
+            self._agent_tile = np.array([0, 0, 0], dtype=np.uint8)
             return
 
         # Crop around ego vehicle
@@ -90,10 +97,18 @@ class BaseMap(Scene):
         if self.mask_fov:
             # 👇 APPLY MASK HERE
             apply_corner_fov_mask(self._fov_surface, mask_frac=0.5)
-        # Store agent tile (for reward)
-        self._agent_tile = self._fov_surface.get_at(self.center)
+        # Store semantic tile from authoritative map coordinates.
+        self._agent_tile = self.semantic_tile_at(self.hero.position)
         # Draw ego
         self.hero.draw(self.canvas, self.map_surface)
+
+    def semantic_tile_at(self, position):
+        x = int(np.clip(round(float(position.x)), 0, self._X - 1))
+        y = int(np.clip(round(float(position.y)), 0, self._Y - 1))
+        return np.array(self._map_arr[y, x], dtype=np.uint8)
+
+    def is_obstacle_tile(self, tile):
+        return np.array_equal(tile, np.array([150, 150, 150], dtype=np.uint8))
 
     # =====================================================
     # --- Properties ---
@@ -108,7 +123,9 @@ class BaseMap(Scene):
 
     @property
     def agent_tile(self):
-        return np.array(self._agent_tile)[:-1]
+        if getattr(self, "hero", None) is None:
+            return np.array([0, 0, 0], dtype=np.uint8)
+        return self.semantic_tile_at(self.hero.position)
 
 
 def apply_corner_fov_mask(surface, mask_frac=0.25):

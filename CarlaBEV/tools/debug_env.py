@@ -40,6 +40,9 @@ def main(size: int = 128):
         "reset_mask": np.array([True], dtype=bool),
     }
     observation, info = envs.reset(options=options)
+    spawn_info = info.get("spawn_validation", {})
+    if spawn_info and not spawn_info.get("valid", False):
+        raise RuntimeError(f"Invalid ego spawn at reset: {spawn_info}")
     running = True
 
     while running:
@@ -103,6 +106,9 @@ def main(size: int = 128):
                     "reset_mask": np.logical_or(terminated, trunks),
                 }
                 observation, info = envs.reset(options=options)
+                spawn_info = info.get("spawn_validation", {})
+                if spawn_info and not spawn_info.get("valid", False):
+                    raise RuntimeError(f"Invalid ego spawn during debug reset: {spawn_info}")
 
     envs.close()
 

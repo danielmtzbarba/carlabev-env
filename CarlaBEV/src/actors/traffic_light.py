@@ -69,7 +69,7 @@ class TrafficLight(Actor):
     def step(self, t=0.0, dt=0.05):
         return
 
-    def draw(self, screen):
+    def draw(self, screen, frame=None):
         self._update_rect()
         if self.orientation == 'horizontal':
             w, h = self.length, self.width

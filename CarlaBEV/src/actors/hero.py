@@ -1,9 +1,8 @@
-import numpy as np
 import pygame
 import math
+import numpy as np
 
 from CarlaBEV.src.control.stanley_controller import Controller
-from CarlaBEV.src.gui.settings import Settings as cfg
 
 
 class Hero(pygame.sprite.Sprite):
@@ -15,21 +14,19 @@ class Hero(pygame.sprite.Sprite):
         #
         self.w = int(car_size / self.scale)
         self.l = self.w
-        # Visual Offset Bug
-        self._offx = -32
-        self._offy = -32
 
     def _setup(self):
         center = self.window_center
-        self.fov_rect = pygame.Rect((center, center, self.w, self.l))
-        self.rect = pygame.Rect((self.x0, self.y0, self.w, self.l))
-        # movement
-        self.x = self.rect.x 
-        self.y = self.rect.y
+        self.fov_rect = pygame.Rect(0, 0, self.w, self.l)
+        self.fov_rect.center = (center, center)
+        self.rect = pygame.Rect(0, 0, self.w, self.l)
 
     def draw(self, display_fov, display):
         pygame.draw.rect(display_fov, self.color, self.fov_rect)
         #pygame.draw.rect(display, self.color, self.rect)
+
+    def sync_rect(self, frame):
+        self.rect = frame.rect_from_world_center((self.x, self.y), (self.w, self.l))
 
     @property
     def position(self):
@@ -42,6 +39,9 @@ class Hero(pygame.sprite.Sprite):
 
 class BaseAgent(Controller, Hero):
     dt = 0.1
+    min_action_steer_deg = 8.0
+    max_action_steer_deg = 18.0
+    steer_speed_scale = 0.35
 
     def __init__(
         self,
@@ -56,8 +56,6 @@ class BaseAgent(Controller, Hero):
         Hero.__init__(self, window_size, color, car_size)
 
         xs, ys = route[0], route[1]
-        self.x0 = int(xs[0])
-        self.y0 = int(ys[0])
         self.acc = 0.0
         self._setup()
 
@@ -94,8 +92,6 @@ class BaseAgent(Controller, Hero):
         if abs(self.v) < 0.05:
             self.v = 0.0
 
-        # === Render update ===
-        self.rect.center = (round(self.x) + self._offx, round(self.y) + self._offy)
         # natural drag proportional to speed
         self.v *= 0.985
 
@@ -104,14 +100,19 @@ class BaseAgent(Controller, Hero):
         return max(0.0, amount) * 1.0 * self.scale
     
     def steering(self, steer_action):
-        """Turn realistically, depending on speed."""
+        """Map normalized steering actions to a meaningful wheel angle."""
         if abs(self.v) < 0.1:
-            return  0.0# no turn if not moving
+            return 0.0
 
-        min_turn_scale = 0.3
-        max_turn_scale = 1.2
-        turn_scale = np.clip(self.v / 2.0, min_turn_scale, max_turn_scale)
-        delta = math.radians(steer_action * turn_scale)
+        # Give the policy enough steering authority to make lane changes and
+        # avoidance maneuvers, while tapering at higher speed to avoid twitchy turns.
+        steer_deg = self.max_action_steer_deg / (1.0 + self.steer_speed_scale * abs(self.v))
+        steer_deg = np.clip(
+            steer_deg,
+            self.min_action_steer_deg,
+            self.max_action_steer_deg,
+        )
+        delta = math.radians(steer_action * steer_deg)
         return delta
 
     def brake(self, amount):

@@ -15,36 +15,29 @@ class Target(pygame.sprite.Sprite):
     def reset(self):
         self._visible = True
         self.position = pygame.math.Vector2(self.x0, self.y0)
-        self.rect = pygame.Rect(
-            int(self.x0 - self.width / 2),
-            int(self.y0 - self.lenght / 2),
-            self.width,
-            self.lenght,
+        self.rect = pygame.Rect(0, 0, self.width, self.lenght)
+
+    def sync_rect(self, frame):
+        self.rect = frame.rect_from_world_center(
+            (self.position.x, self.position.y), (self.width, self.lenght)
         )
 
     def step(self, t, dt):
         pass
 
-    def isCollided(self, hero, offset):
+    def isCollided(self, hero, offset=None):
         result = None
         if self._visible:
-            offsetx = offset - hero.rect.w / 2
-            offsety = offset - hero.rect.w / 2
-
-            dummy_rect = pygame.Rect(
-                hero.rect.x + offsetx,
-                hero.rect.y + offsety,
-                hero.rect.w + 1,
-                hero.rect.w + 1,
-            )
-            result = dummy_rect.colliderect(self.rect)
+            result = hero.rect.colliderect(self.rect)
             if result:
                 self._visible = False
 
         return self.id, result, 9999
 
-    def draw(self, map):
+    def draw(self, map, frame=None):
         if self.visible:
+            if frame is not None:
+                self.sync_rect(frame)
             self.rect = pygame.draw.rect(map, self.color, self.rect)
 
     @property

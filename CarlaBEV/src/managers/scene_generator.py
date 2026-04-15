@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import warnings
 from random import choice
 from CarlaBEV.src.scenes.utils import get_random_node, find_route, find_route_in_range
 from CarlaBEV.src.actors.vehicle import Vehicle
@@ -147,7 +148,10 @@ def get_actor(actor_type, lane, planners):
         veh, path = find_route(planners, veh, lane=lane)
         if len(path[0]) > 5:
             return veh, path
-    except Exception:
-        # route generation failed
-       pass 
+    except Exception as exc:
+        warnings.warn(
+            f"Route generation failed for actor_type={actor_type}, lane={lane}: {exc}",
+            RuntimeWarning,
+            stacklevel=2,
+        )
     return None, None

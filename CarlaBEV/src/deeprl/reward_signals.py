@@ -55,8 +55,8 @@ def compute_ttc_raw(hero_state, actors_state, dt=0.1, meters_per_pixel=0.625):
     hx_m = hx * meters_per_pixel
     hy_m = hy * meters_per_pixel
 
-    # Convert hero speed: px/step → m/s
-    hv_m = hv_px * meters_per_pixel / dt
+    # Controller speed behaves like px/s, so convert directly to m/s.
+    hv_m = hv_px * meters_per_pixel
     hvx_m = hv_m * np.cos(hyaw)
     hvy_m = hv_m * np.sin(hyaw)
 
@@ -70,9 +70,9 @@ def compute_ttc_raw(hero_state, actors_state, dt=0.1, meters_per_pixel=0.625):
         ax_m = ax_px * meters_per_pixel
         ay_m = ay_px * meters_per_pixel
 
-        # Convert actor velocity to m/s
-        avx_m = avx_px * meters_per_pixel / dt
-        avy_m = avy_px * meters_per_pixel / dt
+        # Actor velocity components behave like px/s as well.
+        avx_m = avx_px * meters_per_pixel
+        avy_m = avy_px * meters_per_pixel
 
         # Relative position and velocity
         rx = ax_m - hx_m

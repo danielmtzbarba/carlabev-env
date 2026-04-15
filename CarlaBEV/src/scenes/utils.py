@@ -7,6 +7,11 @@ import ast
 import yaml
 import pandas as pd
 
+from CarlaBEV.envs.geometry import (
+    raw_to_surface,
+    route_length_meters,
+    surface_to_raw,
+)
 from CarlaBEV.src.gui.settings import Settings as cfg
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.scenes.target import Target
@@ -60,11 +65,11 @@ def select_node(event, planner, lane, actor):
     node = planner.get_closest_node(click_pos * 8, None)
 
     node_pos = np.array(planner.G.nodes[node]["pos"])
-    dist = np.linalg.norm(8 * click_pos - node_pos)
+    dist = np.linalg.norm(surface_to_raw(click_pos) - node_pos)
 
     if dist < min_dist:
         min_dist = dist
-        pos = planner.get_node_pos(node) / 8
+        pos = planner.get_node_pos_surface(node)
         closest_node = Node(node, pos, lane=None)
 
     return closest_node
@@ -75,7 +80,7 @@ def get_random_node(planner, actor_type, lane):
     planner_id = "pedestrian" if actor_type == "Pedestrian" else f"vehicle-{lane}"
     planner = planner[planner_id]
     rdm_node_id = planner.get_random_node(lane)
-    pos = planner.get_node_pos(rdm_node_id)
+    pos = planner.get_node_pos_surface(rdm_node_id)
     return Node(rdm_node_id, pos, lane)
 
 
@@ -88,8 +93,7 @@ def find_route(planner, actor, lane):
         path, _ = planner.find_path(start.id, end.id, actor.id)
         rx, ry, path_pos = [], [], []
         for node_id in path[1:-1]:
-            pos_scaled = planner.G.nodes[node_id]["pos"]
-            x, y = pos_scaled[0] / 8, pos_scaled[1] / 8
+            x, y = planner.get_node_pos_surface(node_id)
             actor.set_route_wp(node_id, x, y)
             rx.append(x)
             ry.append(y)
@@ -235,10 +239,9 @@ def find_route_in_range(
     planner,
     actor_type,
     lane,
-    min_dist_meters=30.0,  # minimum route length in meters
-    max_dist_meters=50.0,  # maximum route length in meters
+    min_dist_meters=30.0,
+    max_dist_meters=50.0,
     max_attempts=100,
-    scale=8,  # pixel scaling factor, e.g. raw pos / scale
 ):
     """
     Create a route for `actor` within a valid distance range.
@@ -252,8 +255,6 @@ def find_route_in_range(
         lane: lane index or "sidewalk" for pedestrians
         min_dist_meters, max_dist_meters: distance constraints
         max_attempts: how many attempts before fallback
-        scale: scale factor to convert pixel pos -> BEV coords
-
     Returns:
         actor: with updated route assigned via actor.set_route_wp(...)
         (rx, ry): list of float BEV coords of the route
@@ -277,27 +278,27 @@ def find_route_in_range(
 
         # Compute route waypoints
         rx, ry = [], []
-        total_dist_px = 0.0
+        total_dist_surface = 0.0
         for prev, curr in zip(path[:-1], path[1:]):
-            n1_pos = lane_planner.G.nodes[prev]["pos"]
-            n2_pos = lane_planner.G.nodes[curr]["pos"]
-            px1, py1 = n1_pos[0] / scale, n1_pos[1] / scale
-            px2, py2 = n2_pos[0] / scale, n2_pos[1] / scale
-            dist_px = np.hypot(px2 - px1, py2 - py1)
-            total_dist_px += dist_px
+            px1, py1 = lane_planner.get_node_pos_surface(prev)
+            px2, py2 = lane_planner.get_node_pos_surface(curr)
+            dist_surface = np.hypot(px2 - px1, py2 - py1)
+            total_dist_surface += dist_surface
             rx.append(px2)
             ry.append(py2)
 
+        total_dist_meters = route_length_meters(rx, ry)
+
         # Check if route is within the range
-        if min_dist_meters <= total_dist_px <= max_dist_meters:
+        if min_dist_meters <= total_dist_meters <= max_dist_meters:
             # Assign route to actor
             actor = Vehicle(start_node=start_node, end_node=end_node, map_size=128)
-            return actor, (rx, ry), total_dist_px
+            return actor, (rx, ry), total_dist_meters
 
     # Fallback: no route within range
     #    print(f"[WARN] No valid route found within {min_dist_meters}-{max_dist_meters}m after {max_attempts} attempts.")
     actor = Vehicle(start_node=start_node, end_node=end_node, map_size=128)
-    return actor, (rx, ry), total_dist_px
+    return actor, (rx, ry), total_dist_meters
 
 
 def compute_total_dist_px(path, scale=1):
@@ -308,3 +309,7 @@ def compute_total_dist_px(path, scale=1):
         dist_px = np.hypot(px2 - px1, py2 - py1)
         total_dist_px += dist_px
     return total_dist_px
+
+
+def compute_total_dist_m(path, scale=1):
+    return route_length_meters(path[0], path[1])

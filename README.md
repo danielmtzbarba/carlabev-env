@@ -1,8 +1,8 @@
 <div align="center">
 
-# CarlaBEV 🚗🗺️
+# CarlaBEV
 
-**A Custom Simulation Framework for Autonomous Vehicle Motion Planning and Deep Reinformecent Learning**
+**A bird's-eye-view simulator for vision-based autonomous-driving reinforcement learning**
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 [![Gymnasium](https://img.shields.io/badge/gymnasium-API-brightgreen)](https://gymnasium.farama.org/)
@@ -10,142 +10,188 @@
 
 </div>
 
----
+## Overview
 
-## 📌 Overview
+`CarlaBEV` is a lightweight BEV simulator for autonomous-driving research. It is designed for rapid iteration on:
 
-**CarlaBEV** is a custom simulation environment designed from the ground up to support research and development in motion planning for self-driving vehicles. Built on top of [Farama Gymnasium](https://gymnasium.farama.org/) and lightweight [PyGame](https://www.pygame.org/) 2D rendering, it provides a highly customizable and efficient platform for testing Deep Reinforcement Learning (DeepRL) agents.
+- vision-based DRL training
+- route-following and avoidance behavior
+- procedurally generated traffic scenes
+- edge-case scenario design and evaluation
 
-Whether you're exploring complex Bird's Eye View (BEV) state representations, structured vector observations, or custom tracking logic, CarlaBEV offers the modularity needed to get experiments running quickly.
+The simulator uses a Gymnasium-compatible API, a 2D raster BEV pipeline, explicit route and actor management, and a growing set of scenario generators for structured safety-critical evaluation.
 
-<!-- Hero Banner Image Placeholder -->
+It is not a full dynamic clone of CARLA. The project is best understood as a fast research simulator for BEV decision-making and control experiments.
+
 <div align="center">
   <img src="CarlaBEV/assets/images/carlabev_hero_banner.png" alt="CarlaBEV Hero Banner" width="800">
 </div>
 
----
+## Current Status
 
-## ✨ Key Features
+The project currently supports:
 
-- 🎮 **Standard API Compatibility:** Implements the Gymnasium interface, enabling drop-in replaceability with standard Deep RL libraries (Stable Baselines3, CleanRL, etc.).
-- 👁️ **Multi-modal Observation Spaces:** Toggle between rich **`bev`** (Bird's Eye View) rendering and low-dimensional **`vector`** formats via configuration.
-- 🕹️ **Flexible Action Spaces:** Built-in abstraction for both **`discrete`** and **`continuous`** control spaces.
-- 📈 **DeepRL Integration Toolkit:** Includes custom reward functions (e.g., `CaRLRewardFn`), experiment loggers, and wrappers (like `rgb_to_semantic`) out of the box.
-- 🏗️ **Scenario Designer (Coming Soon):** Future support for a built-in `scene_designer.py` and `scene_generator` to quickly mock up custom urban scenarios.
+- Gymnasium vectorized environment usage
+- RGB or semantic-mask BEV observations
+- discrete or continuous ego actions
+- route-following ego dynamics with a kinematic bicycle update
+- explicit camera/FOV centering on the true ego start state
+- synchronized rendering, collision, semantic tile lookup, and checkpoint detection
+- random scene generation
+- predefined edge-case scenarios including:
+  - `lead_brake`
+  - `jaywalk`
+  - `red_light_runner`
 
----
+Recent simulator hardening work also introduced:
 
-## 🚀 Getting Started
+- explicit geometry conversion utilities across raw asset, runtime, and metric frames
+- reset-time spawn validation for valid ego initialization
+- stronger steering authority for meaningful turns and avoidance
+- executable simulator validity checks
 
-### Prerequisites
+## Key Features
 
-I recommend using [uv](https://github.com/astral-sh/uv) to manage the Python environment and dependencies for blazingly fast installations.
+- **Gymnasium-compatible API** for training with standard RL tooling.
+- **BEV observation pipeline** with optional semantic masking and frame stacking.
+- **Scenario generation** for both random traffic scenes and structured edge cases.
+- **Configurable ego control** with discrete and continuous actions.
+- **Semantic map awareness** for drivable-space checks, collision logic, and route progress.
+- **Debug tooling** for manual inspection of environment behavior.
+- **Technical documentation** covering kinematics, geometry, control, and coordinate conventions.
 
-### Installation
+## Documentation
 
-1. Clone the repository and navigate into it:
+Project documentation lives in `CarlaBEV/docs/`:
 
-   ```bash
-   git clone https://github.com/yourusername/carlabev-env.git
-   cd carlabev-env
-   ```
+- [Ego Kinematics](CarlaBEV/docs/ego_kinematics.md)
+- [Geometry And Metric Frame](CarlaBEV/docs/geometry_and_metric_frame.md)
+- [Control And Actions](CarlaBEV/docs/control_and_actions.md)
+- [Coordinate Conventions](CarlaBEV/docs/coordinate_conventions.md)
+- [Scenario Specifications](CarlaBEV/docs/scenario_specifications.md)
 
-2. Initialize and sync the environment:
-   ```bash
-   uv sync
-   ```
+These docs describe the simulator as it exists in the repository today.
 
-### Running the Debug Environment
+## Repository Layout
 
-You can jump right in and test the framework manually or watch the default scenario unfold using the provided debugging tool:
+`CarlaBEV/` is organized into a few main layers:
+
+- `CarlaBEV/envs/`
+  Core environment, rendering, camera, transforms, spaces, and wrappers entrypoint.
+
+- `CarlaBEV/src/actors/`
+  Ego, vehicle, pedestrian, traffic-light, and actor behavior logic.
+
+- `CarlaBEV/src/control/`
+  Vehicle state integration, Stanley tracking, and control utilities.
+
+- `CarlaBEV/src/scenes/`
+  Scene orchestration, targets, utilities, and predefined scenarios.
+
+- `CarlaBEV/src/managers/`
+  Actor management, scene generation, and serialization.
+
+- `CarlaBEV/src/deeprl/`
+  Reward functions, reward signals, stats, and logging helpers.
+
+- `CarlaBEV/tools/`
+  Debug scripts, scene tools, and validation utilities.
+
+## Installation
+
+Using [`uv`](https://github.com/astral-sh/uv) is recommended.
+
+```bash
+git clone https://github.com/danielmtzbarba/carlabev-env.git
+cd carlabev-env
+uv sync
+```
+
+## Running The Simulator
+
+### Debug Viewer
+
+The fastest way to inspect the simulator manually is:
 
 ```bash
 uv run CarlaBEV/tools/debug_env.py
 ```
 
-This will launch a `PyGame` window, initialize the `red_light_runner` scene, and begin stepping the generic environment.
+This launches a `pygame` window and steps the environment with keyboard control.
 
----
+### Validity Checks
 
-## 🗺️ System Architecture
+The repository includes a simulator validation script:
 
-CarlaBEV is structured modularly. The architecture enables users to build custom environments, scenes, and behavior by composing existing logical managers or writing flexible reward functions.
-
-```mermaid
-graph TD
-    %% Core Nodes
-    App["User Application / RL Agent"]
-    GymAPI["Gymnasium Environment API"]
-    CarlaBEV_Core["CarlaBEV Base Env"]
-
-    %% Simulation Architecture
-    subgraph Env ["CarlaBEV/envs"]
-        BaseMap["Base Map / World"]
-        Renderer["Renderer / PyGame"]
-        Spaces["Action & Obs Space Mgmt"]
-    end
-
-    subgraph Src ["CarlaBEV/src"]
-        SceneGen["Scene Generator"]
-        ControlMgr["Control & Dynamics"]
-        ActorMgr["Actor Manager"]
-        RewardFn["DeepRL Reward Fn"]
-        StatsLogger["Stats Tracking"]
-    end
-
-    subgraph Utils ["CarlaBEV/wrappers & tools"]
-        Wrappers["Gym Wrappers"]
-        Tools["debug_env.py"]
-    end
-
-    CarlaBEV_Core --> BaseMap
-    CarlaBEV_Core --> Renderer
-    CarlaBEV_Core --> Spaces
-
-    BaseMap --> SceneGen
-    BaseMap --> ControlMgr
-    BaseMap --> ActorMgr
-
-    CarlaBEV_Core --> RewardFn
-    CarlaBEV_Core --> StatsLogger
-
-    App -->|"step action"| Wrappers
-    Wrappers --> GymAPI
-    GymAPI --> CarlaBEV_Core
-    CarlaBEV_Core -->|"returns observation, reward, done"| GymAPI
+```bash
+uv run python CarlaBEV/tools/validate_simulator_semantics.py
 ```
 
-### Module Breakdown:
+This checks core simulator contracts such as:
 
-1. **`CarlaBEV/envs/`**: The Core Gymnasium environment (`carlabev.py`), spaces definitions, rendering engine, and core World logic (`world.py`).
-2. **`CarlaBEV/src/`**: Logic separation layers. Contains physical controllers (`control/`), deep reinforcement learning tooling (`deeprl/`), scene orchestration (`scene/`), and actor management.
-3. **`CarlaBEV/tools/`**: Included utilities such as the `debug_env.py` executable for human-playable debugging.
-4. **`CarlaBEV/wrappers/`**: Standard RL gym environment modifiers (e.g. clipping reward, `rgb_to_semantic.py`).
+- bicycle yaw update consistency
+- geometry conversion consistency
+- observation-shape correctness
+- valid scenario spawns
 
----
+## Configuration
 
-## 🛠️ Configuration and Customization
+Primary debug/training configuration lives in [cfg.py](CarlaBEV/tools/debug/cfg.py).
 
-The core configuration is strictly typed and managed to ensure reproducible environments. When initializing the environment, key configurations like spatial layout, action formats, and view dimensions can be quickly swapped.
+Important environment options include:
+
+- `obs_space`: `bev` or `vector`
+- `masked`: semantic-mask observations vs grayscale pipeline
+- `action_space`: `discrete` or `continuous`
+- `reward_type`: `carl` or default reward
+- `size`: base BEV size
+- `obs_size`: final resized observation size
+- `traffic_enabled`
+- `max_vehicles`
+
+## Example Reset
 
 ```python
-from CarlaBEV.envs import make_env
 import numpy as np
-from random import choice
 
-# Define custom arguments/options
-options = {
-    "scene": choice(["red_light_runner"]),
-    "num_vehicles": 25,
-    "route_dist_range": [30, 100],
-    "reset_mask": np.array([True], dtype=bool)
-}
+from CarlaBEV.envs import make_env
+from CarlaBEV.tools.debug.cfg import ArgsCarlaBEV, EnvConfig, LoggerConfig
 
-# The make_env helper spins up your scenario
+cfg = ArgsCarlaBEV(
+    env=EnvConfig(render_mode="rgb_array"),
+    logging=LoggerConfig(),
+)
+
 envs = make_env(cfg)
-obs, info = envs.reset(options=options)
+
+obs, info = envs.reset(
+    options={
+        "scene": "red_light_runner",
+        "num_vehicles": 10,
+        "route_dist_range": [30, 100],
+        "reset_mask": np.array([True], dtype=bool),
+    }
+)
 ```
 
----
+## Research Scope
 
-## 📄 License
+CarlaBEV is a strong fit for:
+
+- BEV policy learning
+- scenario-driven DRL benchmarking
+- failure analysis in edge-case traffic situations
+- rapid experimentation on observation design and reward shaping
+
+It is a weaker fit for:
+
+- high-fidelity vehicle dynamics
+- sensor-realism studies
+- direct simulation-to-real transfer claims without additional validation
+
+## Known Modeling Boundaries
+
+- Ego dynamics use a simplified kinematic bicycle model.
+- Collision footprints are coarse relative to real vehicle geometry.
+- Some scenario anchors remain map-specific even though the geometry pipeline now exposes explicit metric conversions.
+- The simulator is optimized for research iteration speed, not photorealism or detailed physics.

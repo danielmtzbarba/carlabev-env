@@ -1,7 +1,8 @@
 from CarlaBEV.src.scenes.scenarios import Scenario
 from CarlaBEV.src.actors.behavior.lead_brake import LeadBrakeBehavior
 from CarlaBEV.src.actors.vehicle import Vehicle
-from CarlaBEV.src.scenes.utils import compute_total_dist_px
+from CarlaBEV.envs.geometry import distance_meters_to_surface
+from CarlaBEV.src.scenes.utils import compute_total_dist_m
 import numpy as np
 
 
@@ -25,7 +26,7 @@ class LeadBrakeScenario(Scenario):
             return super().sample(level=level, **kwargs)
         # --- Customization Parameters (Fallback to Random) ---
         ego_start_y = kwargs.get("anchor_y", np.random.randint(900, 1000))
-        lead_gap = kwargs.get("lead_gap", np.random.randint(15, 40))
+        lead_gap_m = kwargs.get("lead_gap", np.random.uniform(4.5, 12.5))
         ego_speed = kwargs.get("ego_speed", np.random.uniform(40.0, 80.0))
         lead_speed = kwargs.get(
             "lead_speed", ego_speed + np.random.uniform(-5.0, 5.0)
@@ -35,16 +36,19 @@ class LeadBrakeScenario(Scenario):
 
         # --- Base routes (lane centerlines) ---
         x_center = kwargs.get("anchor_x", 850)
-        lane_width = 7  # approximate BEV lane spacing (adjust as needed)
+        lane_width = distance_meters_to_surface(2.2)
+        ego_step = distance_meters_to_surface(6.25)
+        lead_step = distance_meters_to_surface(1.56)
+        rear_step = distance_meters_to_surface(3.12)
 
         # Ego path (straight northbound)
         ego_rx = [x_center] * 6
-        ego_ry = [ego_start_y - i * 20 for i in range(6)]
-        len_route = compute_total_dist_px(np.array([ego_rx, ego_ry]))
+        ego_ry = [ego_start_y - i * ego_step for i in range(6)]
+        len_route = compute_total_dist_m(np.array([ego_rx, ego_ry]))
         # Lead vehicle (same lane)
-        lead_ry_start = ego_ry[0] - lead_gap
+        lead_ry_start = ego_ry[0] - distance_meters_to_surface(lead_gap_m)
         lead_rx = [x_center - 1] * 6
-        lead_ry = [lead_ry_start - i * 5 for i in range(6)]
+        lead_ry = [lead_ry_start - i * lead_step for i in range(6)]
 
         # --- Lead braking behavior ---
         lead_behavior = LeadBrakeBehavior(
@@ -85,10 +89,10 @@ class LeadBrakeScenario(Scenario):
         # --- Level 3: Add Rear Vehicle (Follower)
         # =====================================================
         if level >= 3:
-            rear_gap = kwargs.get("rear_gap", np.random.randint(10, 20))
+            rear_gap_m = kwargs.get("rear_gap", np.random.uniform(3.0, 6.0))
             rear_rx = [x_center] * 6
-            rear_ry_start = ego_ry[0] + rear_gap
-            rear_ry = [rear_ry_start - i * 10 for i in range(6)]
+            rear_ry_start = ego_ry[0] + distance_meters_to_surface(rear_gap_m)
+            rear_ry = [rear_ry_start - i * rear_step for i in range(6)]
             rear_speed = kwargs.get(
                 "rear_speed", ego_speed - np.random.uniform(5.0, 10.0)
             )

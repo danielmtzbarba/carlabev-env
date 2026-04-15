@@ -3,6 +3,7 @@ import numpy as np
 from CarlaBEV.src.scenes.utils import *
 
 from CarlaBEV.envs.camera import Camera, Follow
+from CarlaBEV.envs.transforms import SurfaceFrame
 from CarlaBEV.src.managers.actor_manager import ActorManager
 from CarlaBEV.src.scenes.utils import set_targets
 
@@ -22,6 +23,7 @@ class Scene:
         self.action_space = action_space
         #        self._const = int(size / 4) + 1
         self._const = 35
+        self.surface_frame = SurfaceFrame()
 
         # --- Managers ---
         self.actor_manager = ActorManager(size, action_space=self.action_space)
@@ -73,9 +75,16 @@ class Scene:
             self.actor_manager.reset_all()
 
             # Camera
-            self.camera = Camera(self.hero, resolution=(self.size, self.size))
+            self.hero.sync_rect(self.surface_frame)
+            self.camera = Camera(
+                self.hero,
+                resolution=(self.size, self.size),
+                frame=self.surface_frame,
+                crop_resolution=getattr(self, "crop_resolution", (self.size, self.size)),
+            )
             follow = Follow(self.camera, self.hero)
             self.camera.setmethod(follow)
+            self.camera.scroll()
         return True
 
     def _scene_step(self, action):
@@ -83,7 +92,7 @@ class Scene:
         self.hero_step(action)
         self._scene.blit(self._map_img, (0, 0))
         self.actor_manager.step_all(self._t, self._dt)
-        self.actor_manager.draw_all(self.map_surface)
+        self.actor_manager.draw_all(self.map_surface, self.surface_frame)
 
         self._dist2goal_t_1 = self._dist2goal
         self._dist2goal = self.dist2goal()
@@ -91,6 +100,7 @@ class Scene:
     def hero_step(self, action):
         """Advance hero agent one step and update heading."""
         self.hero.step(action)
+        self.hero.sync_rect(self.surface_frame)
         self._theta = self.hero.yaw
         self.camera.scroll()
 
@@ -103,10 +113,13 @@ class Scene:
         coll_id = None
         actors_state = []
         info = self.scene_info
+        self.hero.sync_rect(self.surface_frame)
         for id_type, actor_list in self.actor_manager.actors.items():
             if id_type in ["agent", "traffic_light"]:
                 continue
             for actor in actor_list:
+                if hasattr(actor, "sync_rect"):
+                    actor.sync_rect(self.surface_frame)
                 actor_id, collision, distance = actor.isCollided(self.hero, self._const)
                 if id_type in ["vehicle", "pedestrian"]:
                     if abs(distance) < min_dist:
@@ -125,6 +138,36 @@ class Scene:
         info["collision"]["actors_state"] = actors_state
 
         return info
+
+    def spawn_validation_info(self):
+        if self.hero is None:
+            return {"valid": False, "reason": "missing_hero"}
+
+        self.hero.sync_rect(self.surface_frame)
+        hero_tile = self.agent_tile
+
+        if hasattr(self, "is_obstacle_tile") and self.is_obstacle_tile(hero_tile):
+            return {
+                "valid": False,
+                "reason": "hero_on_obstacle",
+                "tile": hero_tile.tolist(),
+            }
+
+        for id_type, actor_list in self.actor_manager.actors.items():
+            if id_type in ["agent", "traffic_light", "target"]:
+                continue
+            for actor in actor_list:
+                if hasattr(actor, "sync_rect"):
+                    actor.sync_rect(self.surface_frame)
+                if self.hero.rect.colliderect(actor.rect):
+                    return {
+                        "valid": False,
+                        "reason": "hero_overlaps_actor",
+                        "actor_type": id_type,
+                        "actor_id": getattr(actor, "id", None),
+                    }
+
+        return {"valid": True, "reason": "ok", "tile": hero_tile.tolist()}
 
     # =====================================================
     # --- Utilities

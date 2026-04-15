@@ -56,7 +56,7 @@ class GraphPlanner(MapGraph):
     def preproc_route(self, path_ids):
         rx, ry = [], []
         for nodeid in path_ids:
-            pos = self.get_node_pos(nodeid)
+            pos = self.get_node_pos_surface(nodeid)
             rx.append(pos[1])
             ry.append(pos[0])
         return (rx, ry)

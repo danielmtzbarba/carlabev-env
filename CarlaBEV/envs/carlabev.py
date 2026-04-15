@@ -74,12 +74,26 @@ class CarlaBEV(gym.Env):
         self.current_info = {}
         self._current_step = 0
         self.stats.reset()
-        # Load scene
-        actors, len_route = self.scene_generator.build_scene(options)
-        self.len_ego_route = len_route
-        self.num_vehicles = len(actors["vehicle"])
-        self.map.reset(actors)
-        
+        max_reset_attempts = options.get("max_reset_attempts", 10)
+        last_spawn_info = None
+
+        for _ in range(max_reset_attempts):
+            # Load scene
+            actors, len_route = self.scene_generator.build_scene(options)
+            self.len_ego_route = len_route
+            self.num_vehicles = len(actors["vehicle"])
+            self.map.reset(actors)
+            if actors and actors.get("agent") is not None:
+                last_spawn_info = self.map.spawn_validation_info()
+            else:
+                last_spawn_info = {"valid": True, "reason": "no_agent"}
+            if last_spawn_info["valid"]:
+                break
+        else:
+            raise RuntimeError(
+                f"Failed to reset into a valid initial state after {max_reset_attempts} attempts: {last_spawn_info}"
+            )
+
         if actors and actors.get("agent") is not None:
             rx, ry = self.map.route
             if self.cfg.reward_type == "carl":
@@ -92,7 +106,10 @@ class CarlaBEV(gym.Env):
             else:
                 self.reward_fn.reset()
 
-        return self._get_obs(), self._get_info()
+        info = self._get_info()
+        if last_spawn_info is not None:
+            info["spawn_validation"] = last_spawn_info
+        return self._get_obs(), info
 
     def _preprocess_action(self, action):
         if self.cfg.action_space == "discrete":
@@ -137,7 +154,7 @@ class CarlaBEV(gym.Env):
                 vector_data = np.concatenate([hero, set_point]).astype(np.float32)
                 self._observation = vector_data
             else:
-                self._observation = np.zeros(6, dtype=np.float32)
+                self._observation = np.zeros(7, dtype=np.float32)
 
         if self.render_mode == "human":
             self.renderer.render(self.map.canvas)

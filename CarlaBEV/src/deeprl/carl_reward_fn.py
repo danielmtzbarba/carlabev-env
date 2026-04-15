@@ -130,6 +130,19 @@ class CaRLRewardFn:
         self.prev_yaw_rate = None
         self.prev_dist2goal = None
         self._step_count = 0
+        self._s_prev = None
+
+    def _speed_to_mps(self, speed_value):
+        # Controller state integrates x += v * dt, so v behaves like px/s.
+        return float(speed_value) * meters_per_pixel
+
+    def _speed_limit_to_mps(self, speed_limit_value):
+        # Preserve compatibility with existing configs where the scene speed
+        # limit is commonly stored in km/h-like values such as 35.
+        speed_limit_value = float(speed_limit_value)
+        if speed_limit_value > 20.0:
+            return speed_limit_value / 3.6
+        return speed_limit_value
 
     # =========================================================
     def step(self, info):
@@ -172,6 +185,12 @@ class CaRLRewardFn:
             info["reward"]["reward"] = 1.0
             return 1.0, True, "success", info
 
+        # checkpoint / intermediate target
+        if collision == "target" and target_id is not None:
+            info["reward"]["cause"] = "ckpt"
+            info["reward"]["reward"] = 0.1
+            return 0.1, False, "ckpt", info
+
         # dynamic actor collision
         if collision is not None and collision in ["vehicle", "pedestrian"]:
             info["reward"]["cause"] = "collision"
@@ -188,6 +207,7 @@ class CaRLRewardFn:
         # 2. Route completion RC_t
         # -------------------------
         x, y, yaw, speed = info["hero"]["state"]
+        speed_mps = self._speed_to_mps(speed)
 
         # Compute arc-length progress along route (in pixels)
         s_t = compute_route_progress(x, y, self._route, self._route_lengths)
@@ -233,21 +253,15 @@ class CaRLRewardFn:
         p_factors["off_lane"] = 0.0 if off_lane else 1.0
 
         # 3.3 speeding
-        speed_limit = info["scene"]["speed_limit"]  # km/h
-        speed_kmh = speed  # km/h
-
-        # Convert both to m/s
-        speed_mps = speed_kmh * (3600.0 / 1000.0)
-        speed_limit_mps = speed_limit * (1000.0 / 3600.0)
+        speed_limit = info["scene"]["speed_limit"]
+        speed_limit_mps = self._speed_limit_to_mps(speed_limit)
         overspeed_mps = max(speed_mps - speed_limit_mps, 0.0)
 
-        # Convert overspeed back to km/h for penalty formula
-        overspeed_kmh = overspeed_mps * 3.6
-
-        if overspeed_kmh <= 0.0:
+        if overspeed_mps <= 0.0:
             p_speed = 1.0
         else:
-            p_speed = 1 - 0.5 * ((4.5 - 2) / 8)
+            # Monotone overspeed penalty with a floor to keep reward gradients alive.
+            p_speed = max(0.1, float(np.exp(-overspeed_mps / 6.0)))
 
         p_factors["speed"] = p_speed
 
@@ -297,8 +311,8 @@ class CaRLRewardFn:
         info["reward"]["debug"] = {
             "x": float(x),
             "y": float(y),
-            "speed": float(speed),
-            "speed_limit": float(speed_limit),
+            "speed": float(speed_mps),
+            "speed_limit": float(speed_limit_mps),
             "overspeed": float(overspeed_mps),
             "dist2route": float(dist2route),
             "lat_err_clipped": float(dist_m),
@@ -337,6 +351,7 @@ class CaRLRewardFn:
     # -----------------------------------------------------
     def _update_kinematics(self, info):
         x, y, yaw, speed = info["hero"]["state"]
+        speed_mps = self._speed_to_mps(speed)
         dt = self.dt
 
         # yaw rate
@@ -350,10 +365,10 @@ class CaRLRewardFn:
         if self.prev_speed is None:
             accel_long = 0.0
         else:
-            accel_long = (speed - self.prev_speed) / dt
+            accel_long = (speed_mps - self.prev_speed) / dt
 
         # lateral accel
-        accel_lat = speed * yaw_rate
+        accel_lat = speed_mps * yaw_rate
 
         # jerks
         if self.prev_accel_long is None:
@@ -382,7 +397,7 @@ class CaRLRewardFn:
         info["hero"]["yaw_acc"] = yaw_acc_deg
 
         # update prev
-        self.prev_speed = speed
+        self.prev_speed = speed_mps
         self.prev_yaw = yaw
         self.prev_accel_long = accel_long
         self.prev_accel_lat = accel_lat

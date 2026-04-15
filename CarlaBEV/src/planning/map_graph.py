@@ -4,6 +4,8 @@ import pickle
 
 from random import choice
 
+from CarlaBEV.envs.geometry import raw_to_meters, raw_to_surface
+
 
 class MapGraph(object):
     def __init__(self, graph):
@@ -47,6 +49,12 @@ class MapGraph(object):
 
     def get_node_pos(self, node_id):
         return np.array(self._G.nodes[node_id]["pos"], dtype=np.int32)
+
+    def get_node_pos_surface(self, node_id):
+        return raw_to_surface(self.get_node_pos(node_id))
+
+    def get_node_pos_meters(self, node_id):
+        return raw_to_meters(self.get_node_pos(node_id))
 
     def get_closest_node(self, position, lane_type=None):
         """

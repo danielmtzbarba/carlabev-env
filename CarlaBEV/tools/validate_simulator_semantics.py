@@ -12,11 +12,16 @@ from CarlaBEV.envs.geometry import (
     meters_to_surface,
     raw_to_meters,
     raw_to_surface,
+    speed_mps_to_surface,
     surface_to_meters,
     surface_to_raw,
 )
 from CarlaBEV.envs.spaces import get_obs_space
+from CarlaBEV.src.actors.pedestrian import Pedestrian
+from CarlaBEV.src.actors.vehicle import Vehicle
+from CarlaBEV.src.actors.behavior.jaywalk import StopReturnBehavior
 from CarlaBEV.src.actors.hero import ContinuousAgent
+from CarlaBEV.src.managers.actor_manager import ActorManager
 from CarlaBEV.src.control.stanley_controller import Controller
 from CarlaBEV.src.deeprl.carl_reward_fn import CaRLRewardFn
 from CarlaBEV.tools.debug.cfg import EnvConfig
@@ -178,6 +183,71 @@ def check_reward_speed_penalty_monotonicity() -> CheckResult:
     )
 
 
+def check_speed_parameter_contract() -> CheckResult:
+    requested_vehicle_speed = 12.5
+    requested_ped_speed = 1.7
+    route = ([0.0, 10.0, 20.0], [0.0, 0.0, 0.0])
+
+    vehicle = Vehicle(map_size=128, routeX=route[0], routeY=route[1], target_speed=requested_vehicle_speed)
+    pedestrian = Pedestrian(map_size=128, routeX=route[0], routeY=route[1], target_speed=requested_ped_speed)
+    manager = ActorManager(size=128, action_space="continuous")
+    hero = manager.spawn_hero(route=route, initial_speed_mps=3.0, target_speed_mps=9.0)
+
+    checks = [
+        math.isclose(vehicle.target_speed_mps, requested_vehicle_speed, rel_tol=1e-6, abs_tol=1e-6),
+        math.isclose(vehicle.target_speed, speed_mps_to_surface(requested_vehicle_speed), rel_tol=1e-6, abs_tol=1e-6),
+        math.isclose(pedestrian.target_speed_mps, requested_ped_speed, rel_tol=1e-6, abs_tol=1e-6),
+        math.isclose(pedestrian.target_speed, speed_mps_to_surface(requested_ped_speed), rel_tol=1e-6, abs_tol=1e-6),
+        math.isclose(hero.v, speed_mps_to_surface(3.0), rel_tol=1e-6, abs_tol=1e-6),
+        math.isclose(hero._target_speed, speed_mps_to_surface(9.0), rel_tol=1e-6, abs_tol=1e-6),
+    ]
+
+    if all(checks):
+        return pass_result(
+            "speed_parameter_contract",
+            "Hero, vehicles, and pedestrians preserve requested speeds through the runtime conversion layer.",
+        )
+
+    return fail_result(
+        "speed_parameter_contract",
+        (
+            "Scenario speed parameters are not propagating faithfully into runtime state. "
+            f"vehicle_mps={vehicle.target_speed_mps:.3f}, pedestrian_mps={pedestrian.target_speed_mps:.3f}, "
+            f"hero_v={hero.v:.3f}, hero_target={hero._target_speed:.3f}"
+        ),
+    )
+
+
+def check_jaywalk_behavior_fsm() -> CheckResult:
+    ped = Pedestrian(
+        map_size=128,
+        routeX=[10.0, 12.0, 14.0, 16.0, 18.0, 20.0],
+        routeY=[10.0, 10.0, 10.0, 10.0, 10.0, 10.0],
+        target_speed=1.5,
+        behavior=StopReturnBehavior(start_delay=0.2, yield_duration=0.2),
+    )
+    ped.reset()
+
+    visited = []
+    for k in range(200):
+        ped.step(t=k * 0.1, dt=0.1)
+        visited.append(ped.behavior_state)
+        if ped.behavior_state == "retreated":
+            break
+
+    required = {"waiting", "entering", "yielding", "retreating"}
+    if required.issubset(set(visited)):
+        return pass_result(
+            "jaywalk_behavior_fsm",
+            f"Jaywalk behavior visits explicit semantic states: {visited[:12]}...",
+        )
+
+    return fail_result(
+        "jaywalk_behavior_fsm",
+        f"Jaywalk FSM did not reach the expected states. visited={visited}",
+    )
+
+
 def check_vector_observation_contract() -> CheckResult:
     cfg = EnvConfig(obs_space="vector", render_mode="rgb_array")
     declared = get_obs_space(cfg).shape
@@ -282,6 +352,8 @@ def main() -> int:
     checks = [
         run_check("bicycle_yaw_update", check_bicycle_yaw_update),
         run_check("straight_route_motion", check_straight_route_motion),
+        run_check("speed_parameter_contract", check_speed_parameter_contract),
+        run_check("jaywalk_behavior_fsm", check_jaywalk_behavior_fsm),
         run_check(
             "reward_speed_penalty_monotonicity",
             check_reward_speed_penalty_monotonicity,

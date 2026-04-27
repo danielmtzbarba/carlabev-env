@@ -32,11 +32,14 @@ class Controller(State):
     def set_target_speed(self, target_speed):
         self._target_speed = target_speed
 
-    def set_route(self, ax, ay, v0=0.0):
+    def set_route(self, ax, ay, v0=0.0, jitter_start=True):
         """Stanley steering control on a cubic spline."""
         cx, cy, cyaw, ck, s = smooth_and_compute(ax, ay, window=11, poly=3)
 
-        self.x, self.y = cx[0] + randint(-1, 1), cy[0] + randint(-1, 1)
+        if jitter_start:
+            self.x, self.y = cx[0] + randint(-1, 1), cy[0] + randint(-1, 1)
+        else:
+            self.x, self.y = cx[0], cy[0]
         self.cx, self.cy = cx, cy
         self.v = v0
         self.cyaw = cyaw

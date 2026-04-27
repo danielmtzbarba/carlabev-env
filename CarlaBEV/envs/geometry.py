@@ -50,6 +50,14 @@ def distance_meters_to_surface(distance: float) -> float:
     return float(distance) / SURFACE_METERS_PER_PIXEL
 
 
+def speed_mps_to_surface(speed_mps: float) -> float:
+    return distance_meters_to_surface(speed_mps)
+
+
+def speed_surface_to_mps(speed_surface: float) -> float:
+    return distance_surface_to_meters(speed_surface)
+
+
 def route_length_meters(rx, ry) -> float:
     if len(rx) != len(ry):
         raise ValueError("Route coordinates mismatch.")

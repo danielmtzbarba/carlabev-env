@@ -10,12 +10,11 @@ class Pedestrian(Actor):
         routeX=None,
         routeY=None,
         behavior=None,
-        target_speed=2,
+        target_speed=1.5,
     ):
         self._color = (255, 0, 0)
         self._map_size = map_size
         self._scale = int(1024 / self._map_size)
-        self.target_speed = 5 / self._scale
         super().__init__(
             start_node,
             end_node,
@@ -25,3 +24,4 @@ class Pedestrian(Actor):
             routeY=routeY,
             behavior=behavior
         )
+        self.set_cruise_speed_mps(target_speed)

@@ -10,7 +10,7 @@ class LoggerConfig:
 @dataclass
 class EnvConfig:
     seed: int = 0
-    fps: int = 60
+    fps: int = 15
     size: int = 128
     env_id: str = "CarlaBEV-v0"
     map_name: str = "Town01"

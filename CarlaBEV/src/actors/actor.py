@@ -5,6 +5,7 @@ import numpy as np
 from CarlaBEV.src.gui.settings import Settings as cfg
 from CarlaBEV.src.planning.planner import Planner, scale_route
 from CarlaBEV.src.control.stanley_controller import Controller
+from CarlaBEV.envs.geometry import speed_mps_to_surface, speed_surface_to_mps
 
 
 class Node(object):
@@ -60,13 +61,20 @@ class Actor(pygame.sprite.Sprite):
         self.end_node = end_node
         #
         if routeX is not None and routeY is not None:
-            self.rx = routeX
-            self.ry = routeY
+            self.rx = list(routeX)
+            self.ry = list(routeY)
         else:
             self.rx, self.ry = [], []
+        self._initial_rx = list(self.rx)
+        self._initial_ry = list(self.ry)
         #
         self.path = []
         self.selected = False
+        self.behavior_state = "idle"
+        self.target_speed = 0.0
+        self.target_speed_mps = 0.0
+        self.cruise_speed = 0.0
+        self.cruise_speed_mps = 0.0
 
     def set_route_wp(self, node_id, x, y):
         self.rx.append(x)
@@ -75,9 +83,17 @@ class Actor(pygame.sprite.Sprite):
         self.path.append(Node(node_id, pos))
 
     def reset(self):
+        if not self._initial_rx or not self._initial_ry:
+            self._initial_rx = list(self.rx)
+            self._initial_ry = list(self.ry)
+        self.rx = list(self._initial_rx)
+        self.ry = list(self._initial_ry)
         # initialize controller at target speed
         self._controller = Controller(self.target_speed)
         self._controller.set_route(self.rx, self.ry)
+        self.target_speed = self.cruise_speed
+        self.target_speed_mps = self.cruise_speed_mps
+        self.behavior_state = "idle"
 
         if self.behavior:
             self.behavior.reset(self)
@@ -94,6 +110,36 @@ class Actor(pygame.sprite.Sprite):
 
         finished = self._controller.control_step()
         return finished
+
+    def set_target_speed_mps(self, speed_mps):
+        speed_mps = max(0.0, float(speed_mps))
+        self.target_speed_mps = speed_mps
+        self.target_speed = speed_mps_to_surface(speed_mps)
+
+    def set_target_speed_surface(self, speed_surface):
+        speed_surface = max(0.0, float(speed_surface))
+        self.target_speed = speed_surface
+        self.target_speed_mps = speed_surface_to_mps(speed_surface)
+
+    def set_cruise_speed_mps(self, speed_mps):
+        self.cruise_speed_mps = max(0.0, float(speed_mps))
+        self.cruise_speed = speed_mps_to_surface(self.cruise_speed_mps)
+        self.set_target_speed_mps(self.cruise_speed_mps)
+
+    def set_behavior_state(self, state_name):
+        self.behavior_state = str(state_name)
+
+    def set_route_surface(self, route_x, route_y, initial_speed_surface=None, jitter_start=False):
+        self.rx = list(route_x)
+        self.ry = list(route_y)
+        if initial_speed_surface is None:
+            initial_speed_surface = self.state[3] if hasattr(self, "_controller") else self.target_speed
+        self._controller.set_route(
+            self.rx,
+            self.ry,
+            v0=float(initial_speed_surface),
+            jitter_start=jitter_start,
+        )
 
     def sync_rect(self, frame):
         self.rect = frame.rect_from_world_center(

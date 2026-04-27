@@ -35,14 +35,15 @@ class JaywalkScenario(Scenario):
             return super().sample(level=level, **kwargs)
         # --- Customization Parameters (Fallback to Random) ---
         ego_start_y = kwargs.get("anchor_y", np.random.randint(900, 1000))
-        ego_speed = kwargs.get("ego_speed", np.random.uniform(40.0, 70.0))
+        ego_speed = kwargs.get("ego_speed", np.random.uniform(8.0, 14.0))
         ped_x_base = kwargs.get("anchor_x", 850)  # center lane crossing
         lane_width = distance_meters_to_surface(1.6)
         cross_offset_m = kwargs.get("cross_offset", np.random.uniform(-3.0, 3.0))
-        cross_delay = kwargs.get("cross_delay", np.random.uniform(2.0, 4.0))
-        pedestrian_speed = kwargs.get("pedestrian_speed", np.random.uniform(1.8, 3.6))
+        cross_delay = kwargs.get("cross_delay", np.random.uniform(1.0, 2.5))
+        pedestrian_speed = kwargs.get("pedestrian_speed", np.random.uniform(1.2, 2.2))
         ego_step = distance_meters_to_surface(6.25)
         rear_step = distance_meters_to_surface(3.12)
+        yield_duration = kwargs.get("yield_duration", np.random.uniform(0.8, 1.6))
 
         # === Ego vehicle path ===
         ego_rx = [ped_x_base] * 6
@@ -64,9 +65,9 @@ class JaywalkScenario(Scenario):
         elif level == 2:
             behavior = StopMidBehavior(start_delay=cross_delay)
         elif level == 3:
-            behavior = StopReturnBehavior(start_delay=cross_delay)
+            behavior = StopReturnBehavior(start_delay=cross_delay, yield_duration=yield_duration)
         else:
-            behavior = StopReturnBehavior(start_delay=cross_delay)
+            behavior = StopReturnBehavior(start_delay=cross_delay, yield_duration=yield_duration)
 
         # --- Build pedestrian actor ---
         pedestrian = Pedestrian(
@@ -90,7 +91,7 @@ class JaywalkScenario(Scenario):
             rear_ry_start = ego_ry[0] + distance_meters_to_surface(rear_gap_m)
             rear_ry = [rear_ry_start - i * rear_step for i in range(6)]
             rear_speed = kwargs.get(
-                "rear_speed", ego_speed - np.random.uniform(5.0, 10.0)
+                "rear_speed", max(ego_speed - np.random.uniform(1.0, 3.0), 4.0)
             )
 
             rear_vehicle = Vehicle(
@@ -103,7 +104,7 @@ class JaywalkScenario(Scenario):
             vehicles.append(rear_vehicle)
 
         return {
-            "agent": (ego_rx, ego_ry, ego_speed),
+            "agent": (ego_rx, ego_ry, ego_speed, ego_speed),
             "vehicle": vehicles,
             "pedestrian": pedestrians,
             "target": [],

@@ -12,4 +12,4 @@ class LeadBrakeBehavior:
             self.braking = True
 
         if self.braking:
-            actor.target_speed = max(0.0, actor.target_speed - self.dec_rate * dt)
+            actor.set_target_speed_mps(actor.target_speed_mps - self.dec_rate * dt)

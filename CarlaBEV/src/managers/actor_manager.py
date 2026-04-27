@@ -1,5 +1,6 @@
 import copy
 from CarlaBEV.envs.geometry import route_length_meters
+from CarlaBEV.envs.geometry import speed_mps_to_surface
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.actors.pedestrian import Pedestrian
 from CarlaBEV.src.actors.hero import DiscreteAgent, ContinuousAgent
@@ -32,15 +33,17 @@ class ActorManager:
     # ======================================================
     # --- Creation ---
     # ======================================================
-    def spawn_hero(self, route, initial_speed, scale):
+    def spawn_hero(self, route, initial_speed_mps, target_speed_mps):
         """Spawn the main agent (hero vehicle)."""
+        initial_speed = speed_mps_to_surface(initial_speed_mps)
+        target_speed = speed_mps_to_surface(target_speed_mps)
         if self.action_space == "continuous":
              hero = ContinuousAgent(
                 window_size=self.size,
                 route=route,
                 initial_speed=initial_speed,
                 color=(0, 0, 0),
-                target_speed=int(50 / scale),
+                target_speed=target_speed,
                 car_size=32,
             )
         else:
@@ -49,9 +52,11 @@ class ActorManager:
                 route=route,
                 initial_speed=initial_speed,
                 color=(0, 0, 0),
-                target_speed=int(50 / scale),
+                target_speed=target_speed,
                 car_size=32,
             )
+        hero.initial_speed_mps = float(initial_speed_mps)
+        hero.target_speed_mps = float(target_speed_mps)
         self.route_length = compute_route_length(route)
         self.actors["agent"] = hero
         return hero
@@ -82,7 +87,10 @@ class ActorManager:
         """Load actors from a prebuilt dictionary (used when loading from CSV)."""
         self.clear()
         for key, value in copy.deepcopy(actors_dict).items():
-            self.actors[key] = value
+            if key in {"vehicle", "pedestrian"}:
+                self.actors[key] = [actor for actor in value if self._has_valid_route(actor)]
+            else:
+                self.actors[key] = value
 
     # ======================================================
     # --- Simulation ---
@@ -93,6 +101,8 @@ class ActorManager:
             if k == "agent" or not v:
                 continue
             for actor in v:
+                if k in {"vehicle", "pedestrian"} and not self._has_valid_route(actor):
+                    continue
                 if hasattr(actor, "reset"):
                     actor.reset()
 
@@ -102,6 +112,8 @@ class ActorManager:
             if k == "agent":
                 continue
             for actor in v:
+                if k in {"vehicle", "pedestrian"} and not self._has_valid_route(actor):
+                    continue
                 actor.step(t, dt)
 
     def draw_all(self, surface, frame):
@@ -113,8 +125,16 @@ class ActorManager:
                 continue
             else:
                 for actor in v:
+                    if k in {"vehicle", "pedestrian"} and not self._has_valid_route(actor):
+                        continue
                     actor.draw(surface, frame)
 
     @property
     def num_vehicles(self):
         return len(self.actors["vehicle"])
+
+    @staticmethod
+    def _has_valid_route(actor):
+        rx = getattr(actor, "rx", None)
+        ry = getattr(actor, "ry", None)
+        return rx is not None and ry is not None and len(rx) >= 2 and len(ry) >= 2

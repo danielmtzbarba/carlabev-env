@@ -2,8 +2,6 @@ import pygame
 import numpy as np
 import tyro
 
-from random import choice
-
 from CarlaBEV.envs import make_env
 from CarlaBEV.tools.debug.controls import (
     init_key_tracking,
@@ -12,10 +10,12 @@ from CarlaBEV.tools.debug.controls import (
 )
 
 from CarlaBEV.src.deeprl.logger import create_loggers
+from CarlaBEV.src.scenes.scenarios.specs import build_runtime_scenario_options
 from CarlaBEV.tools.debug.cfg import ArgsCarlaBEV
 
 
 cfg = tyro.cli(ArgsCarlaBEV)
+DEBUG_PRESET_ID = "jaywalk_debug"
 
 
 # Assuming cfg.exp_name and cfg.logging.enabled are defined
@@ -28,17 +28,20 @@ def get_base_env(env):
     return env
 
 
+def build_debug_reset_options(reset_mask, overrides=None):
+    return build_runtime_scenario_options(
+        DEBUG_PRESET_ID,
+        reset_mask=reset_mask,
+        overrides=overrides,
+    )
+
+
 def main(size: int = 128):
     pygame.init()
     keys_held = init_key_tracking()
     envs = make_env(cfg)
     print("Observation space:", envs.observation_space)
-    options = {
-        "scene": choice(["red_light_runner"]),
-        "num_vehicles": 25,
-        "route_dist_range": [30, 100],
-        "reset_mask": np.array([True], dtype=bool),
-    }
+    options = build_debug_reset_options(np.array([True], dtype=bool))
     observation, info = envs.reset(options=options)
     spawn_info = info.get("spawn_validation", {})
     if spawn_info and not spawn_info.get("valid", False):
@@ -97,14 +100,9 @@ def main(size: int = 128):
         for i, ended in enumerate(terminated):
             if ended:
                 sim_logger.log_episode(info["episode_info"], i)
-                # === Reset the finished env ===
-                #
-                options = {
-        "scene": choice(["red_light_runner"]),
-        "num_vehicles": 25,
-                    "route_dist_range": [30, 130],
-                    "reset_mask": np.logical_or(terminated, trunks),
-                }
+                options = build_debug_reset_options(
+                    np.logical_or(terminated, trunks)
+                )
                 observation, info = envs.reset(options=options)
                 spawn_info = info.get("spawn_validation", {})
                 if spawn_info and not spawn_info.get("valid", False):

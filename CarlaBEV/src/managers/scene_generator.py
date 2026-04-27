@@ -89,8 +89,9 @@ class SceneGenerator:
 
         # --- Case 2: Predefined scenario ---
         elif isinstance(scene, str) and scene in self.scenarios:
-            level = options.get("level", choice([1, 2, 3, 4]))
-            return self.scenarios[scene].sample(level=level, **options)
+            scenario_options = dict(options)
+            scenario_options.setdefault("level", choice([1, 2, 3, 4]))
+            return self.scenarios[scene].sample(**scenario_options)
             
         # --- Default Fallback: Empty Scene ---
         return {
@@ -110,6 +111,7 @@ class SceneGenerator:
         Returns actor dictionary compatible with Scene.reset().
         """
         num_cars = num_cars if self.traffic_enabled else 0
+        ego_target_speed = float(self.cfg.get("ego_target_speed", 12.0))
 
         actors = {
             "agent": None,
@@ -121,12 +123,15 @@ class SceneGenerator:
 
         # 1️⃣ Agent route
         for attempt in range(max_retries):
-            
             _, path, len_route = find_route_in_range(self.planners.all, "agent", 'R',
                                           dist_range[0], dist_range[1])
-            if path is not None:
-                actors["agent"] = (path[0], path[1], 0.0)
+            if path is not None and len(path[0]) > 1:
+                actors["agent"] = (path[0], path[1], 0.0, ego_target_speed)
                 break
+        if actors["agent"] is None:
+            raise RuntimeError(
+                f"Failed to generate a valid ego route in range {dist_range} after {max_retries} attempts."
+            )
 
         # 2️⃣ Background vehicles
         for _ in range(num_cars):

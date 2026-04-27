@@ -62,12 +62,12 @@ class Scene:
     def load_scene(self, actors):
         self.actor_manager.load(actors)
         if self.actor_manager.actors.get("agent"):
-            cx, cy, v = self.agent_route
+            cx, cy, initial_speed_mps, target_speed_mps = self.agent_route
             self.route = (cx, cy)
             self.hero = self.actor_manager.spawn_hero(
                 route=(cx, cy),
-                initial_speed=v,
-                scale=self._scale,
+                initial_speed_mps=initial_speed_mps,
+                target_speed_mps=target_speed_mps,
             )
             self._actors = set_targets(
                 self.actor_manager.actors, self.hero.cx, self.hero.cy
@@ -179,8 +179,21 @@ class Scene:
     @property
     def agent_route(self):
         """Return hero route as (cx, cy)."""
-        cx, cy, v = self.actor_manager.actors["agent"]
-        return np.array(cx, dtype=np.int32), np.array(cy, dtype=np.int32), v
+        agent = self.actor_manager.actors["agent"]
+        if len(agent) == 3:
+            cx, cy, speed = agent
+            initial_speed = speed
+            target_speed = speed
+        elif len(agent) == 4:
+            cx, cy, initial_speed, target_speed = agent
+        else:
+            raise ValueError(f"Unsupported agent route format: {agent}")
+        return (
+            np.array(cx, dtype=np.int32),
+            np.array(cy, dtype=np.int32),
+            float(initial_speed),
+            float(target_speed),
+        )
 
     @property
     def curr_actors(self):

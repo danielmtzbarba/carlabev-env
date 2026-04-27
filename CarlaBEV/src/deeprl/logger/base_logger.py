@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import json
 
 from datetime import datetime
 from rich.console import Console
@@ -34,6 +35,32 @@ class BaseLogger:
         if self.enabled:
             self.logger.info(text)
 
+    def _to_serializable(self, value):
+        if hasattr(value, "item"):
+            try:
+                return value.item()
+            except Exception:
+                pass
+        if isinstance(value, dict):
+            return {str(k): self._to_serializable(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [self._to_serializable(v) for v in value]
+        return value
+
+    def _extract_indexed_record(self, info, idx):
+        record = {}
+        for key, value in info.items():
+            if isinstance(value, (list, tuple)):
+                record[key] = self._to_serializable(value[idx])
+            elif hasattr(value, "__getitem__") and not isinstance(value, (str, bytes, dict)):
+                try:
+                    record[key] = self._to_serializable(value[idx])
+                except Exception:
+                    record[key] = self._to_serializable(value)
+            else:
+                record[key] = self._to_serializable(value)
+        return record
+
     def close(self):
         if self.writer:
             self.writer.close()
@@ -49,19 +76,32 @@ class BaseLogger:
         if not self.enabled:
             return
 
-        data = info
+        data = self._extract_indexed_record(info, idx)
         # Console output
-        #
+        scenario_bits = []
+        if data.get("scenario_preset_id"):
+            scenario_bits.append(f"preset: {data['scenario_preset_id']}")
+        elif data.get("scene"):
+            scenario_bits.append(f"scene: {data['scene']}")
+        if data.get("level") is not None:
+            scenario_bits.append(f"level: {data['level']}")
+
         self.console.print(
-            f"Ep {data["episode"][idx]} | Return: [green]{data["return"][idx]:.2f}[/green] | "
-            f"len_route: {int(data["len_ego_route"][idx])} | num_veh: {data["num_vehicles"][idx]} | "
-            f"len_steps: {data["length"][idx]} | cause: {data["termination"][idx]} | "
+            f"Ep {data['episode']} | Return: [green]{data['return']:.2f}[/green] | "
+            f"len_route: {int(data['len_ego_route'])} | num_veh: {data['num_vehicles']} | "
+            f"len_steps: {data['length']} | cause: {data['termination']} | "
+            + (" | ".join(scenario_bits) if scenario_bits else "")
         )
 
+        json_path = os.path.join(self.log_dir, "episodes.jsonl")
+        with open(json_path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(data) + "\n")
+
         # Write to TensorBoard
-        for k, v in info.items():
+        for k, v in data.items():
             if isinstance(v, (int, float)):
-                self.log_scalar(f"sim/{k}", v, info["episode"])
+                if hasattr(self, "log_scalar"):
+                    self.log_scalar(f"sim/{k}", v, data["episode"])
 
     def log_learning(self, step, **kwargs):
         for k, v in kwargs.items():

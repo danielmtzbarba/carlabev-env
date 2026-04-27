@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from copy import deepcopy
+
+import numpy as np
 
 
 @dataclass(frozen=True)
@@ -33,6 +36,14 @@ class ScenarioSpec:
         return [f"Level {level}" for level in self.levels]
 
 
+@dataclass(frozen=True)
+class ScenarioPreset:
+    preset_id: str
+    scene: str
+    description: str
+    options: dict
+
+
 SCENARIO_SPECS = {
     "jaywalk": ScenarioSpec(
         scenario_id="jaywalk",
@@ -40,12 +51,13 @@ SCENARIO_SPECS = {
         description="Pedestrian crosses ahead of the ego vehicle.",
         levels=(1, 2, 3, 4),
         fields=(
-            ScenarioField("ego_speed", "Ego Speed (m/s)", 45.0),
-            ScenarioField("cross_delay", "Cross Delay (s)", 3.0),
-            ScenarioField("pedestrian_speed", "Ped Speed (m/s)", 2.5),
+            ScenarioField("ego_speed", "Ego Speed (m/s)", 12.0),
+            ScenarioField("cross_delay", "Cross Delay (s)", 1.5),
+            ScenarioField("pedestrian_speed", "Ped Speed (m/s)", 1.6),
             ScenarioField("cross_offset", "Cross Offset (m)", 0.0),
+            ScenarioField("yield_duration", "Yield Duration (s)", 1.2),
             ScenarioField("rear_gap", "Rear Gap (m)", 5.0),
-            ScenarioField("rear_speed", "Rear Speed (m/s)", 38.0),
+            ScenarioField("rear_speed", "Rear Speed (m/s)", 10.0),
         ),
     ),
     "lead_brake": ScenarioSpec(
@@ -54,15 +66,15 @@ SCENARIO_SPECS = {
         description="Lead vehicle brakes hard in front of ego.",
         levels=(1, 2, 3),
         fields=(
-            ScenarioField("ego_speed", "Ego Speed (m/s)", 45.0),
+            ScenarioField("ego_speed", "Ego Speed (m/s)", 12.0),
             ScenarioField("lead_gap", "Lead Gap (m)", 7.5),
-            ScenarioField("lead_speed", "Lead Speed (m/s)", 45.0),
-            ScenarioField("brake_delay", "Brake Delay (s)", 4.0),
-            ScenarioField("brake_strength", "Brake Strength", 3.5),
-            ScenarioField("left_speed", "Left Lane Speed (m/s)", 52.0),
+            ScenarioField("lead_speed", "Lead Speed (m/s)", 12.0),
+            ScenarioField("brake_delay", "Brake Delay (s)", 2.5),
+            ScenarioField("brake_strength", "Brake Strength (m/s^2)", 4.0),
+            ScenarioField("left_speed", "Left Lane Speed (m/s)", 14.0),
             ScenarioField("rear_gap", "Rear Gap (m)", 5.0),
-            ScenarioField("rear_speed", "Rear Speed (m/s)", 38.0),
-            ScenarioField("rear_brake_delay", "Rear Brake Delay (s)", 6.0),
+            ScenarioField("rear_speed", "Rear Speed (m/s)", 10.0),
+            ScenarioField("rear_brake_delay", "Rear Brake Delay (s)", 3.0),
         ),
     ),
     "red_light_runner": ScenarioSpec(
@@ -71,10 +83,62 @@ SCENARIO_SPECS = {
         description="Perpendicular adversary runs a red light.",
         levels=(1,),
         fields=(
-            ScenarioField("ego_speed", "Ego Speed (m/s)", 50.0),
-            ScenarioField("adv_speed", "Adversary Speed (m/s)", 60.0),
-            ScenarioField("intersection_index", "Intersection Index", 2, int),
+            ScenarioField("ego_speed", "Ego Speed (m/s)", 10.0),
+            ScenarioField("adv_speed", "Adversary Speed (m/s)", 16.0),
+            ScenarioField("intersection_index", "Intersection Index", 11, int),
         ),
+    ),
+}
+
+
+SCENARIO_PRESETS = {
+    "jaywalk_debug": ScenarioPreset(
+        preset_id="jaywalk_debug",
+        scene="jaywalk",
+        description="Debug-friendly jaywalk preset with explicit semantic parameters.",
+        options={
+            "scene": "jaywalk",
+            "level": 3,
+            "ego_speed": 10.0,
+            "cross_delay": 1.2,
+            "pedestrian_speed": 1.6,
+            "yield_duration": 1.2,
+        },
+    ),
+    "lead_brake_debug": ScenarioPreset(
+        preset_id="lead_brake_debug",
+        scene="lead_brake",
+        description="Lead-brake preset for interactive debugging.",
+        options={
+            "scene": "lead_brake",
+            "level": 2,
+            "ego_speed": 12.0,
+            "lead_gap": 8.0,
+            "lead_speed": 11.0,
+            "brake_delay": 2.0,
+            "brake_strength": 4.0,
+        },
+    ),
+    "red_light_debug": ScenarioPreset(
+        preset_id="red_light_debug",
+        scene="red_light_runner",
+        description="Graph-backed signalized intersection conflict preset.",
+        options={
+            "scene": "red_light_runner",
+            "intersection_index": 11,
+            "ego_speed": 10.0,
+            "adv_speed": 16.0,
+        },
+    ),
+    "rdm_navigation": ScenarioPreset(
+        preset_id="rdm_navigation",
+        scene="rdm",
+        description="Random background-traffic navigation preset.",
+        options={
+            "scene": "rdm",
+            "num_vehicles": 25,
+            "route_dist_range": [30, 130],
+        },
     ),
 }
 
@@ -83,10 +147,39 @@ def list_scenario_ids() -> list[str]:
     return list(SCENARIO_SPECS.keys())
 
 
+def list_scenario_preset_ids() -> list[str]:
+    return list(SCENARIO_PRESETS.keys())
+
+
 def get_scenario_spec(scenario_id: str) -> ScenarioSpec:
     if scenario_id not in SCENARIO_SPECS:
         raise KeyError(f"Unknown scenario '{scenario_id}'")
     return SCENARIO_SPECS[scenario_id]
+
+
+def get_scenario_preset(preset_id: str) -> ScenarioPreset:
+    if preset_id not in SCENARIO_PRESETS:
+        raise KeyError(f"Unknown scenario preset '{preset_id}'")
+    return SCENARIO_PRESETS[preset_id]
+
+
+def build_runtime_scenario_options(
+    preset_id: str,
+    *,
+    reset_mask=None,
+    overrides: dict | None = None,
+) -> dict:
+    preset = get_scenario_preset(preset_id)
+    options = deepcopy(preset.options)
+    options["scenario_preset_id"] = preset.preset_id
+    options["scenario_preset_scene"] = preset.scene
+    options["scenario_preset_description"] = preset.description
+    for key, value in (overrides or {}).items():
+        if value is not None:
+            options[key] = value
+    if reset_mask is not None:
+        options["reset_mask"] = np.asarray(reset_mask, dtype=bool)
+    return options
 
 
 def coerce_parameters(scenario_id: str, raw_values: dict | None) -> dict:

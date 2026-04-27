@@ -67,13 +67,18 @@ class CarlaBEV(gym.Env):
         return self.render()
 
     def _get_info(self):
-        return {}
+        info = {}
+        if hasattr(self, "_scenario_context") and self._scenario_context:
+            info["scenario"] = dict(self._scenario_context)
+        return info
 
-    def reset(self, seed=0, options={}):
+    def reset(self, seed=0, options=None):
+        options = {} if options is None else dict(options)
         super().reset(seed=seed)
         self.current_info = {}
         self._current_step = 0
         self.stats.reset()
+        self._scenario_context = self._extract_scenario_context(options)
         max_reset_attempts = options.get("max_reset_attempts", 10)
         last_spawn_info = None
 
@@ -130,8 +135,45 @@ class CarlaBEV(gym.Env):
             episode_summary = self.stats.terminated()
             episode_summary["num_vehicles"] = self.num_vehicles
             episode_summary["len_ego_route"] = self.len_ego_route
+            if getattr(self, "_scenario_context", None):
+                episode_summary.update(self._scenario_context)
             return True, (cause == "max_actions"), {"episode_info": episode_summary}
         return False, False, {}
+
+    def _extract_scenario_context(self, options):
+        context = {}
+        keys = (
+            "scene",
+            "level",
+            "scenario_preset_id",
+            "scenario_preset_scene",
+            "scenario_preset_description",
+            "config_file",
+        )
+        for key in keys:
+            if key in options and options[key] is not None:
+                context[key] = options[key]
+
+        parameter_keys = sorted(
+            key
+            for key in options.keys()
+            if key
+            not in {
+                "reset_mask",
+                "max_reset_attempts",
+                "scene",
+                "config_file",
+                "scenario_preset_id",
+                "scenario_preset_scene",
+                "scenario_preset_description",
+            }
+        )
+        for key in parameter_keys:
+            value = options[key]
+            if isinstance(value, np.ndarray):
+                continue
+            context[f"scenario_param_{key}"] = value
+        return context
 
     def step(self, action):
         self._simulate(action)

@@ -262,6 +262,9 @@ def find_route_in_range(
     planner_id = "pedestrian" if actor_type == "pedestrian" else f"vehicle-{lane}"
     lane_planner = planner[planner_id]
 
+    start_node = None
+    end_node = None
+
     for attempt in range(max_attempts):
         # Sample random nodes as start/end of route
         start_node = get_random_node(planner, actor_type, lane)
@@ -297,8 +300,7 @@ def find_route_in_range(
 
     # Fallback: no route within range
     #    print(f"[WARN] No valid route found within {min_dist_meters}-{max_dist_meters}m after {max_attempts} attempts.")
-    actor = Vehicle(start_node=start_node, end_node=end_node, map_size=128)
-    return actor, (rx, ry), total_dist_meters
+    return None, None, None
 
 
 def compute_total_dist_px(path, scale=1):

@@ -1,5 +1,6 @@
 import pygame
 from CarlaBEV.src.actors.actor import Actor
+from CarlaBEV.envs.geometry import distance_meters_to_surface
 
 class TrafficLightState:
     RED = 0
@@ -15,21 +16,28 @@ class TrafficLight(Actor):
         orientation='horizontal', # 'horizontal' or 'vertical' strip
         signal_state=TrafficLightState.RED,
         width=None,
-        length=None
+        length=None,
     ):
         """
-        pos_x, pos_y: Center position of the traffic light strip (scaled coords)
+        pos_x, pos_y: Center position of the semantic stop-line strip.
         """
         super().__init__(id="traffic_light", actor_size=1)
 
-        scale = max(1, int(1024 / map_size))
         self.x = pos_x
         self.y = pos_y
         self._map_size = map_size
         self.orientation = orientation
         self.signal_state = signal_state
-        self.width = width if width is not None else max(2, int(16 / scale))
-        self.length = length if length is not None else max(6, int(48 / scale))
+        self.width = (
+            float(width)
+            if width is not None
+            else max(1.0, distance_meters_to_surface(0.45)) + 1.0
+        )
+        self.length = (
+            float(length)
+            if length is not None
+            else max(4.0, distance_meters_to_surface(8.5))
+        )
 
         self._set_color()
         self._update_rect()
@@ -47,7 +55,7 @@ class TrafficLight(Actor):
     # ... (skipping _update_rect as it doesn't use state)
 
     def _update_rect(self):
-        # Center the rect around x, y
+        # Center the semantic strip around x, y.
         if self.orientation == 'horizontal':
             w, h = self.length, self.width
         else:

@@ -18,7 +18,9 @@ from CarlaBEV.src.scenes.scene import Scene, Node
 from CarlaBEV.src.scenes.utils import *
 
 from CarlaBEV.src.gui import GUI
-from CarlaBEV.src.gui.settings import Settings as cfg
+from CarlaBEV.src.gui.settings import Settings
+from CarlaBEV.src.actors.vehicle import Vehicle
+from CarlaBEV.src.actors.pedestrian import Pedestrian
 from CarlaBEV.src.scenes.scenarios.specs import (
     build_scenario_config,
     scenario_config_to_options,
@@ -31,8 +33,14 @@ device = "cuda:0"
 
 
 class SceneDesigner(GUI):
-    def __init__(self, env):
-        GUI.__init__(self)
+    ACTOR_DEFAULT_SPEEDS = {
+        "agent": 12.0,
+        "vehicle": 10.0,
+        "pedestrian": 1.6,
+    }
+
+    def __init__(self, env, settings=None):
+        GUI.__init__(self, settings=settings)
         self.env = env
 
         # Actor data structure
@@ -43,6 +51,86 @@ class SceneDesigner(GUI):
         self.loaded_scene = None
         self.anchor = None
         self.last_config = None
+
+    @staticmethod
+    def _build_linear_route(start, end, step_px=8):
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        length = max(abs(dx), abs(dy))
+        num_points = max(2, int(length / max(1, step_px)) + 1)
+        rx = np.linspace(start[0], end[0], num_points).round().astype(int).tolist()
+        ry = np.linspace(start[1], end[1], num_points).round().astype(int).tolist()
+        return rx, ry
+
+    def _build_authored_scene_dict(self):
+        scene_dict = {
+            "agent": None,
+            "vehicle": [],
+            "pedestrian": [],
+            "target": [],
+            "traffic_light": [],
+        }
+        for actor in self.designed_actors:
+            rx, ry = self._build_linear_route(actor["start"], actor["end"])
+            speed = float(actor.get("speed", self.ACTOR_DEFAULT_SPEEDS[actor["type"]]))
+            if actor["type"] == "agent":
+                scene_dict["agent"] = (rx, ry, speed, speed)
+            elif actor["type"] == "vehicle":
+                scene_dict["vehicle"].append(
+                    Vehicle(self.env.map.size, routeX=rx, routeY=ry, target_speed=speed)
+                )
+            elif actor["type"] == "pedestrian":
+                scene_dict["pedestrian"].append(
+                    Pedestrian(self.env.map.size, routeX=rx, routeY=ry, target_speed=speed)
+                )
+        return scene_dict
+
+    def refresh_scene_preview(self):
+        if self.designed_actors:
+            actor_scene = self._build_authored_scene_dict()
+            if actor_scene["agent"] is not None:
+                self.env.map.reset(actor_scene)
+                self.env.num_vehicles = len(actor_scene["vehicle"])
+                self.env.len_ego_route = self.env.map.actor_manager.route_length
+                rx, ry = self.env.map.route
+                if self.env.cfg.reward_type == "carl":
+                    self.env.reward_fn.reset(rx, ry)
+                else:
+                    self.env.reward_fn.reset()
+                self.set_status(
+                    f"Previewing authored scene with {len(self.designed_actors)} actor(s).",
+                    "Play Preview uses the authored actor scene.",
+                )
+                return
+        if self.last_config is not None:
+            self.env.reset(options=scenario_config_to_options(self.last_config))
+
+    def add_authored_actor(self, actor_type, start_pos, end_pos):
+        start = self.screen_to_map_pos(start_pos)
+        end = self.screen_to_map_pos(end_pos)
+        if start is None or end is None:
+            return
+        actor_entry = {
+            "type": actor_type,
+            "start": [int(start[0]), int(start[1])],
+            "end": [int(end[0]), int(end[1])],
+            "speed": self.ACTOR_DEFAULT_SPEEDS[actor_type],
+        }
+        if actor_type == "agent":
+            self.designed_actors = [actor for actor in self.designed_actors if actor["type"] != "agent"]
+        self.designed_actors.append(actor_entry)
+        self.selected_actor_index = len(self.designed_actors) - 1
+        self.refresh_scene_preview()
+
+    def delete_selected_actor(self):
+        if self.selected_actor_index is None or self.selected_actor_index >= len(self.designed_actors):
+            return
+        del self.designed_actors[self.selected_actor_index]
+        if not self.designed_actors:
+            self.selected_actor_index = None
+        else:
+            self.selected_actor_index = min(self.selected_actor_index, len(self.designed_actors) - 1)
+        self.refresh_scene_preview()
 
     def render(self, env=None):
         self.draw_gui()
@@ -71,34 +159,63 @@ class SceneDesigner(GUI):
 
         print(f"Anchoring {scenario_key} at ({map_x}, {map_y}) | Level {level}")
         self.env.reset(options=options)
-        self.listbox.categories = {
-            "Scenario": [f"{scenario_key} / L{level}"],
-            "Anchor": [f"x={map_x}, y={map_y}"],
-            "Params": [f"{key}={value}" for key, value in parameters.items()],
-        }
         self.set_status(
             f"Previewing {scenario_key} at anchor ({map_x}, {map_y}).",
             "Save writes a reusable scenario config JSON.",
         )
 
     def play_scene(self):
-        self.loaded_scene = self.env.map.curr_actors
-        self.env.map.reset(self.loaded_scene)
+        if self.designed_actors:
+            self.loaded_scene = self._build_authored_scene_dict()
+            self.env.map.reset(self.loaded_scene)
+            self.env.num_vehicles = len(self.loaded_scene["vehicle"])
+            self.env.len_ego_route = self.env.map.actor_manager.route_length
+            rx, ry = self.env.map.route
+            if self.env.cfg.reward_type == "carl":
+                self.env.reward_fn.reset(rx, ry)
+            else:
+                self.env.reward_fn.reset()
+        else:
+            self.loaded_scene = self.env.map.curr_actors
+            self.env.map.reset(self.loaded_scene)
         self.toggle_play_mode()
 
     def save_scene(self, scene_id):
         import json
 
-        if not self.last_config:
-            print("No scenario anchored. Please click the map first.")
-            self.set_status("No anchor selected yet.", "Click the map before saving.")
-            return
-
         out_path = f"CarlaBEV/assets/scenes/{scene_id}.json"
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
-
-        config = dict(self.last_config)
-        config["scene_id"] = scene_id
+        if self.designed_actors:
+            actor_records = []
+            for actor in self.designed_actors:
+                rx, ry = self._build_linear_route(actor["start"], actor["end"])
+                actor_records.append(
+                    {
+                        "type": actor["type"],
+                        "start": {"x": actor["start"][0], "y": actor["start"][1]},
+                        "goal": {"x": actor["end"][0], "y": actor["end"][1]},
+                        "rx": rx,
+                        "ry": ry,
+                        "speed": actor["speed"],
+                    }
+                )
+            config = {
+                "version": 1,
+                "type": "authored_scene",
+                "scene_id": scene_id,
+                "scenario_id": self.scenario_selector.selection,
+                "level": int(self.level_selector.selection.replace("Level ", "")),
+                "anchor": self.anchor,
+                "parameters": self.get_form_values(),
+                "actors": actor_records,
+            }
+        else:
+            if not self.last_config:
+                print("No scenario anchored. Please click the map first.")
+                self.set_status("No anchor selected yet.", "Click the map before saving.")
+                return
+            config = dict(self.last_config)
+            config["scene_id"] = scene_id
 
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)
@@ -130,7 +247,8 @@ def main():
     #
     keys_held = init_key_tracking()
     pygame.init()
-    app = SceneDesigner(env=env)
+    designer_settings = Settings(designer_layout_preset="comfortable")
+    app = SceneDesigner(env=env, settings=designer_settings)
     env.reset(options={})
     #
     running = True
@@ -155,6 +273,14 @@ def main():
                 total_reward = 0
             elif isinstance(flag, dict) and flag.get("action") == "anchor":
                 app.add_anchor(flag["pos"])
+            elif isinstance(flag, dict) and flag.get("action") == "add_actor":
+                app.add_authored_actor(
+                    flag["actor_type"],
+                    flag["start_pos"],
+                    flag["end_pos"],
+                )
+            elif isinstance(flag, dict) and flag.get("action") == "delete_actor":
+                app.delete_selected_actor()
 
         app.loaded_scene = "notNone"
         if app.play_mode:
@@ -172,12 +298,15 @@ def main():
                 length = episode_info.get("length", 0)
                 total_reward = 0
                 print(f"Episode finished | return={ret} | length={length}")
-                reset_options = (
-                    scenario_config_to_options(app.last_config)
-                    if app.last_config is not None
-                    else {}
-                )
-                observation, info = env.reset(options=reset_options)
+                if app.designed_actors:
+                    app.refresh_scene_preview()
+                else:
+                    reset_options = (
+                        scenario_config_to_options(app.last_config)
+                        if app.last_config is not None
+                        else {}
+                    )
+                    observation, info = env.reset(options=reset_options)
 
         app.render(env)
 

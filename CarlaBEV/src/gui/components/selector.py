@@ -9,13 +9,20 @@ class Selector:
         self.options = options
         self.selected = selected
         self.option_rects = []
+        self.option_height = 30
+        self.option_gap = 4
         self._build_option_rects()
 
     def _build_option_rects(self):
         self.option_rects = []
         y = self.rect.y
         for i, opt in enumerate(self.options):
-            r = pygame.Rect(self.rect.x, y + i * 34, self.rect.width, 30)
+            r = pygame.Rect(
+                self.rect.x,
+                y + i * (self.option_height + self.option_gap),
+                self.rect.width,
+                self.option_height,
+            )
             self.option_rects.append(r)
 
     def handle_event(self, event):
@@ -48,3 +55,8 @@ class Selector:
             if self.selected >= len(options):
                 self.selected = 0
             self._build_option_rects()
+
+    def set_metrics(self, option_height, option_gap):
+        self.option_height = int(option_height)
+        self.option_gap = int(option_gap)
+        self._build_option_rects()

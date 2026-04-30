@@ -2,6 +2,7 @@ import pygame
 from random import randint
 import os
 import sys
+import logging
 
 import numpy as np
 import pandas as pd
@@ -30,6 +31,13 @@ from CarlaBEV.envs import CarlaBEV
 
 device = "cuda:0"
 # -----------------------------------------
+
+
+def configure_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
 
 
 class SceneDesigner(GUI):
@@ -240,6 +248,7 @@ def main():
     import tyro
     from CarlaBEV.tools.debug.cfg import ArgsCarlaBEV
     
+    configure_logging()
     cfg = tyro.cli(ArgsCarlaBEV)
     cfg.env.render_mode = "rgb_array"
     
@@ -247,7 +256,7 @@ def main():
     #
     keys_held = init_key_tracking()
     pygame.init()
-    designer_settings = Settings(designer_layout_preset="comfortable")
+    designer_settings = Settings(designer_layout_preset="auto")
     app = SceneDesigner(env=env, settings=designer_settings)
     env.reset(options={})
     #

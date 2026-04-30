@@ -202,7 +202,10 @@ class Settings:
     designer_layout: DesignerLayoutConfig = field(init=False)
 
     def __post_init__(self):
-        self.designer_layout = get_designer_layout_config(
-            self.designer_layout_preset,
-            self.designer_layout_overrides,
-        )
+        if self.designer_layout_preset == "auto":
+            self.designer_layout = DesignerLayoutConfig()
+        else:
+            self.designer_layout = get_designer_layout_config(
+                self.designer_layout_preset,
+                self.designer_layout_overrides,
+            )

@@ -1,4 +1,6 @@
 import math
+import logging
+import os
 import pygame
 import numpy as np
 
@@ -6,23 +8,35 @@ from CarlaBEV.src.gui.components import Button, Selector, TextBox, ListBox
 from CarlaBEV.src.gui.settings import Settings
 from CarlaBEV.src.scenes.scenarios.specs import get_scenario_spec, list_scenario_ids
 
+logger = logging.getLogger("carlabev.scene_designer")
+
 
 class GUI:
     def __init__(self, settings=None):
         self.settings = settings or Settings()
         pygame.display.set_caption("Traffic Scenario Designer")
-        self.layout_cfg = self.settings.designer_layout
-        display = pygame.display.Info()
+        self.min_window_size = (
+            960,
+            640,
+        )
+        self._desktop_size = self._get_desktop_size()
+        self._last_desktop_size = self._desktop_size
+        self._user_resized_window = False
+        self._last_display_snapshot = None
+        self._resolved_layout_preset = self._resolve_layout_preset(self._desktop_size)
+        self.layout_cfg = self._get_runtime_layout_config(self._resolved_layout_preset)
         self.min_window_size = (
             self.layout_cfg.min_window_width,
             self.layout_cfg.min_window_height,
         )
-        window_width, window_height = self._compute_window_size(display)
+        window_width, window_height = self._compute_window_size(self._desktop_size)
         self.screen = pygame.display.set_mode(
             (window_width, window_height),
             pygame.RESIZABLE,
         )
-        self._apply_responsive_metrics(window_width, window_height)
+        actual_window_size = self.screen.get_size()
+        self._refresh_layout_preset(self._desktop_size, actual_window_size, "startup")
+        self._apply_responsive_metrics(*actual_window_size, self._desktop_size)
 
         self.colors = {
             "app_bg": (232, 235, 239),
@@ -51,14 +65,16 @@ class GUI:
 
         self.current_frame = 0
         self.total_frames = 200
-        self.status_lines = ["Click the map to place the scenario anchor."]
-        self._last_window_size = self.screen.get_size()
+        self.status_lines = []
+        self._last_window_size = actual_window_size
         self.map_click_mode = None
         self.pending_actor_type = None
         self.pending_actor_start = None
         self.designed_actors = []
         self.selected_actor_index = None
         self.actor_row_rects = []
+        self.editor_tab = "parameters"
+        self.editor_tab_rects = {}
 
         self.scene_name = TextBox((0, 0, 100, 36), self.font, "Scene1")
         self.scenario_selector = Selector((0, 0, 100, 100), self.font, list_scenario_ids())
@@ -80,10 +96,102 @@ class GUI:
         self.fov_rect = pygame.Rect(0, 0, 180, 180)
         self.timeline_rect = pygame.Rect(0, 0, 100, 14)
         self.section_rects = {}
+        self._log_display_context("startup")
 
-    def _compute_window_size(self, display):
-        screen_w = max(display.current_w, self.min_window_size[0])
-        screen_h = max(display.current_h, self.min_window_size[1])
+    def _resolve_layout_preset(self, desktop_size, window_size=None):
+        requested = self.settings.designer_layout_preset
+        if requested != "auto":
+            return requested
+        desktop_w, desktop_h = desktop_size
+        window_w, window_h = window_size or desktop_size
+        effective_h = min(desktop_h, window_h)
+        effective_w = min(desktop_w, window_w)
+        if effective_h <= 620 and effective_w <= 760:
+            return "dense"
+        if effective_h <= 760 or effective_w <= 1180:
+            return "compact"
+        return "comfortable"
+
+    def _get_runtime_layout_config(self, preset_name):
+        from CarlaBEV.src.gui.settings import get_designer_layout_config
+
+        return get_designer_layout_config(
+            preset_name,
+            self.settings.designer_layout_overrides,
+        )
+
+    def _get_desktop_size(self):
+        desktop_sizes = pygame.display.get_desktop_sizes()
+        if desktop_sizes:
+            width, height = max(desktop_sizes, key=lambda size: size[0] * size[1])
+            return max(width, self.min_window_size[0]), max(height, self.min_window_size[1])
+        display = pygame.display.Info()
+        return (
+            max(display.current_w, self.min_window_size[0]),
+            max(display.current_h, self.min_window_size[1]),
+        )
+
+    def _display_snapshot(self):
+        info = pygame.display.Info()
+        window_size = pygame.display.get_window_size() if pygame.display.get_surface() else None
+        return {
+            "driver": pygame.display.get_driver(),
+            "display_info": {"w": info.current_w, "h": info.current_h},
+            "window_size": window_size,
+            "desktop_sizes": pygame.display.get_desktop_sizes(),
+            "wayland_display": os.environ.get("WAYLAND_DISPLAY"),
+            "display_env": os.environ.get("DISPLAY"),
+            "session_type": os.environ.get("XDG_SESSION_TYPE"),
+            "layout_preset": self.settings.designer_layout_preset,
+            "resolved_layout_preset": self._resolved_layout_preset,
+            "layout_overrides": dict(self.settings.designer_layout_overrides),
+            "ui_scale": round(getattr(self, "ui_scale", 0.0), 4),
+            "user_resized_window": self._user_resized_window,
+        }
+
+    def _log_display_context(self, reason):
+        snapshot = self._display_snapshot()
+        logger.info("designer_display_context[%s] %s", reason, snapshot)
+        self._last_display_snapshot = snapshot
+
+    def _log_display_changes(self, reason):
+        snapshot = self._display_snapshot()
+        if self._last_display_snapshot is None:
+            self._log_display_context(reason)
+            return
+        changed = {
+            key: {"old": self._last_display_snapshot.get(key), "new": snapshot.get(key)}
+            for key in snapshot
+            if self._last_display_snapshot.get(key) != snapshot.get(key)
+        }
+        if changed:
+            logger.info("designer_display_change[%s] %s", reason, changed)
+            self._last_display_snapshot = snapshot
+
+    def _refresh_layout_preset(self, desktop_size, window_size, reason):
+        resolved = self._resolve_layout_preset(desktop_size, window_size)
+        if resolved != self._resolved_layout_preset:
+            old_preset = self._resolved_layout_preset
+            self._resolved_layout_preset = resolved
+            self.layout_cfg = self._get_runtime_layout_config(resolved)
+            self.min_window_size = (
+                self.layout_cfg.min_window_width,
+                self.layout_cfg.min_window_height,
+            )
+            logger.info(
+                "designer_layout_preset_change[%s] %s",
+                reason,
+                {
+                    "old": old_preset,
+                    "new": resolved,
+                    "desktop_size": desktop_size,
+                    "window_size": window_size,
+                },
+            )
+
+    def _compute_window_size(self, desktop_size):
+        screen_w = max(desktop_size[0], self.min_window_size[0])
+        screen_h = max(desktop_size[1], self.min_window_size[1])
         window_width = int(screen_w * self.layout_cfg.window_width_ratio)
         window_height = int(screen_h * self.layout_cfg.window_height_ratio)
         window_width = max(
@@ -100,14 +208,27 @@ class GUI:
         surface = pygame.display.get_surface()
         if surface is None:
             return
+        current_desktop_size = self._get_desktop_size()
         current_size = surface.get_size()
-        if current_size != self._last_window_size:
+        desktop_changed = current_desktop_size != self._last_desktop_size
+        if desktop_changed:
+            self._desktop_size = current_desktop_size
+            self._last_desktop_size = current_desktop_size
+            if not self._user_resized_window:
+                target_size = self._compute_window_size(current_desktop_size)
+                if target_size != current_size:
+                    self.screen = pygame.display.set_mode(target_size, pygame.RESIZABLE)
+                    surface = pygame.display.get_surface()
+                    current_size = surface.get_size()
+        self._refresh_layout_preset(current_desktop_size, current_size, "refresh")
+        if current_size != self._last_window_size or desktop_changed:
             self.screen = surface
             self._last_window_size = current_size
-            self._apply_responsive_metrics(*current_size)
+            self._apply_responsive_metrics(*current_size, desktop_size=current_desktop_size)
             self.update_layout(self._map_surface_size)
+            self._log_display_changes("refresh")
 
-    def _apply_responsive_metrics(self, screen_w, screen_h):
+    def _apply_responsive_metrics(self, screen_w, screen_h, desktop_size=None):
         scale = min(
             screen_w / self.layout_cfg.scale_ref_width,
             screen_h / self.layout_cfg.scale_ref_height,
@@ -152,9 +273,12 @@ class GUI:
             None,
             max(self.layout_cfg.font_section_min, int(round(self.layout_cfg.font_section_base * self.ui_scale))),
         )
+        self.font_button = pygame.font.SysFont(
+            None,
+            max(self.layout_cfg.font_body_min + 2, int(round((self.layout_cfg.font_body_base + 2) * self.ui_scale))),
+        )
 
         for widget in (
-            "scene_name",
             "save_btn",
             "anchor_btn",
             "add_rdm_actor_btn",
@@ -165,7 +289,9 @@ class GUI:
             "place_ped_btn",
         ):
             if hasattr(self, widget):
-                getattr(self, widget).font = self.font
+                getattr(self, widget).font = self.font_button
+        if hasattr(self, "scene_name"):
+            self.scene_name.font = self.font
         for widget in ("scenario_selector", "level_selector"):
             if hasattr(self, widget):
                 selector = getattr(self, widget)
@@ -187,12 +313,14 @@ class GUI:
             surface = pygame.display.get_surface()
             if surface is None:
                 return None
-            new_w = max(self.min_window_size[0], surface.get_width())
-            new_h = max(self.min_window_size[1], surface.get_height())
+            new_w, new_h = surface.get_size()
             self.screen = surface
             self._last_window_size = surface.get_size()
-            self._apply_responsive_metrics(new_w, new_h)
+            self._user_resized_window = True
+            self._refresh_layout_preset(self._get_desktop_size(), (new_w, new_h), "videoresize")
+            self._apply_responsive_metrics(new_w, new_h, desktop_size=self._get_desktop_size())
             self.update_layout(self._map_surface_size)
+            self._log_display_changes("videoresize")
             return None
 
         self.scene_name.handle_event(event)
@@ -211,6 +339,10 @@ class GUI:
             for idx, row_rect in enumerate(self.actor_row_rects):
                 if row_rect.collidepoint(event.pos):
                     self.selected_actor_index = idx
+                    return None
+            for tab_name, tab_rect in self.editor_tab_rects.items():
+                if tab_rect.collidepoint(event.pos):
+                    self.editor_tab = tab_name
                     return None
 
         ignored_click = False
@@ -333,26 +465,27 @@ class GUI:
         self._map_surface_size = map_surface_size
         screen_w = self.screen.get_width()
         screen_h = self.screen.get_height()
+        panel_scale = max(0.92, 0.75 + 0.25 * self.ui_scale)
 
         left_w = min(
-            int(self.layout_cfg.left_panel_width_max * self.ui_scale),
-            max(int(self.layout_cfg.left_panel_width_min * self.ui_scale), screen_w // 3),
+            int(self.layout_cfg.left_panel_width_max * panel_scale),
+            max(int(self.layout_cfg.left_panel_width_min * panel_scale), screen_w // 3),
         )
         right_w = min(
-            int(self.layout_cfg.right_panel_width_max * self.ui_scale),
-            max(int(self.layout_cfg.right_panel_width_min * self.ui_scale), screen_w // 5),
+            int((self.layout_cfg.right_panel_width_max + 28) * panel_scale),
+            max(int((self.layout_cfg.right_panel_width_min + 18) * panel_scale), screen_w // 4),
         )
         center_min_w = self.layout_cfg.center_panel_min_width
         if left_w + right_w + center_min_w > screen_w:
             overflow = left_w + right_w + center_min_w - screen_w
             left_w -= min(
                 overflow,
-                max(0, left_w - int(self.layout_cfg.left_panel_floor * self.ui_scale)),
+                max(0, left_w - int(self.layout_cfg.left_panel_floor * panel_scale)),
             )
             overflow = max(0, left_w + right_w + center_min_w - screen_w)
             right_w -= min(
                 overflow,
-                max(0, right_w - int(self.layout_cfg.right_panel_floor * self.ui_scale)),
+                max(0, right_w - int(self.layout_cfg.right_panel_floor * panel_scale)),
             )
 
         self.left_panel_rect = pygame.Rect(0, 0, left_w, screen_h)
@@ -383,19 +516,21 @@ class GUI:
 
         center_x = self.left_panel_rect.right + self.spacing_lg
         center_w = self.right_panel_rect.left - center_x - self.spacing_lg
-        center_y = self.spacing_lg + self.spacing_xs
+        center_top = self.spacing_lg + self.spacing_xs
         center_h = screen_h - max(
             self.layout_cfg.center_bottom_reserve_min,
             int(self.layout_cfg.center_bottom_reserve * self.ui_scale),
         )
-
         crop_w, crop_h = self._map_crop_rect.size
         map_w, map_h = crop_w, crop_h
         scale = min(center_w / map_w, center_h / map_h)
         draw_w = max(1, int(map_w * scale))
         draw_h = max(1, int(map_h * scale))
         map_x = center_x + max(0, (center_w - draw_w) // 2)
-        map_y = center_y + max(0, (center_h - draw_h) // 2)
+        help_h = self.font_small.get_height() + self.spacing_sm
+        block_h = draw_h + self.spacing_lg + help_h + self.timeline_height
+        block_top = center_top + max(0, (center_h - block_h) // 2) + self.spacing_sm
+        map_y = block_top
         self.map_rect = pygame.Rect(map_x, map_y, draw_w, draw_h)
 
         fov_size = min(
@@ -404,7 +539,7 @@ class GUI:
         )
         self.timeline_rect = pygame.Rect(
             self.map_rect.x,
-            self.map_rect.bottom + self.spacing_lg,
+            self.map_rect.bottom + self.spacing_lg + help_h,
             self.map_rect.width,
             self.timeline_height,
         )
@@ -420,8 +555,9 @@ class GUI:
         card_bottom_pad = self.section_pad
         card_header_gap = self.spacing_sm
         field_label_gap = self.spacing_xs
-        field_row_gap = self.spacing_md
+        field_row_gap = self.spacing_sm
         label_h = self.font_small.get_height()
+        param_textbox_h = max(28, self.textbox_height - 8)
         setup_option_height = max(22, self.option_height - 6)
         setup_option_gap = max(2, self.option_gap - 1)
         self.scenario_selector.set_metrics(setup_option_height, setup_option_gap)
@@ -431,7 +567,7 @@ class GUI:
         gap = self.spacing_md
         col_count = 2 if len(self.active_fields) > 3 else 1
         field_w = left_w if col_count == 1 else (left_w - gap) // 2
-        row_h = label_h + field_label_gap + self.textbox_height + field_row_gap
+        row_h = label_h + field_label_gap + param_textbox_h + field_row_gap
         actor_row_h = self.font_small.get_height() + self.spacing_sm
         actor_list_rows = 4
         actor_list_h = actor_row_h * actor_list_rows + self.spacing_sm
@@ -439,12 +575,27 @@ class GUI:
         actor_button_w = (left_w - actor_button_gap) // 2
         setup_col_gap = self.spacing_sm
         setup_col_w = (left_w - setup_col_gap) // 2
+        tab_gap = self.spacing_sm
+        tab_h = max(26, self.button_height - 6)
+        tab_w = (left_w - tab_gap) // 2
 
         rows = math.ceil(len(self.active_fields) / col_count) if self.active_fields else 0
         params_content_h = 0
         if rows > 0:
-            params_content_h = rows * (label_h + field_label_gap + self.textbox_height)
+            params_content_h = rows * (label_h + field_label_gap + param_textbox_h)
             params_content_h += max(0, rows - 1) * field_row_gap
+        params_section_h = card_top_pad + card_title_h + card_header_gap + params_content_h + card_bottom_pad
+        actors_section_h = (
+            card_top_pad
+            + tab_h
+            + card_header_gap
+            + 2 * self.button_height
+            + actor_button_gap
+            + self.spacing_md
+            + actor_list_h
+            + card_bottom_pad
+        )
+        editor_content_h = max(params_section_h, actors_section_h)
         section_heights = {
             "scene_name": card_top_pad + card_title_h + card_header_gap + self.textbox_height + card_bottom_pad,
             "setup": (
@@ -456,20 +607,9 @@ class GUI:
                 + max(scenario_h, level_h)
                 + card_bottom_pad
             ),
-            "parameters": card_top_pad + card_title_h + card_header_gap + params_content_h + card_bottom_pad,
-            "actors": (
-                card_top_pad
-                + card_title_h
-                + card_header_gap
-                + 2 * self.button_height
-                + actor_button_gap
-                + self.spacing_md
-                + actor_list_h
-                + card_bottom_pad
-            ),
-            "actions": self.button_height + 2 * self.spacing_xs,
+            "editor": card_top_pad + tab_h + card_header_gap + max(params_content_h, actors_section_h - card_top_pad - tab_h - card_header_gap - card_bottom_pad) + card_bottom_pad,
         }
-        section_order = ["scene_name", "setup", "parameters", "actors", "actions"]
+        section_order = ["scene_name", "setup", "editor"]
         natural_gap = self.spacing_lg
         minimum_gap = self.spacing_sm
         tight_gap = self.spacing_xs
@@ -530,28 +670,26 @@ class GUI:
         self.level_selector._build_option_rects()
         y += section_heights["setup"] + distributed_gap
 
-        self.section_rects["parameters"] = pygame.Rect(
+        self.section_rects["editor"] = pygame.Rect(
             left_x - self.section_pad,
             y,
             left_w + 2 * self.section_pad,
-            section_heights["parameters"],
+            section_heights["editor"],
         )
-        params_y = self.section_rects["parameters"].y + card_top_pad + card_title_h + card_header_gap
+        tab_y = self.section_rects["editor"].y + card_top_pad
+        self.editor_tab_rects = {
+            "parameters": pygame.Rect(left_x, tab_y, tab_w, tab_h),
+            "actors": pygame.Rect(left_x + tab_w + tab_gap, tab_y, tab_w, tab_h),
+        }
+        editor_content_y = tab_y + tab_h + card_header_gap
+        params_y = editor_content_y
         for idx, field in enumerate(self.active_fields):
             col = idx % col_count
             row = idx // col_count
             box_x = left_x + col * (field_w + gap)
             box_y = params_y + row * row_h + label_h + field_label_gap
-            self.field_boxes[field.key].rect = pygame.Rect(box_x, box_y, field_w, self.textbox_height)
-        y += section_heights["parameters"] + distributed_gap
-
-        self.section_rects["actors"] = pygame.Rect(
-            left_x - self.section_pad,
-            y,
-            left_w + 2 * self.section_pad,
-            section_heights["actors"],
-        )
-        actor_buttons_y = self.section_rects["actors"].y + card_top_pad + card_title_h + card_header_gap
+            self.field_boxes[field.key].rect = pygame.Rect(box_x, box_y, field_w, param_textbox_h)
+        actor_buttons_y = editor_content_y
         self.place_ego_btn.rect = pygame.Rect(left_x, actor_buttons_y, actor_button_w, self.button_height)
         self.place_vehicle_btn.rect = pygame.Rect(
             left_x + actor_button_w + actor_button_gap,
@@ -573,27 +711,15 @@ class GUI:
         )
         actor_list_y = actor_buttons_y + 2 * self.button_height + actor_button_gap + self.spacing_md
         self.actor_row_rects = []
-        actor_card_x = self.section_rects["actors"].x + self.section_pad
-        actor_card_w = self.section_rects["actors"].width - 2 * self.section_pad
+        actor_card_x = self.section_rects["editor"].x + self.section_pad
+        actor_card_w = self.section_rects["editor"].width - 2 * self.section_pad
         for idx in range(actor_list_rows):
             self.actor_row_rects.append(
                 pygame.Rect(actor_card_x, actor_list_y + idx * actor_row_h, actor_card_w, actor_row_h)
             )
-        y += section_heights["actors"] + distributed_gap
+        y += section_heights["editor"] + distributed_gap
 
-        self.section_rects["actions"] = pygame.Rect(
-            left_x - self.section_pad,
-            y,
-            left_w + 2 * self.section_pad,
-            section_heights["actions"],
-        )
-        anchor_y = (
-            self.section_rects["actions"].y
-            + max(self.spacing_xs, (self.section_rects["actions"].height - self.button_height) // 2 - self.spacing_xs)
-        )
-        self.anchor_btn.rect = pygame.Rect(left_x, anchor_y, left_w, self.button_height)
-
-        content_end = self.section_rects["actions"].bottom + self.spacing_sm
+        content_end = self.section_rects["editor"].bottom + self.spacing_sm
         self.left_content_height = max(available_h, content_end - content_top)
 
         right_x = self.right_panel_rect.x + self.panel_padding
@@ -609,49 +735,51 @@ class GUI:
         summary_line_h = self.font.get_height()
         status_line_h = self.font_small.get_height()
         preview_card_y = self.right_body_rect.y + self.spacing_sm
-        preview_card_h = right_card_top_pad + right_card_title_h + right_card_header_gap + fov_size + right_card_bottom_pad
-        self.preview_card_rect = pygame.Rect(
-            right_x - self.section_pad,
-            preview_card_y,
+        preview_card_h = right_card_top_pad + right_card_title_h + max(4, self.spacing_xs // 2) + fov_size + max(6, right_card_bottom_pad - self.spacing_xs)
+        preview_card_w = min(
             right_w + 2 * self.section_pad,
+            fov_size + 2 * (self.section_pad + self.spacing_sm),
+        )
+        self.preview_card_rect = pygame.Rect(
+            self.right_panel_rect.x + (self.right_panel_rect.width - preview_card_w) // 2,
+            preview_card_y,
+            preview_card_w,
             preview_card_h,
         )
         self.fov_rect = pygame.Rect(
             self.right_panel_rect.x + (self.right_panel_rect.width - fov_size) // 2,
-            self.preview_card_rect.y + right_card_top_pad + right_card_title_h + right_card_header_gap,
+            self.preview_card_rect.y + right_card_top_pad + right_card_title_h + self.spacing_xs,
             fov_size,
             fov_size,
         )
+        anchor_y = self.right_body_rect.y + self.spacing_sm
+        self.anchor_btn.rect = pygame.Rect(right_x, anchor_y, right_w, self.button_height)
+        self.preview_card_rect.y = self.anchor_btn.rect.bottom + self.spacing_lg
+        self.fov_rect.y = self.preview_card_rect.y + right_card_top_pad + right_card_title_h + self.spacing_xs
         action_y = self.preview_card_rect.bottom + self.spacing_lg
-        self.add_rdm_actor_btn.rect = pygame.Rect(right_x, action_y, right_w, self.button_height)
-        self.play_btn.rect = pygame.Rect(right_x, action_y + self.button_height + self.spacing_md, right_w, self.button_height)
-        self.save_btn.rect = pygame.Rect(
-            right_x,
-            self.play_btn.rect.bottom + self.spacing_md,
-            right_w,
-            self.button_height,
-        )
+        self.play_btn.rect = pygame.Rect(right_x, action_y, right_w, self.button_height)
+        self.add_rdm_actor_btn.rect = pygame.Rect(right_x, self.play_btn.rect.bottom + self.spacing_md, right_w, self.button_height)
 
-        summary_y = self.save_btn.rect.bottom + self.spacing_lg
-        summary_lines_h = len(self.status_lines[:3]) * (status_line_h + self.spacing_xs)
+        summary_y = self.add_rdm_actor_btn.rect.bottom + self.spacing_lg
         info_content_h = (
             right_card_title_h
             + right_card_header_gap
             + 3 * summary_line_h
-            + 2 * self.spacing_sm
-            + self.spacing_lg
-            + right_card_title_h
-            + right_card_header_gap
-            + max(status_line_h, summary_lines_h)
         )
-        self.info_card_rect = pygame.Rect(
+        self.status_card_rect = pygame.Rect(
             right_x - self.section_pad,
             summary_y,
             right_w + 2 * self.section_pad,
             max(
-                int(self.layout_cfg.summary_card_min_height * self.ui_scale),
+                int((self.layout_cfg.summary_card_min_height - 72) * self.ui_scale),
                 right_card_top_pad + info_content_h + right_card_bottom_pad,
             ),
+        )
+        self.save_btn.rect = pygame.Rect(
+            right_x,
+            self.status_card_rect.bottom + self.spacing_lg,
+            right_w,
+            self.button_height,
         )
 
     def screen_to_map_pos(self, pos):
@@ -676,21 +804,28 @@ class GUI:
         return screen_x, screen_y
 
     def set_status(self, *lines):
-        self.status_lines = list(lines)
+        self.status_lines = [line for line in lines if line]
+
+    def current_map_help_text(self):
+        if self.map_click_mode == "anchor":
+            return "Click on the map to place the scenario anchor."
+        if self.map_click_mode == "actor_start":
+            actor_name = (self.pending_actor_type or "actor").replace("agent", "ego")
+            return f"Click on the map to place the {actor_name} start point."
+        if self.map_click_mode == "actor_end":
+            actor_name = (self.pending_actor_type or "actor").replace("agent", "ego")
+            return f"Click on the map to place the {actor_name} end point."
+        if self.editor_tab == "actors":
+            return "Use the actor tools to place start and end points on the map."
+        return "Use Anchor On Map or an actor placement button to start editing on the map."
 
     def draw_fov(self):
         self._draw_card_rect(self.preview_card_rect)
         title = self.font_section.render("FOV Preview", True, self.colors["text"])
-        self.screen.blit(title, (self.preview_card_rect.x + self.section_pad, self.preview_card_rect.y + self.section_pad))
+        title_rect = title.get_rect(centerx=self.fov_rect.centerx, y=self.preview_card_rect.y + max(6, self.section_pad - self.spacing_xs))
+        self.screen.blit(title, title_rect)
 
         vehicle_surface = self.env.map.canvas
-        pygame.draw.rect(
-            self.screen,
-            self.colors["border"],
-            self.fov_rect.inflate(2, 2),
-            width=1,
-            border_radius=self.button_radius,
-        )
         if vehicle_surface is not None:
             scaled = pygame.transform.scale(vehicle_surface, (self.fov_rect.width, self.fov_rect.height))
             self.screen.blit(scaled, self.fov_rect.topleft)
@@ -767,38 +902,27 @@ class GUI:
         self._draw_label("Difficulty", self.level_selector.rect.x, level_label_y, small=True)
         self.level_selector.draw(self.screen)
 
-        if self.active_fields:
-            self._draw_soft_section(self.section_rects["parameters"])
-            self._draw_section_header(
-                "Parameters",
-                self.section_rects["parameters"].x + self.section_pad,
-                self.section_rects["parameters"].y + self.section_pad,
-            )
+        self._draw_soft_section(self.section_rects["editor"])
+        self._draw_tab_button(self.editor_tab_rects["parameters"], "Parameters", active=self.editor_tab == "parameters")
+        self._draw_tab_button(self.editor_tab_rects["actors"], "Actors", active=self.editor_tab == "actors")
 
-        for field in self.active_fields:
-            box = self.field_boxes[field.key]
-            self._draw_label(
-                field.label,
-                box.rect.x,
-                box.rect.y - self.spacing_xs - self.font_small.get_height(),
-                small=True,
-            )
-            box.draw(self.screen)
+        if self.editor_tab == "parameters":
+            for field in self.active_fields:
+                box = self.field_boxes[field.key]
+                self._draw_label(
+                    field.label,
+                    box.rect.x,
+                    box.rect.y - self.spacing_xs - self.font_small.get_height(),
+                    small=True,
+                )
+                box.draw(self.screen)
+        else:
+            self.place_ego_btn.draw(self.screen)
+            self.place_vehicle_btn.draw(self.screen)
+            self.place_ped_btn.draw(self.screen)
+            self.del_btn.draw(self.screen)
+            self._draw_actor_rows()
 
-        self._draw_soft_section(self.section_rects["actors"])
-        self._draw_section_header(
-            "Actors",
-            self.section_rects["actors"].x + self.section_pad,
-            self.section_rects["actors"].y + self.section_pad,
-        )
-        self.place_ego_btn.draw(self.screen)
-        self.place_vehicle_btn.draw(self.screen)
-        self.place_ped_btn.draw(self.screen)
-        self.del_btn.draw(self.screen)
-        self._draw_actor_rows()
-
-        self._draw_soft_section(self.section_rects["actions"])
-        self.anchor_btn.draw(self.screen)
         self.screen.set_clip(previous_clip)
 
     def _draw_actor_rows(self):
@@ -861,14 +985,7 @@ class GUI:
         self.screen.blit(scaled_map, self.map_rect.topleft)
         self._draw_actor_overlay()
 
-        caption = self.font_small.render("Map canvas", True, self.colors["muted"])
-        self.screen.blit(caption, (frame_rect.x + self.spacing_sm, frame_rect.y + self.spacing_xs))
-
-        help_text = self.font_small.render(
-            "Click anywhere on the map to place the scenario anchor.",
-            True,
-            self.colors["muted"],
-        )
+        help_text = self.font_small.render(self.current_map_help_text(), True, self.colors["muted"])
         self.screen.blit(help_text, (self.map_rect.x, self.timeline_rect.y - self.font_small.get_height() - self.spacing_sm))
         self.draw_timeline()
 
@@ -882,19 +999,19 @@ class GUI:
             self.right_header_subtitle_pos,
         )
 
-        self.add_rdm_actor_btn.draw(self.screen)
+        self.anchor_btn.draw(self.screen)
         self.play_btn.draw(self.screen)
-        self.save_btn.draw(self.screen)
+        self.add_rdm_actor_btn.draw(self.screen)
 
-        self._draw_card_rect(self.info_card_rect)
-        info_x = self.info_card_rect.x + self.section_pad
-        info_y = self.info_card_rect.y + self.section_pad
-        self.screen.blit(self.font_section.render("Current Setup", True, self.colors["text"]), (info_x, info_y))
+        self._draw_card_rect(self.status_card_rect)
+        info_x = self.status_card_rect.x + self.section_pad
+        info_y = self.status_card_rect.y + self.section_pad
+        self.screen.blit(self.font_section.render("Status", True, self.colors["text"]), (info_x, info_y))
 
         summary_lines = [
             f"Scenario: {self.scenario_spec.display_name}",
             f"Level: {self.level_selector.selection}",
-            f"Fields: {len(self.active_fields)}",
+            f"Actors: {len(self.designed_actors)}",
         ]
         summary_y = info_y + self.font_section.get_height() + self.spacing_sm
         for idx, line in enumerate(summary_lines):
@@ -905,29 +1022,7 @@ class GUI:
                     summary_y + idx * (self.font.get_height() + self.spacing_sm),
                 ),
             )
-
-        status_title_y = (
-            summary_y
-            + len(summary_lines) * self.font.get_height()
-            + max(0, len(summary_lines) - 1) * self.spacing_sm
-            + self.spacing_lg
-        )
-        self.screen.blit(
-            self.font_section.render("Status", True, self.colors["text"]),
-            (info_x, status_title_y),
-        )
-        for idx, line in enumerate(self.status_lines[:3]):
-            self._draw_wrapped_text(
-                line,
-                pygame.Rect(
-                    info_x,
-                    status_title_y + self.font_section.get_height() + self.spacing_sm + idx * (self.font_small.get_height() + self.spacing_xs),
-                    self.info_card_rect.width - 2 * self.section_pad,
-                    self.font_small.get_height() + self.spacing_sm,
-                ),
-                self.font_small,
-                self.colors["muted"],
-            )
+        self.save_btn.draw(self.screen)
 
     def update_frame_from_mouse(self, mouse_x):
         rel_x = max(0, min(mouse_x - self.timeline_rect.x, self.timeline_rect.width))
@@ -951,6 +1046,15 @@ class GUI:
 
     def _draw_section_header(self, text, x, y):
         self.screen.blit(self.font_section.render(text, True, self.colors["text"]), (x, y))
+
+    def _draw_tab_button(self, rect, text, active=False):
+        bg = self.colors["accent_soft"] if active else (246, 247, 249)
+        border = self.colors["accent"] if active else (204, 209, 216)
+        text_color = (18, 73, 170) if active else self.colors["text"]
+        pygame.draw.rect(self.screen, bg, rect, border_radius=self.button_radius)
+        pygame.draw.rect(self.screen, border, rect, 1 if not active else 2, border_radius=self.button_radius)
+        label = self.font.render(text, True, text_color)
+        self.screen.blit(label, label.get_rect(center=rect.center))
 
     def _draw_disabled_button(self, rect, text):
         pygame.draw.rect(self.screen, self.colors["success_soft"], rect, border_radius=self.button_radius)

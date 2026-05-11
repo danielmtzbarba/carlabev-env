@@ -88,11 +88,12 @@ class Actor(pygame.sprite.Sprite):
             self._initial_ry = list(self.ry)
         self.rx = list(self._initial_rx)
         self.ry = list(self._initial_ry)
-        # initialize controller at target speed
-        self._controller = Controller(self.target_speed)
-        self._controller.set_route(self.rx, self.ry)
+        # initialize controller at the authored cruise speed so spawned actors
+        # start with the configured scene speed instead of accelerating from 0
         self.target_speed = self.cruise_speed
         self.target_speed_mps = self.cruise_speed_mps
+        self._controller = Controller(self.target_speed)
+        self._controller.set_route(self.rx, self.ry, v0=self.cruise_speed)
         self.behavior_state = "idle"
 
         if self.behavior:

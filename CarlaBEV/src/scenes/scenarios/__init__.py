@@ -5,6 +5,7 @@ from CarlaBEV.src.scenes.scenarios.specs import (
     load_scenario_config_file,
     scenario_config_to_options,
 )
+from CarlaBEV.src.actors.behavior.registry import build_behavior
 
 class Scenario:
     def __init__(self, name, map_size=128):
@@ -53,53 +54,39 @@ class Scenario:
         from CarlaBEV.src.actors.vehicle import Vehicle
         from CarlaBEV.src.actors.pedestrian import Pedestrian
 
-        # Load behavior modules to evaluate strings
-        import CarlaBEV.src.actors.behavior.jaywalk as jaywalk_beh
-        import CarlaBEV.src.actors.behavior.lead_brake as lead_beh
-
-        def get_behavior(name, kwargs):
-            if name == "Normal" or not name:
-                return None
-
-            # Map names to classes dynamically
-            if hasattr(jaywalk_beh, name):
-                cls = getattr(jaywalk_beh, name)
-                return cls(**kwargs)
-            elif hasattr(lead_beh, name):
-                cls = getattr(lead_beh, name)
-                return cls(**kwargs)
-            return None
-
         for actor_data in data["actors"]:
             atype = actor_data["type"]
             rx = actor_data["rx"]
             ry = actor_data["ry"]
-            speed = actor_data.get("speed", 2.0)
+            speed = actor_data.get(
+                "cruise_speed",
+                actor_data.get("initial_speed", actor_data.get("speed", 2.0)),
+            )
 
             if atype == "agent":
                 scene_dict["agent"] = (rx, ry, speed)
             elif atype == "vehicle":
-                beh_name = actor_data.get("behavior", "Normal")
-                beh_kwargs = actor_data.get("behavior_kwargs", {})
-                behavior = get_behavior(beh_name, beh_kwargs)
+                behavior, _ = build_behavior("vehicle", actor_data.get("behavior", "constant_speed"))
 
                 v = Vehicle(
                     self.map_size,
                     routeX=rx,
                     routeY=ry,
-                            target_speed=speed, behavior=behavior)
+                    target_speed=speed,
+                    behavior=behavior,
+                )
                 scene_dict["vehicle"].append(v)
 
             elif atype == "pedestrian":
-                beh_name = actor_data.get("behavior", "Normal")
-                beh_kwargs = actor_data.get("behavior_kwargs", {})
-                behavior = get_behavior(beh_name, beh_kwargs)
+                behavior, _ = build_behavior("pedestrian", actor_data.get("behavior", "cross"))
 
                 p = Pedestrian(
                     self.map_size,
                     routeX=rx,
                     routeY=ry,
-                               target_speed=speed, behavior=behavior)
+                    target_speed=speed,
+                    behavior=behavior,
+                )
                 scene_dict["pedestrian"].append(p)
 
         # len_route calculation can just use agent

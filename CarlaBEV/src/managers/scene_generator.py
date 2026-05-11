@@ -1,3 +1,4 @@
+import json
 import os
 import numpy as np
 import warnings
@@ -75,6 +76,19 @@ class SceneGenerator:
             config_file = scene
 
         if config_file:
+            with open(config_file, "r", encoding="utf-8") as handle:
+                raw_config = json.load(handle)
+
+            if "actors" in raw_config:
+                scenario_id = raw_config.get("scenario_id") or raw_config.get("scenario")
+                if scenario_id not in self.scenarios:
+                    raise KeyError(
+                        f"Unknown scenario '{scenario_id}' in authored config '{config_file}'"
+                    )
+                authored_options = dict(options)
+                authored_options["config_file"] = config_file
+                return self.scenarios[scenario_id].sample(**authored_options)
+
             config = load_scenario_config_file(config_file)
             scenario_id = config["scenario_id"]
             if scenario_id not in self.scenarios:

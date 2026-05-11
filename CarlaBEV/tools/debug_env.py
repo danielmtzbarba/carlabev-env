@@ -1,6 +1,7 @@
 import pygame
 import numpy as np
 import tyro
+import os
 
 from CarlaBEV.envs import make_env
 from CarlaBEV.tools.debug.controls import (
@@ -16,6 +17,7 @@ from CarlaBEV.tools.debug.cfg import ArgsCarlaBEV
 
 cfg = tyro.cli(ArgsCarlaBEV)
 DEBUG_PRESET_ID = "jaywalk_debug"
+DEBUG_CONFIG_FILE = os.environ.get("CARLABEV_DEBUG_CONFIG")
 
 
 # Assuming cfg.exp_name and cfg.logging.enabled are defined
@@ -29,6 +31,11 @@ def get_base_env(env):
 
 
 def build_debug_reset_options(reset_mask, overrides=None):
+    if DEBUG_CONFIG_FILE:
+        options = {"config_file": DEBUG_CONFIG_FILE, "reset_mask": reset_mask}
+        if overrides:
+            options.update(overrides)
+        return options
     return build_runtime_scenario_options(
         DEBUG_PRESET_ID,
         reset_mask=reset_mask,

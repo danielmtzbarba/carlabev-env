@@ -3,6 +3,7 @@ from random import randint
 import os
 import sys
 import logging
+import json
 
 import numpy as np
 import pandas as pd
@@ -19,11 +20,20 @@ from CarlaBEV.src.scenes.scene import Scene, Node
 from CarlaBEV.src.scenes.utils import *
 
 from CarlaBEV.src.gui import GUI
+from CarlaBEV.src.gui.components import TextBox, ChoiceBox
 from CarlaBEV.src.gui.settings import Settings
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.actors.pedestrian import Pedestrian
+from CarlaBEV.src.actors.behavior.registry import (
+    behavior_options_for_actor,
+    behavior_label_map_for_actor,
+    build_behavior,
+    get_behavior_spec,
+    normalize_behavior_spec,
+)
 from CarlaBEV.src.scenes.scenarios.specs import (
     build_scenario_config,
+    load_scenario_config_file,
     scenario_config_to_options,
 )
 
@@ -46,6 +56,20 @@ class SceneDesigner(GUI):
         "vehicle": 10.0,
         "pedestrian": 1.6,
     }
+    ACTOR_ROLE_OPTIONS = {
+        "agent": ["ego"],
+        "vehicle": ["vehicle", "lead_vehicle", "rear_vehicle", "cross_traffic"],
+        "pedestrian": ["pedestrian", "jaywalker"],
+    }
+    ACTOR_ROLE_LABELS = {
+        "ego": "Ego",
+        "vehicle": "Vehicle",
+        "lead_vehicle": "Lead Vehicle",
+        "rear_vehicle": "Rear Vehicle",
+        "cross_traffic": "Cross Traffic",
+        "pedestrian": "Pedestrian",
+        "jaywalker": "Jaywalker",
+    }
 
     def __init__(self, env, settings=None):
         GUI.__init__(self, settings=settings)
@@ -59,6 +83,186 @@ class SceneDesigner(GUI):
         self.loaded_scene = None
         self.anchor = None
         self.last_config = None
+        self.loaded_scene_path = None
+        self._init_actor_behavior_widgets()
+        self.refresh_saved_scene_list()
+
+    def _init_actor_behavior_widgets(self):
+        self.actor_speed_box = TextBox((0, 0, 100, 34), self.font, "")
+        self.actor_role_selector = ChoiceBox((0, 0, 100, 34), self.font, ["ego"], labels=self.ACTOR_ROLE_LABELS)
+        self.actor_behavior_selector = ChoiceBox((0, 0, 100, 34), self.font, ["none"])
+        self.actor_behavior_fields = {}
+        self.actor_behavior_active_fields = []
+
+    def refresh_actor_detail_fonts(self):
+        if not hasattr(self, "actor_speed_box"):
+            return
+        self.actor_speed_box.font = self.font
+        self.actor_role_selector.font = self.font
+        self.actor_behavior_selector.font = self.font
+        for box in self.actor_behavior_fields.values():
+            box.font = self.font
+
+    def _default_actor_behavior(self, actor_type):
+        return normalize_behavior_spec(actor_type, None)
+
+    def _default_actor_role(self, actor_type):
+        return self.ACTOR_ROLE_OPTIONS[actor_type][0]
+
+    def _ensure_actor_defaults(self, actor):
+        actor["speed"] = float(actor.get("speed", self.ACTOR_DEFAULT_SPEEDS[actor["type"]]))
+        actor["role"] = actor.get("role", self._default_actor_role(actor["type"]))
+        actor["behavior"] = normalize_behavior_spec(actor["type"], actor.get("behavior"))
+        return actor
+
+    def _selected_actor(self):
+        if self.selected_actor_index is None:
+            return None
+        if self.selected_actor_index >= len(self.designed_actors):
+            return None
+        return self.designed_actors[self.selected_actor_index]
+
+    def _sync_actor_behavior_widgets(self):
+        actor = self._selected_actor()
+        if actor is None:
+            self.actor_speed_box.text = ""
+            self.actor_role_selector.update_options(["ego"], labels=self.ACTOR_ROLE_LABELS)
+            self.actor_role_selector.selected = 0
+            self.actor_behavior_selector.update_options(["none"], labels={"none": "None"})
+            self.actor_behavior_selector.selected = 0
+            self.actor_behavior_fields = {}
+            self.actor_behavior_active_fields = []
+            return
+
+        self._ensure_actor_defaults(actor)
+        actor_type = actor["type"]
+        behavior_spec = actor["behavior"]
+        role_options = self.ACTOR_ROLE_OPTIONS[actor_type]
+        self.actor_role_selector.update_options(role_options, labels=self.ACTOR_ROLE_LABELS)
+        self.actor_role_selector.set_selected_by_value(actor["role"])
+        options = behavior_options_for_actor(actor_type)
+        self.actor_behavior_selector.update_options(options, labels=behavior_label_map_for_actor(actor_type))
+        if behavior_spec["type"] in options:
+            self.actor_behavior_selector.set_selected_by_value(behavior_spec["type"])
+        else:
+            self.actor_behavior_selector.selected = 0
+        self.actor_speed_box.text = str(actor["speed"])
+        spec = get_behavior_spec(actor_type, behavior_spec["type"])
+        self.actor_behavior_active_fields = list(spec.fields)
+        new_boxes = {}
+        for field in self.actor_behavior_active_fields:
+            text = str(behavior_spec["params"].get(field.key, field.default))
+            existing = self.actor_behavior_fields.get(field.key)
+            new_boxes[field.key] = TextBox((0, 0, 100, 34), self.font, existing.text if existing else text)
+            new_boxes[field.key].text = text
+        self.actor_behavior_fields = new_boxes
+        if getattr(self, "_layout_ready", False):
+            self.update_layout(self._map_surface_size)
+
+    def _update_selected_actor_from_widgets(self):
+        actor = self._selected_actor()
+        if actor is None:
+            return
+        actor["speed"] = max(0.0, float(self.actor_speed_box.text or self.ACTOR_DEFAULT_SPEEDS[actor["type"]]))
+        actor["role"] = self.actor_role_selector.selection or self._default_actor_role(actor["type"])
+        behavior_type = self.actor_behavior_selector.selection
+        spec = get_behavior_spec(actor["type"], behavior_type)
+        params = {}
+        for field in spec.fields:
+            params[field.key] = field.parse(self.actor_behavior_fields[field.key].text)
+            self.actor_behavior_fields[field.key].text = str(params[field.key])
+        actor["behavior"] = {"type": behavior_type, "params": params}
+        self.loaded_scene_path = None
+
+    def on_selected_actor_changed(self):
+        self._sync_actor_behavior_widgets()
+
+    def on_editor_tab_changed(self):
+        if self.editor_tab == "actors":
+            self._sync_actor_behavior_widgets()
+
+    def layout_actor_detail_widgets(self, detail_rect):
+        self.actor_detail_rect = detail_rect
+        if detail_rect.width <= 0 or detail_rect.height <= 0:
+            return
+        label_h = self.font_small.get_height()
+        field_gap = self.spacing_xs
+        control_h = max(28, self.textbox_height - 8)
+        row_gap = self.spacing_sm
+        col_gap = self.spacing_sm
+        field_w = (detail_rect.width - col_gap) // 2
+        y = detail_rect.y + label_h + field_gap
+        self.actor_speed_box.rect = pygame.Rect(detail_rect.x, y, field_w, control_h)
+        self.actor_behavior_selector.rect = pygame.Rect(
+            detail_rect.x + field_w + col_gap,
+            y,
+            field_w,
+            control_h,
+        )
+        y += control_h + row_gap + label_h + field_gap
+        self.actor_role_selector.rect = pygame.Rect(detail_rect.x, y, field_w, control_h)
+        param_label_x = detail_rect.x + field_w + col_gap
+        for idx, field in enumerate(self.actor_behavior_active_fields[:2]):
+            box_x = param_label_x if idx == 0 else detail_rect.x
+            box_y = y if idx == 0 else y + control_h + row_gap + label_h + field_gap
+            self.actor_behavior_fields[field.key].rect = pygame.Rect(box_x, y, field_w, control_h)
+            if idx == 1:
+                self.actor_behavior_fields[field.key].rect.y = box_y
+
+    def draw_actor_detail_panel(self, screen, rect):
+        actor = self._selected_actor()
+        if actor is None:
+            self._draw_label("Select an actor to edit speed and behavior.", rect.x, rect.y, small=True)
+            return
+        self._draw_label("Speed (m/s)", self.actor_speed_box.rect.x, self.actor_speed_box.rect.y - self.spacing_xs - self.font_small.get_height(), small=True)
+        self.actor_speed_box.draw(screen)
+        self._draw_label("Behavior", self.actor_behavior_selector.rect.x, self.actor_behavior_selector.rect.y - self.spacing_xs - self.font_small.get_height(), small=True)
+        self.actor_behavior_selector.draw(screen)
+        self._draw_label("Role", self.actor_role_selector.rect.x, self.actor_role_selector.rect.y - self.spacing_xs - self.font_small.get_height(), small=True)
+        self.actor_role_selector.draw(screen)
+        for field in self.actor_behavior_active_fields[:2]:
+            box = self.actor_behavior_fields[field.key]
+            self._draw_label(field.label, box.rect.x, box.rect.y - self.spacing_xs - self.font_small.get_height(), small=True)
+            box.draw(screen)
+
+    def handle_actor_detail_event(self, event):
+        actor = self._selected_actor()
+        if actor is None:
+            return False
+
+        previous_behavior = self.actor_behavior_selector.selected
+        previous_role = self.actor_role_selector.selected
+        previous_speed = self.actor_speed_box.text
+        self.actor_speed_box.handle_event(event)
+        self.actor_role_selector.handle_event(event)
+        self.actor_behavior_selector.handle_event(event)
+        if self.actor_role_selector.selected != previous_role:
+            self._update_selected_actor_from_widgets()
+            self.refresh_scene_preview()
+            return True
+        if self.actor_behavior_selector.selected != previous_behavior:
+            actor["behavior"] = {"type": self.actor_behavior_selector.selection, "params": {}}
+            self._sync_actor_behavior_widgets()
+            self._update_selected_actor_from_widgets()
+            self.refresh_scene_preview()
+            return True
+
+        changed = False
+        if self.actor_speed_box.text != previous_speed:
+            changed = True
+        for box in self.actor_behavior_fields.values():
+            was_text = box.text
+            box.handle_event(event)
+            if box.text != was_text:
+                changed = True
+        if changed:
+            try:
+                self._update_selected_actor_from_widgets()
+                self.refresh_scene_preview()
+            except ValueError:
+                pass
+            return True
+        return False
 
     @staticmethod
     def _build_linear_route(start, end, step_px=8):
@@ -79,17 +283,22 @@ class SceneDesigner(GUI):
             "traffic_light": [],
         }
         for actor in self.designed_actors:
+            self._ensure_actor_defaults(actor)
             rx, ry = self._build_linear_route(actor["start"], actor["end"])
             speed = float(actor.get("speed", self.ACTOR_DEFAULT_SPEEDS[actor["type"]]))
             if actor["type"] == "agent":
                 scene_dict["agent"] = (rx, ry, speed, speed)
             elif actor["type"] == "vehicle":
+                behavior, normalized = build_behavior("vehicle", actor.get("behavior"))
+                actor["behavior"] = normalized
                 scene_dict["vehicle"].append(
-                    Vehicle(self.env.map.size, routeX=rx, routeY=ry, target_speed=speed)
+                    Vehicle(self.env.map.size, routeX=rx, routeY=ry, target_speed=speed, behavior=behavior)
                 )
             elif actor["type"] == "pedestrian":
+                behavior, normalized = build_behavior("pedestrian", actor.get("behavior"))
+                actor["behavior"] = normalized
                 scene_dict["pedestrian"].append(
-                    Pedestrian(self.env.map.size, routeX=rx, routeY=ry, target_speed=speed)
+                    Pedestrian(self.env.map.size, routeX=rx, routeY=ry, target_speed=speed, behavior=behavior)
                 )
         return scene_dict
 
@@ -113,6 +322,150 @@ class SceneDesigner(GUI):
         if self.last_config is not None:
             self.env.reset(options=scenario_config_to_options(self.last_config))
 
+    def _reset_interaction_state(self):
+        self.map_click_mode = None
+        self.pending_actor_type = None
+        self.pending_actor_start = None
+        if self.play_mode:
+            self.play_mode = False
+            self.play_btn.text = "Play Preview"
+            self.env.map.reset()
+
+    def _set_scenario_selection(self, scenario_id):
+        options = self.scenario_selector.options
+        if scenario_id not in options:
+            raise KeyError(f"Unknown scenario '{scenario_id}' in saved scene.")
+        self.scenario_selector.selected = options.index(scenario_id)
+        self.sync_scenario_form()
+
+    def _set_level_selection(self, level):
+        level_text = f"Level {int(level)}"
+        options = self.level_selector.options
+        if level_text in options:
+            self.level_selector.selected = options.index(level_text)
+        else:
+            self.level_selector.selected = 0
+
+    def _load_authored_actors(self, data):
+        actors = []
+        for actor_data in data.get("actors", []):
+            actor_type = actor_data["type"]
+            start = actor_data.get("start")
+            goal = actor_data.get("goal")
+            rx = actor_data.get("rx", [])
+            ry = actor_data.get("ry", [])
+            if start is None and rx and ry:
+                start = {"x": rx[0], "y": ry[0]}
+            if goal is None and rx and ry:
+                goal = {"x": rx[-1], "y": ry[-1]}
+            if start is None or goal is None:
+                continue
+            actors.append(
+                self._ensure_actor_defaults({
+                    "type": actor_type,
+                    "role": actor_data.get("role", self._default_actor_role(actor_type)),
+                    "start": [int(round(start["x"])), int(round(start["y"]))],
+                    "end": [int(round(goal["x"])), int(round(goal["y"]))],
+                    "speed": float(actor_data.get("cruise_speed", actor_data.get("initial_speed", actor_data.get("speed", self.ACTOR_DEFAULT_SPEEDS[actor_type])))),
+                    "behavior": actor_data.get(
+                        "behavior",
+                        {
+                            "type": actor_data.get("behavior", None),
+                            "params": actor_data.get("behavior_kwargs", {}),
+                        } if isinstance(actor_data.get("behavior"), str) else actor_data.get("behavior"),
+                    ),
+                })
+            )
+        self.designed_actors = actors
+        self.selected_actor_index = 0 if actors else None
+        self._sync_actor_behavior_widgets()
+
+    def _resolve_scene_path(self, scene_ref):
+        scene_ref = (scene_ref or "").strip()
+        if not scene_ref:
+            raise ValueError("Scene name is empty.")
+        if scene_ref.endswith(".json"):
+            candidates = [scene_ref]
+        else:
+            candidates = [
+                scene_ref,
+                f"{scene_ref}.json",
+                os.path.join("CarlaBEV/assets/scenes", scene_ref),
+                os.path.join("CarlaBEV/assets/scenes", f"{scene_ref}.json"),
+            ]
+        for candidate in candidates:
+            if os.path.exists(candidate):
+                return candidate
+        raise FileNotFoundError(f"Saved scene '{scene_ref}' was not found.")
+
+    def list_saved_scenes(self):
+        scene_dir = "CarlaBEV/assets/scenes"
+        if not os.path.isdir(scene_dir):
+            return []
+        return sorted(
+            os.path.splitext(name)[0]
+            for name in os.listdir(scene_dir)
+            if name.endswith(".json")
+        )
+
+    def refresh_saved_scene_list(self):
+        selected_name = None
+        if self.loaded_scene_path:
+            selected_name = os.path.splitext(os.path.basename(self.loaded_scene_path))[0]
+        elif self.scene_name.text:
+            selected_name = self.scene_name.text.strip()
+        self.listbox.set_items(self.list_saved_scenes())
+        if selected_name:
+            self.listbox.set_selected_by_value(selected_name)
+
+    def load_scene(self, scene_ref):
+        scene_path = self._resolve_scene_path(scene_ref)
+        with open(scene_path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+
+        scenario_id = data.get("scenario_id") or data.get("scenario")
+        if not scenario_id:
+            raise ValueError(f"Saved scene '{scene_path}' does not define a scenario.")
+
+        self._reset_interaction_state()
+        self.scene_name.text = data.get("scene_id") or os.path.splitext(os.path.basename(scene_path))[0]
+        self.refresh_saved_scene_list()
+        self._set_scenario_selection(scenario_id)
+        self._set_level_selection(data.get("level", 1))
+        self.anchor = data.get("anchor") or None
+        self.loaded_scene_path = scene_path
+        self.refresh_saved_scene_list()
+
+        if "actors" in data:
+            parameters = data.get("parameters") or {}
+            for field in self.active_fields:
+                self.field_boxes[field.key].text = str(parameters.get(field.key, field.default))
+            self._load_authored_actors(data)
+            self.last_config = None
+            self.editor_tab = "actors"
+            self.env.reset(options={"config_file": scene_path})
+            print(f"Loaded authored scene from {scene_path}")
+            self.set_status(
+                f"Loaded authored scene {self.scene_name.text}.",
+                f"Actors: {len(self.designed_actors)}",
+            )
+            return
+
+        config = load_scenario_config_file(scene_path)
+        self.last_config = config
+        self.designed_actors = []
+        self.selected_actor_index = None
+        self.editor_tab = "parameters"
+        self._sync_actor_behavior_widgets()
+        for field in self.active_fields:
+            self.field_boxes[field.key].text = str(config["parameters"].get(field.key, field.default))
+        self.env.reset(options=scenario_config_to_options(config))
+        print(f"Loaded scenario config from {scene_path}")
+        self.set_status(
+            f"Loaded scenario config {self.scene_name.text}.",
+            f"Scenario: {config['scenario_id']} / Level {config['level']}",
+        )
+
     def add_authored_actor(self, actor_type, start_pos, end_pos):
         start = self.screen_to_map_pos(start_pos)
         end = self.screen_to_map_pos(end_pos)
@@ -120,14 +473,18 @@ class SceneDesigner(GUI):
             return
         actor_entry = {
             "type": actor_type,
+            "role": self._default_actor_role(actor_type),
             "start": [int(start[0]), int(start[1])],
             "end": [int(end[0]), int(end[1])],
             "speed": self.ACTOR_DEFAULT_SPEEDS[actor_type],
+            "behavior": self._default_actor_behavior(actor_type),
         }
         if actor_type == "agent":
             self.designed_actors = [actor for actor in self.designed_actors if actor["type"] != "agent"]
         self.designed_actors.append(actor_entry)
         self.selected_actor_index = len(self.designed_actors) - 1
+        self.loaded_scene_path = None
+        self._sync_actor_behavior_widgets()
         self.refresh_scene_preview()
 
     def delete_selected_actor(self):
@@ -138,6 +495,8 @@ class SceneDesigner(GUI):
             self.selected_actor_index = None
         else:
             self.selected_actor_index = min(self.selected_actor_index, len(self.designed_actors) - 1)
+        self.loaded_scene_path = None
+        self._sync_actor_behavior_widgets()
         self.refresh_scene_preview()
 
     def render(self, env=None):
@@ -163,6 +522,7 @@ class SceneDesigner(GUI):
             anchor=self.anchor,
             parameters=parameters,
         )
+        self.loaded_scene_path = None
         options = scenario_config_to_options(self.last_config)
 
         print(f"Anchoring {scenario_key} at ({map_x}, {map_y}) | Level {level}")
@@ -189,22 +549,25 @@ class SceneDesigner(GUI):
         self.toggle_play_mode()
 
     def save_scene(self, scene_id):
-        import json
-
         out_path = f"CarlaBEV/assets/scenes/{scene_id}.json"
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         if self.designed_actors:
             actor_records = []
             for actor in self.designed_actors:
+                self._ensure_actor_defaults(actor)
                 rx, ry = self._build_linear_route(actor["start"], actor["end"])
                 actor_records.append(
                     {
                         "type": actor["type"],
+                        "role": actor["role"],
                         "start": {"x": actor["start"][0], "y": actor["start"][1]},
                         "goal": {"x": actor["end"][0], "y": actor["end"][1]},
                         "rx": rx,
                         "ry": ry,
                         "speed": actor["speed"],
+                        "initial_speed": actor["speed"],
+                        "cruise_speed": actor["speed"],
+                        "behavior": actor["behavior"],
                     }
                 )
             config = {
@@ -227,6 +590,8 @@ class SceneDesigner(GUI):
 
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4)
+        self.loaded_scene_path = out_path
+        self.refresh_saved_scene_list()
         print(f"Saved scenario config to {out_path}")
         self.set_status(
             f"Saved {scene_id}.json",

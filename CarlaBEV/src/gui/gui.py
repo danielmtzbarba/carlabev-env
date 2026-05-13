@@ -20,6 +20,7 @@ class GUI:
     def __init__(self, settings=None):
         self.settings = settings or Settings()
         pygame.display.set_caption("Traffic Scenario Designer")
+        self._allow_window_resize = self._should_allow_window_resize()
         self.min_window_size = (
             960,
             640,
@@ -39,7 +40,7 @@ class GUI:
         window_width, window_height = self._compute_window_size(self._desktop_size)
         self.screen = pygame.display.set_mode(
             (window_width, window_height),
-            pygame.RESIZABLE,
+            self._window_flags(),
         )
         actual_window_size = self.screen.get_size()
         self._refresh_layout_preset(self._desktop_size, actual_window_size, "startup")
@@ -145,12 +146,9 @@ class GUI:
                 width, height = desktop_sizes[display_index]
             else:
                 width, height = desktop_sizes[0]
-            return max(width, self.min_window_size[0]), max(height, self.min_window_size[1])
+            return width, height
         display = pygame.display.Info()
-        return (
-            max(display.current_w, self.min_window_size[0]),
-            max(display.current_h, self.min_window_size[1]),
-        )
+        return display.current_w, display.current_h
 
     def _get_display_index(self):
         if sdl2_video is not None and pygame.display.get_surface() is not None:
@@ -159,6 +157,19 @@ class GUI:
             except Exception:
                 pass
         return int(os.environ.get("PYGAME_DISPLAY", "0"))
+
+    def _should_allow_window_resize(self):
+        session_type = (os.environ.get("XDG_SESSION_TYPE") or "").lower()
+        wayland_display = os.environ.get("WAYLAND_DISPLAY")
+        hyprland_signature = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
+        if hyprland_signature and session_type == "wayland":
+            return False
+        if wayland_display and session_type == "wayland":
+            return False
+        return True
+
+    def _window_flags(self):
+        return pygame.RESIZABLE if self._allow_window_resize else 0
 
     def _display_snapshot(self):
         info = pygame.display.Info()
@@ -221,19 +232,47 @@ class GUI:
             )
 
     def _compute_window_size(self, desktop_size):
-        screen_w = max(desktop_size[0], self.min_window_size[0])
-        screen_h = max(desktop_size[1], self.min_window_size[1])
-        window_width = int(screen_w * self.layout_cfg.window_width_ratio)
-        window_height = int(screen_h * self.layout_cfg.window_height_ratio)
-        window_width = max(
-            self.min_window_size[0],
-            min(window_width, screen_w - self.layout_cfg.window_margin_x),
-        )
-        window_height = max(
-            self.min_window_size[1],
-            min(window_height, screen_h - self.layout_cfg.window_margin_y),
-        )
+        screen_w = max(1, desktop_size[0])
+        screen_h = max(1, desktop_size[1])
+        max_window_width = max(320, screen_w - self.layout_cfg.window_margin_x)
+        max_window_height = max(240, screen_h - self.layout_cfg.window_margin_y)
+        window_width = min(int(screen_w * self.layout_cfg.window_width_ratio), max_window_width)
+        window_height = min(int(screen_h * self.layout_cfg.window_height_ratio), max_window_height)
+        if screen_w >= self.min_window_size[0]:
+            window_width = max(self.min_window_size[0], window_width)
+        if screen_h >= self.min_window_size[1]:
+            window_height = max(self.min_window_size[1], window_height)
+        window_width = max(320, min(window_width, max_window_width))
+        window_height = max(240, min(window_height, max_window_height))
         return window_width, window_height
+
+    def _window_size_below_minimum(self, size):
+        width, height = size
+        return width < self.min_window_size[0] or height < self.min_window_size[1]
+
+    def _desktop_supports_minimum_window(self, desktop_size):
+        width, height = desktop_size
+        return width >= self.min_window_size[0] and height >= self.min_window_size[1]
+
+    def _recover_window_size(self, desktop_size, current_size, reason):
+        target_size = self._compute_window_size(desktop_size)
+        if target_size == current_size:
+            return pygame.display.get_surface(), current_size
+        logger.info(
+            "designer_window_size_recovery[%s] %s",
+            reason,
+            {
+                "current_size": current_size,
+                "target_size": target_size,
+                "desktop_size": desktop_size,
+                "min_window_size": self.min_window_size,
+            },
+        )
+        self.screen = pygame.display.set_mode(target_size, self._window_flags())
+        surface = pygame.display.get_surface()
+        if surface is None:
+            return None, current_size
+        return surface, surface.get_size()
 
     def _refresh_window_metrics(self):
         surface = pygame.display.get_surface()
@@ -247,15 +286,21 @@ class GUI:
         if display_changed:
             self._display_index = current_display_index
             self._last_display_index = current_display_index
+        if current_size[0] <= 0 or current_size[1] <= 0:
+            logger.info("designer_ignoring_invalid_window_size[refresh] %s", {"window_size": current_size})
+            return
+        if self._window_size_below_minimum(current_size) and self._desktop_supports_minimum_window(current_desktop_size):
+            self._user_resized_window = False
+            surface, current_size = self._recover_window_size(current_desktop_size, current_size, "refresh")
+            if surface is None:
+                return
         if desktop_changed:
             self._desktop_size = current_desktop_size
             self._last_desktop_size = current_desktop_size
             if not self._user_resized_window:
-                target_size = self._compute_window_size(current_desktop_size)
-                if target_size != current_size:
-                    self.screen = pygame.display.set_mode(target_size, pygame.RESIZABLE)
-                    surface = pygame.display.get_surface()
-                    current_size = surface.get_size()
+                surface, current_size = self._recover_window_size(current_desktop_size, current_size, "refresh_desktop")
+                if surface is None:
+                    return
         self._refresh_layout_preset(current_desktop_size, current_size, "refresh")
         if current_size != self._last_window_size or desktop_changed or display_changed:
             self.screen = surface
@@ -263,6 +308,30 @@ class GUI:
             self._apply_responsive_metrics(*current_size, desktop_size=current_desktop_size)
             self.update_layout(self._map_surface_size)
             self._log_display_changes("refresh")
+
+    def _handle_window_size_event(self, reason):
+        surface = pygame.display.get_surface()
+        if surface is None:
+            return None
+        current_size = surface.get_size()
+        if current_size[0] <= 0 or current_size[1] <= 0:
+            logger.info("designer_ignoring_invalid_window_size[%s] %s", reason, {"window_size": current_size})
+            return None
+        current_desktop_size = self._get_desktop_size()
+        if self._window_size_below_minimum(current_size) and self._desktop_supports_minimum_window(current_desktop_size):
+            self._user_resized_window = False
+            surface, current_size = self._recover_window_size(current_desktop_size, current_size, reason)
+            if surface is None:
+                return None
+        else:
+            self._user_resized_window = True
+        self.screen = surface
+        self._last_window_size = current_size
+        self._refresh_layout_preset(current_desktop_size, current_size, reason)
+        self._apply_responsive_metrics(*current_size, desktop_size=current_desktop_size)
+        self.update_layout(self._map_surface_size)
+        self._log_display_changes(reason)
+        return None
 
     def _apply_responsive_metrics(self, screen_w, screen_h, desktop_size=None):
         raw_scale = min(
@@ -355,18 +424,21 @@ class GUI:
                 self.update_frame_from_mouse(event.pos[0])
 
     def handle_event(self, event):
-        if event.type == pygame.VIDEORESIZE:
-            surface = pygame.display.get_surface()
-            if surface is None:
-                return None
-            new_w, new_h = surface.get_size()
-            self.screen = surface
-            self._last_window_size = surface.get_size()
-            self._user_resized_window = True
-            self._refresh_layout_preset(self._get_desktop_size(), (new_w, new_h), "videoresize")
-            self._apply_responsive_metrics(new_w, new_h, desktop_size=self._get_desktop_size())
-            self.update_layout(self._map_surface_size)
-            self._log_display_changes("videoresize")
+        if self._allow_window_resize and event.type == pygame.VIDEORESIZE:
+            return self._handle_window_size_event("videoresize")
+
+        window_size_changed = getattr(pygame, "WINDOWSIZECHANGED", None)
+        if self._allow_window_resize and window_size_changed is not None and event.type == window_size_changed:
+            return self._handle_window_size_event("windowsizechanged")
+
+        window_resized = getattr(pygame, "WINDOWRESIZED", None)
+        if self._allow_window_resize and window_resized is not None and event.type == window_resized:
+            return self._handle_window_size_event("windowresized")
+
+        window_display_changed = getattr(pygame, "WINDOWDISPLAYCHANGED", None)
+        if self._allow_window_resize and window_display_changed is not None and event.type == window_display_changed:
+            self._user_resized_window = False
+            self._refresh_window_metrics()
             return None
 
         self.scene_name.handle_event(event)

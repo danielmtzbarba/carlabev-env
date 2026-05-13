@@ -4,6 +4,7 @@ import os
 import sys
 import logging
 import json
+import faulthandler
 
 import numpy as np
 import pandas as pd
@@ -41,6 +42,7 @@ from CarlaBEV.envs import CarlaBEV
 
 device = "cuda:0"
 # -----------------------------------------
+logger = logging.getLogger("carlabev.scene_designer")
 
 
 def configure_logging():
@@ -614,6 +616,7 @@ def main():
     from CarlaBEV.tools.debug.cfg import ArgsCarlaBEV
     
     configure_logging()
+    faulthandler.enable()
     cfg = tyro.cli(ArgsCarlaBEV)
     cfg.env.render_mode = "rgb_array"
     
@@ -627,62 +630,95 @@ def main():
     #
     running = True
     total_reward = 0
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_q:  # Press Q to quit
-                    running = False
-                elif event.key in keys_held:
-                    keys_held[event.key] = True
-            elif event.type == pygame.KEYUP:
-                if event.key in keys_held:
-                    keys_held[event.key] = False
+    last_window_event_ms = -10000
+    ignored_quit_events = 0
+    explicit_close_requested = False
+    try:
+        while running:
+            for event in pygame.event.get():
+                event_name = pygame.event.event_name(event.type)
+                if event_name.startswith("Window"):
+                    last_window_event_ms = pygame.time.get_ticks()
+                    if event.type != getattr(pygame, "WINDOWEXPOSED", None):
+                        logger.info("designer_window_event %s", {"event": event_name})
 
-            flag = app.handle_event(event)
-
-            if flag == "rdm":
-                observation, info = env.reset(options={"scene": "rdm"})
-                total_reward = 0
-            elif isinstance(flag, dict) and flag.get("action") == "anchor":
-                app.add_anchor(flag["pos"])
-            elif isinstance(flag, dict) and flag.get("action") == "add_actor":
-                app.add_authored_actor(
-                    flag["actor_type"],
-                    flag["start_pos"],
-                    flag["end_pos"],
-                )
-            elif isinstance(flag, dict) and flag.get("action") == "delete_actor":
-                app.delete_selected_actor()
-
-        app.loaded_scene = "notNone"
-        if app.play_mode:
-            action = get_action_from_keys(keys_held)
-            action = randint(0, 8)
-
-            # Step through the environment
-            observation, reward, terminated, _, info = env.step(action)
-            total_reward += reward
-
-            # Reset if episode ends
-            if terminated:
-                episode_info = info.get("episode_info", {})
-                ret = episode_info.get("return", total_reward)
-                length = episode_info.get("length", 0)
-                total_reward = 0
-                print(f"Episode finished | return={ret} | length={length}")
-                if app.designed_actors:
-                    app.refresh_scene_preview()
-                else:
-                    reset_options = (
-                        scenario_config_to_options(app.last_config)
-                        if app.last_config is not None
-                        else {}
+                if event.type == pygame.QUIT:
+                    surface = pygame.display.get_surface()
+                    if explicit_close_requested:
+                        logger.info("designer_quit_event %s", {"event": event_name})
+                        running = False
+                        continue
+                    ignored_quit_events += 1
+                    logger.info(
+                        "designer_ignored_quit_event %s",
+                        {
+                            "event": event_name,
+                            "ignored_count": ignored_quit_events,
+                            "window_size": surface.get_size() if surface is not None else None,
+                            "ms_since_window_event": pygame.time.get_ticks() - last_window_event_ms,
+                        },
                     )
-                    observation, info = env.reset(options=reset_options)
+                    continue
+                elif getattr(pygame, "WINDOWCLOSE", None) is not None and event.type == pygame.WINDOWCLOSE:
+                    logger.info("designer_window_close_event %s", {"event": event_name})
+                    explicit_close_requested = True
+                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_q:  # Press Q to quit
+                        explicit_close_requested = True
+                        running = False
+                    elif event.key in keys_held:
+                        keys_held[event.key] = True
+                elif event.type == pygame.KEYUP:
+                    if event.key in keys_held:
+                        keys_held[event.key] = False
 
-        app.render(env)
+                flag = app.handle_event(event)
+
+                if flag == "rdm":
+                    observation, info = env.reset(options={"scene": "rdm"})
+                    total_reward = 0
+                elif isinstance(flag, dict) and flag.get("action") == "anchor":
+                    app.add_anchor(flag["pos"])
+                elif isinstance(flag, dict) and flag.get("action") == "add_actor":
+                    app.add_authored_actor(
+                        flag["actor_type"],
+                        flag["start_pos"],
+                        flag["end_pos"],
+                    )
+                elif isinstance(flag, dict) and flag.get("action") == "delete_actor":
+                    app.delete_selected_actor()
+
+            app.loaded_scene = "notNone"
+            if app.play_mode:
+                action = get_action_from_keys(keys_held)
+                action = randint(0, 8)
+
+                # Step through the environment
+                observation, reward, terminated, _, info = env.step(action)
+                total_reward += reward
+
+                # Reset if episode ends
+                if terminated:
+                    episode_info = info.get("episode_info", {})
+                    ret = episode_info.get("return", total_reward)
+                    length = episode_info.get("length", 0)
+                    total_reward = 0
+                    print(f"Episode finished | return={ret} | length={length}")
+                    if app.designed_actors:
+                        app.refresh_scene_preview()
+                    else:
+                        reset_options = (
+                            scenario_config_to_options(app.last_config)
+                            if app.last_config is not None
+                            else {}
+                        )
+                        observation, info = env.reset(options=reset_options)
+
+            app.render(env)
+    except Exception:
+        logger.exception("scene_designer_main_loop_crashed")
+        raise
 
     env.close()
     pygame.quit()

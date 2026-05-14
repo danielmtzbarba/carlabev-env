@@ -1,10 +1,24 @@
-import pygame
-from random import randint
 import os
 import sys
 import logging
 import json
 import faulthandler
+from random import randint
+
+
+def configure_sdl_backend():
+    session_type = (os.environ.get("XDG_SESSION_TYPE") or "").lower()
+    hyprland_signature = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
+    if hyprland_signature and session_type == "wayland":
+        # Force a consistent X11/XWayland startup path on Hyprland before SDL loads.
+        os.environ.setdefault("SDL_VIDEODRIVER", "x11")
+        os.environ.pop("WAYLAND_DISPLAY", None)
+        os.environ.setdefault("SDL_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR", "0")
+
+
+configure_sdl_backend()
+
+import pygame
 
 import numpy as np
 import pandas as pd
@@ -502,8 +516,9 @@ class SceneDesigner(GUI):
         self.refresh_scene_preview()
 
     def render(self, env=None):
+        if not self._can_render_window():
+            return
         self.draw_gui()
-        self.draw_fov()
         pygame.display.flip()
 
     def add_anchor(self, pos):
@@ -617,6 +632,15 @@ def main():
     
     configure_logging()
     faulthandler.enable()
+    logger.info(
+        "designer_sdl_backend %s",
+        {
+            "SDL_VIDEODRIVER": os.environ.get("SDL_VIDEODRIVER"),
+            "WAYLAND_DISPLAY": os.environ.get("WAYLAND_DISPLAY"),
+            "DISPLAY": os.environ.get("DISPLAY"),
+            "XDG_SESSION_TYPE": os.environ.get("XDG_SESSION_TYPE"),
+        },
+    )
     cfg = tyro.cli(ArgsCarlaBEV)
     cfg.env.render_mode = "rgb_array"
     

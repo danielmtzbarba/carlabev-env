@@ -10,11 +10,6 @@ from CarlaBEV.src.scenes.scenarios.specs import get_scenario_spec, list_scenario
 
 logger = logging.getLogger("carlabev.scene_designer")
 
-try:
-    import pygame._sdl2.video as sdl2_video
-except Exception:  # pragma: no cover - optional SDL2 path
-    sdl2_video = None
-
 
 class GUI:
     def __init__(self, settings=None):
@@ -31,6 +26,8 @@ class GUI:
         self._last_display_index = self._display_index
         self._user_resized_window = False
         self._last_display_snapshot = None
+        self._window_visible = True
+        self._window_minimized = False
         self._resolved_layout_preset = self._resolve_layout_preset(self._desktop_size)
         self.layout_cfg = self._get_runtime_layout_config(self._resolved_layout_preset)
         self.min_window_size = (
@@ -68,6 +65,7 @@ class GUI:
         self._map_surface_size = (128, 128)
         self._map_crop_rect = pygame.Rect(0, 0, 128, 128)
         self._layout_ready = False
+        self._layout_dirty = True
         self.left_scroll_offset = 0
         self.left_content_height = 0
 
@@ -124,9 +122,11 @@ class GUI:
         effective_w = min(desktop_w, window_w)
         if desktop_w >= 1800 and desktop_h >= 1000 and window_w >= 1400 and window_h >= 850:
             return "wide"
-        if effective_h <= 620 and effective_w <= 760:
+        if effective_h <= 700:
             return "dense"
-        if effective_h <= 760 or effective_w <= 1180:
+        if effective_h <= 980:
+            return "compact"
+        if effective_w <= 1180:
             return "compact"
         return "comfortable"
 
@@ -151,12 +151,16 @@ class GUI:
         return display.current_w, display.current_h
 
     def _get_display_index(self):
-        if sdl2_video is not None and pygame.display.get_surface() is not None:
-            try:
-                return int(sdl2_video.Window.from_display_module().display_index)
-            except Exception:
-                pass
         return int(os.environ.get("PYGAME_DISPLAY", "0"))
+
+    def _can_render_window(self):
+        if not self._window_visible or self._window_minimized:
+            return False
+        surface = pygame.display.get_surface()
+        if surface is None:
+            return False
+        width, height = surface.get_size()
+        return width > 0 and height > 0
 
     def _should_allow_window_resize(self):
         session_type = (os.environ.get("XDG_SESSION_TYPE") or "").lower()
@@ -275,6 +279,8 @@ class GUI:
         return surface, surface.get_size()
 
     def _refresh_window_metrics(self):
+        if not self._can_render_window():
+            return
         surface = pygame.display.get_surface()
         if surface is None:
             return
@@ -343,6 +349,10 @@ class GUI:
             scale = 1.0 + (raw_scale - 1.0) * 0.45
         else:
             scale = 1.0 - (1.0 - raw_scale) * 0.80
+        if screen_h <= 900:
+            scale *= 0.86
+        elif screen_h <= 980:
+            scale *= 0.92
         self.ui_scale = max(self.layout_cfg.scale_min, min(scale, self.layout_cfg.scale_max))
 
         self.spacing_xs = max(4, int(round(self.layout_cfg.spacing_xs_base * self.ui_scale)))
@@ -424,6 +434,29 @@ class GUI:
                 self.update_frame_from_mouse(event.pos[0])
 
     def handle_event(self, event):
+        window_hidden = getattr(pygame, "WINDOWHIDDEN", None)
+        if window_hidden is not None and event.type == window_hidden:
+            self._window_visible = False
+            return None
+
+        window_shown = getattr(pygame, "WINDOWSHOWN", None)
+        if window_shown is not None and event.type == window_shown:
+            self._window_visible = True
+            return None
+
+        window_minimized = getattr(pygame, "WINDOWMINIMIZED", None)
+        if window_minimized is not None and event.type == window_minimized:
+            self._window_minimized = True
+            return None
+
+        window_restored = getattr(pygame, "WINDOWRESTORED", None)
+        if window_restored is not None and event.type == window_restored:
+            self._window_minimized = False
+            self._window_visible = True
+            self._layout_dirty = True
+            self._refresh_window_metrics()
+            return None
+
         if self._allow_window_resize and event.type == pygame.VIDEORESIZE:
             return self._handle_window_size_event("videoresize")
 
@@ -591,6 +624,8 @@ class GUI:
 
         if self._layout_ready:
             self.update_layout(self._map_surface_size)
+        else:
+            self._layout_dirty = True
 
     def get_form_values(self):
         values = {}
@@ -683,6 +718,7 @@ class GUI:
 
         self.layout_controls()
         self._layout_ready = True
+        self._layout_dirty = False
 
     def layout_controls(self):
         left_x = self.left_panel_rect.x + self.panel_padding
@@ -747,14 +783,6 @@ class GUI:
             + actor_detail_h
             + card_bottom_pad
         )
-        status_section_h = (
-            card_top_pad
-            + card_title_h
-            + card_header_gap
-            + len(self.status_summary_lines()) * self.font.get_height()
-            + max(0, len(self.status_summary_lines()) - 1) * self.spacing_sm
-            + card_bottom_pad
-        )
         editor_content_h = max(params_section_h, actors_section_h)
         section_heights = {
             "scene_name": card_top_pad + card_title_h + card_header_gap + self.textbox_height + card_bottom_pad,
@@ -768,7 +796,6 @@ class GUI:
                 + card_bottom_pad
             ),
             "editor": card_top_pad + tab_h + card_header_gap + max(params_content_h, actors_section_h - card_top_pad - tab_h - card_header_gap - card_bottom_pad) + card_bottom_pad,
-            "status": status_section_h,
         }
         section_order = ["scene_name", "setup", "editor"]
         natural_gap = self.spacing_lg
@@ -778,10 +805,7 @@ class GUI:
         content_top = self.left_body_rect.y + self.spacing_sm
         content_bottom = self.left_body_rect.bottom - self.spacing_sm
         available_h = max(0, content_bottom - content_top)
-        status_gap = self.spacing_lg
-        status_y = content_bottom - section_heights["status"]
-        upper_content_bottom = max(content_top, status_y - status_gap)
-        upper_available_h = max(0, upper_content_bottom - content_top)
+        upper_available_h = available_h
         total_section_h = sum(section_heights[name] for name in section_order)
         gap_count = max(1, len(section_order) - 1)
         max_fit_gap = max(0, (upper_available_h - total_section_h) // gap_count)
@@ -893,14 +917,7 @@ class GUI:
             self.layout_actor_detail_widgets(self.actor_detail_rect)
         y += section_heights["editor"] + distributed_gap
 
-        self.section_rects["status"] = pygame.Rect(
-            left_x - self.section_pad,
-            status_y,
-            left_w + 2 * self.section_pad,
-            section_heights["status"],
-        )
-
-        content_end = self.section_rects["status"].bottom + self.spacing_sm
+        content_end = y
         self.left_content_height = max(available_h, content_end - content_top)
 
         right_x = self.right_panel_rect.x + self.panel_padding
@@ -1045,10 +1062,13 @@ class GUI:
         )
 
     def draw_gui(self):
+        if not self._can_render_window():
+            return
         self._refresh_window_metrics()
         map_surface = self.env.map.map_surface
         self._map_crop_rect = self._compute_map_crop_rect(map_surface)
-        self.update_layout(map_surface.get_size())
+        if not self._layout_ready or self._layout_dirty or map_surface.get_size() != self._map_surface_size:
+            self.update_layout(map_surface.get_size())
         self.screen.fill(self.colors["app_bg"])
 
         self._draw_side_panels()
@@ -1118,20 +1138,6 @@ class GUI:
             self._draw_actor_rows()
             if hasattr(self, "draw_actor_detail_panel"):
                 self.draw_actor_detail_panel(self.screen, self.actor_detail_rect)
-
-        self._draw_soft_section(self.section_rects["status"])
-        status_x = self.section_rects["status"].x + self.section_pad
-        status_y = self.section_rects["status"].y + self.section_pad
-        self._draw_section_header("Status", status_x, status_y)
-        summary_y = status_y + self.font_section.get_height() + self.spacing_sm
-        for idx, line in enumerate(self.status_summary_lines()):
-            self.screen.blit(
-                self.font.render(line, True, self.colors["text"]),
-                (
-                    status_x,
-                    summary_y + idx * (self.font.get_height() + self.spacing_sm),
-                ),
-            )
 
         self.screen.set_clip(previous_clip)
 

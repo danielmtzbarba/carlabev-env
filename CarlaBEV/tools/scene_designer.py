@@ -347,6 +347,21 @@ class SceneDesigner(GUI):
         ry = np.linspace(start[1], end[1], num_points).round().astype(int).tolist()
         return rx, ry
 
+    @classmethod
+    def _build_route_from_waypoints(cls, waypoints, step_px=8):
+        if len(waypoints) < 2:
+            raise ValueError("Actor route needs at least two waypoints.")
+        route_x = []
+        route_y = []
+        for idx in range(len(waypoints) - 1):
+            seg_x, seg_y = cls._build_linear_route(waypoints[idx], waypoints[idx + 1], step_px=step_px)
+            if idx > 0:
+                seg_x = seg_x[1:]
+                seg_y = seg_y[1:]
+            route_x.extend(seg_x)
+            route_y.extend(seg_y)
+        return route_x, route_y
+
     def _build_authored_scene_dict(self):
         scene_dict = {
             "agent": None,
@@ -357,7 +372,8 @@ class SceneDesigner(GUI):
         }
         for actor in self.designed_actors:
             self._ensure_actor_defaults(actor)
-            rx, ry = self._build_linear_route(actor["start"], actor["end"])
+            waypoints = actor.get("waypoints") or [actor["start"], actor["end"]]
+            rx, ry = self._build_route_from_waypoints(waypoints)
             speed = float(actor.get("speed", self.ACTOR_DEFAULT_SPEEDS[actor["type"]]))
             if actor["type"] == "agent":
                 scene_dict["agent"] = (rx, ry, speed, speed)
@@ -421,6 +437,7 @@ class SceneDesigner(GUI):
         self.map_click_mode = None
         self.pending_actor_type = None
         self.pending_actor_start = None
+        self.pending_actor_waypoints = []
         if self.play_mode:
             self.play_mode = False
             self.play_btn.text = "Play Preview"
@@ -445,22 +462,38 @@ class SceneDesigner(GUI):
         actors = []
         for actor_data in data.get("actors", []):
             actor_type = actor_data["type"]
+            waypoints = actor_data.get("waypoints")
             start = actor_data.get("start")
             goal = actor_data.get("goal")
             rx = actor_data.get("rx", [])
             ry = actor_data.get("ry", [])
+            if waypoints:
+                normalized_waypoints = [
+                    [int(round(point[0])), int(round(point[1]))]
+                    for point in waypoints
+                ]
+                start = {"x": normalized_waypoints[0][0], "y": normalized_waypoints[0][1]}
+                goal = {"x": normalized_waypoints[-1][0], "y": normalized_waypoints[-1][1]}
+            else:
+                normalized_waypoints = None
             if start is None and rx and ry:
                 start = {"x": rx[0], "y": ry[0]}
             if goal is None and rx and ry:
                 goal = {"x": rx[-1], "y": ry[-1]}
             if start is None or goal is None:
                 continue
+            if normalized_waypoints is None:
+                normalized_waypoints = [
+                    [int(round(start["x"])), int(round(start["y"]))],
+                    [int(round(goal["x"])), int(round(goal["y"]))],
+                ]
             actors.append(
                 self._ensure_actor_defaults({
                     "type": actor_type,
                     "role": actor_data.get("role", self._default_actor_role(actor_type)),
-                    "start": [int(round(start["x"])), int(round(start["y"]))],
-                    "end": [int(round(goal["x"])), int(round(goal["y"]))],
+                    "start": normalized_waypoints[0],
+                    "end": normalized_waypoints[-1],
+                    "waypoints": normalized_waypoints,
                     "speed": float(actor_data.get("cruise_speed", actor_data.get("initial_speed", actor_data.get("speed", self.ACTOR_DEFAULT_SPEEDS[actor_type])))),
                     "signal_state": actor_data.get("signal_state", "red"),
                     "behavior": actor_data.get(
@@ -562,16 +595,16 @@ class SceneDesigner(GUI):
             f"Scenario: {config['scenario_id']} / Level {config['level']}",
         )
 
-    def add_authored_actor(self, actor_type, start_pos, end_pos):
-        start = self.screen_to_map_pos(start_pos)
-        end = self.screen_to_map_pos(end_pos)
-        if start is None or end is None:
+    def add_authored_actor_route(self, actor_type, waypoints):
+        if len(waypoints) < 2:
             return
+        normalized_waypoints = [[int(point[0]), int(point[1])] for point in waypoints]
         actor_entry = {
             "type": actor_type,
             "role": self._default_actor_role(actor_type),
-            "start": [int(start[0]), int(start[1])],
-            "end": [int(end[0]), int(end[1])],
+            "start": list(normalized_waypoints[0]),
+            "end": list(normalized_waypoints[-1]),
+            "waypoints": normalized_waypoints,
             "speed": self.ACTOR_DEFAULT_SPEEDS[actor_type],
             "signal_state": "red",
             "behavior": self._default_actor_behavior(actor_type),
@@ -653,13 +686,15 @@ class SceneDesigner(GUI):
             actor_records = []
             for actor in self.designed_actors:
                 self._ensure_actor_defaults(actor)
-                rx, ry = self._build_linear_route(actor["start"], actor["end"])
+                waypoints = actor.get("waypoints") or [actor["start"], actor["end"]]
+                rx, ry = self._build_route_from_waypoints(waypoints)
                 actor_records.append(
                     {
                         "type": actor["type"],
                         "role": actor["role"],
-                        "start": {"x": actor["start"][0], "y": actor["start"][1]},
-                        "goal": {"x": actor["end"][0], "y": actor["end"][1]},
+                        "start": {"x": waypoints[0][0], "y": waypoints[0][1]},
+                        "goal": {"x": waypoints[-1][0], "y": waypoints[-1][1]},
+                        "waypoints": waypoints,
                         "rx": rx,
                         "ry": ry,
                         "speed": actor["speed"],
@@ -786,11 +821,10 @@ def main():
                     total_reward = 0
                 elif isinstance(flag, dict) and flag.get("action") == "anchor":
                     app.add_anchor(flag["pos"])
-                elif isinstance(flag, dict) and flag.get("action") == "add_actor":
-                    app.add_authored_actor(
+                elif isinstance(flag, dict) and flag.get("action") == "add_actor_route":
+                    app.add_authored_actor_route(
                         flag["actor_type"],
-                        flag["start_pos"],
-                        flag["end_pos"],
+                        flag["waypoints"],
                     )
                 elif isinstance(flag, dict) and flag.get("action") == "delete_actor":
                     app.delete_selected_actor()

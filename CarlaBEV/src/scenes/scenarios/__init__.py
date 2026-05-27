@@ -7,6 +7,31 @@ from CarlaBEV.src.scenes.scenarios.specs import (
 )
 from CarlaBEV.src.actors.behavior.registry import build_behavior
 
+
+def _build_linear_route(start, end, step_px=8):
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    length = max(abs(dx), abs(dy))
+    num_points = max(2, int(length / max(1, step_px)) + 1)
+    rx = np.linspace(start[0], end[0], num_points).round().astype(int).tolist()
+    ry = np.linspace(start[1], end[1], num_points).round().astype(int).tolist()
+    return rx, ry
+
+
+def _build_route_from_waypoints(waypoints, step_px=8):
+    if len(waypoints) < 2:
+        return [], []
+    route_x = []
+    route_y = []
+    for idx in range(len(waypoints) - 1):
+        seg_x, seg_y = _build_linear_route(waypoints[idx], waypoints[idx + 1], step_px=step_px)
+        if idx > 0:
+            seg_x = seg_x[1:]
+            seg_y = seg_y[1:]
+        route_x.extend(seg_x)
+        route_y.extend(seg_y)
+    return route_x, route_y
+
 class Scenario:
     def __init__(self, name, map_size=128):
         self.name = name
@@ -57,8 +82,12 @@ class Scenario:
 
         for actor_data in data["actors"]:
             atype = actor_data["type"]
-            rx = actor_data["rx"]
-            ry = actor_data["ry"]
+            rx = actor_data.get("rx")
+            ry = actor_data.get("ry")
+            if (not rx or not ry) and actor_data.get("waypoints"):
+                rx, ry = _build_route_from_waypoints(actor_data["waypoints"])
+            rx = rx or []
+            ry = ry or []
             speed = actor_data.get(
                 "cruise_speed",
                 actor_data.get("initial_speed", actor_data.get("speed", 2.0)),

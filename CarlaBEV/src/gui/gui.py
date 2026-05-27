@@ -76,6 +76,7 @@ class GUI:
         self.map_click_mode = None
         self.pending_actor_type = None
         self.pending_actor_start = None
+        self.pending_actor_waypoints = []
         self.designed_actors = []
         self.selected_actor_index = None
         self.actor_row_rects = []
@@ -98,6 +99,7 @@ class GUI:
         self.place_vehicle_btn = Button((0, 0, 120, 34), self.font, "Place Vehicle")
         self.place_ped_btn = Button((0, 0, 120, 34), self.font, "Place Ped")
         self.place_light_btn = Button((0, 0, 120, 34), self.font, "Place Light")
+        self.finish_route_btn = Button((0, 0, 120, 34), self.font, "Finish Route")
         self.listbox = ListBox((0, 0, 100, 100), self.font)
         self.save_btn = Button((0, 0, 120, 34), self.font, "Save Config")
         self.load_btn = Button((0, 0, 120, 34), self.font, "Load Config")
@@ -419,6 +421,7 @@ class GUI:
             "place_vehicle_btn",
             "place_ped_btn",
             "place_light_btn",
+            "finish_route_btn",
         ):
             if hasattr(self, widget):
                 getattr(self, widget).font = self.font_button
@@ -539,6 +542,7 @@ class GUI:
                     self.place_vehicle_btn.rect,
                     self.place_ped_btn.rect,
                     self.place_light_btn.rect,
+                    self.finish_route_btn.rect,
                     self.add_rdm_actor_btn.rect,
                     self.play_btn.rect,
                 ]
@@ -550,23 +554,16 @@ class GUI:
             if self.map_click_mode == "anchor":
                 self.map_click_mode = None
                 return {"action": "anchor", "pos": event.pos}
-            if self.map_click_mode == "actor_start":
-                self.pending_actor_start = event.pos
-                self.map_click_mode = "actor_end"
-                self.set_status("Select the actor end position.", "Second click completes the route.")
+            if self.map_click_mode == "actor_route":
+                map_pos = self.screen_to_map_pos(event.pos)
+                if map_pos is not None:
+                    self.pending_actor_waypoints.append([int(map_pos[0]), int(map_pos[1])])
+                    actor_name = (self.pending_actor_type or "actor").replace("agent", "ego")
+                    self.set_status(
+                        f"{actor_name.title()} route has {len(self.pending_actor_waypoints)} waypoint(s).",
+                        "Click to add more waypoints, then use Finish Route.",
+                    )
                 return None
-            if self.map_click_mode == "actor_end" and self.pending_actor_start is not None:
-                start_pos = self.pending_actor_start
-                actor_type = self.pending_actor_type
-                self.pending_actor_start = None
-                self.pending_actor_type = None
-                self.map_click_mode = None
-                return {
-                    "action": "add_actor",
-                    "actor_type": actor_type,
-                    "start_pos": start_pos,
-                    "end_pos": event.pos,
-                }
 
         if self.add_rdm_actor_btn.handle_event(event):
             self.env.reset(options={"scene": "rdm"})
@@ -595,35 +592,56 @@ class GUI:
             self.map_click_mode = "anchor"
             self.pending_actor_start = None
             self.pending_actor_type = None
+            self.pending_actor_waypoints = []
             self.set_status("Click the map to place the scenario anchor.", "Anchor placement is active.")
             return None
 
         if self.place_ego_btn.handle_event(event):
-            self.map_click_mode = "actor_start"
+            self.map_click_mode = "actor_route"
             self.pending_actor_type = "agent"
             self.pending_actor_start = None
-            self.set_status("Click the ego start position.", "Second click sets the ego end position.")
+            self.pending_actor_waypoints = []
+            self.set_status("Click the ego route waypoints.", "Use Finish Route when the route is complete.")
             return None
 
         if self.place_vehicle_btn.handle_event(event):
-            self.map_click_mode = "actor_start"
+            self.map_click_mode = "actor_route"
             self.pending_actor_type = "vehicle"
             self.pending_actor_start = None
-            self.set_status("Click the vehicle start position.", "Second click sets the vehicle end position.")
+            self.pending_actor_waypoints = []
+            self.set_status("Click the vehicle route waypoints.", "Use Finish Route when the route is complete.")
             return None
 
         if self.place_ped_btn.handle_event(event):
-            self.map_click_mode = "actor_start"
+            self.map_click_mode = "actor_route"
             self.pending_actor_type = "pedestrian"
             self.pending_actor_start = None
-            self.set_status("Click the pedestrian start position.", "Second click sets the pedestrian end position.")
+            self.pending_actor_waypoints = []
+            self.set_status("Click the pedestrian route waypoints.", "Use Finish Route when the route is complete.")
             return None
 
         if self.place_light_btn.handle_event(event):
-            self.map_click_mode = "actor_start"
+            self.map_click_mode = "actor_route"
             self.pending_actor_type = "traffic_light"
             self.pending_actor_start = None
-            self.set_status("Click the traffic-light strip start position.", "Second click sets the strip end position.")
+            self.pending_actor_waypoints = []
+            self.set_status("Click the traffic-light strip waypoints.", "Use Finish Route when the strip is complete.")
+            return None
+
+        if self.finish_route_btn.handle_event(event):
+            if self.map_click_mode == "actor_route" and self.pending_actor_type and len(self.pending_actor_waypoints) >= 2:
+                actor_type = self.pending_actor_type
+                waypoints = list(self.pending_actor_waypoints)
+                self.pending_actor_start = None
+                self.pending_actor_type = None
+                self.pending_actor_waypoints = []
+                self.map_click_mode = None
+                return {
+                    "action": "add_actor_route",
+                    "actor_type": actor_type,
+                    "waypoints": waypoints,
+                }
+            self.set_status("Route needs at least two waypoints.", "Add waypoints on the map before finishing the route.")
             return None
 
         if self.del_btn.handle_event(event):
@@ -822,8 +840,8 @@ class GUI:
             card_top_pad
             + tab_h
             + card_header_gap
-            + 3 * self.button_height
-            + 2 * actor_button_gap
+            + 4 * self.button_height
+            + 3 * actor_button_gap
             + self.spacing_md
             + actor_list_h
             + self.spacing_md
@@ -952,7 +970,13 @@ class GUI:
             left_w,
             self.button_height,
         )
-        actor_list_y = actor_buttons_y + 3 * self.button_height + 2 * actor_button_gap + self.spacing_md
+        self.finish_route_btn.rect = pygame.Rect(
+            left_x,
+            self.del_btn.rect.bottom + actor_button_gap,
+            left_w,
+            self.button_height,
+        )
+        actor_list_y = self.finish_route_btn.rect.bottom + self.spacing_md
         self.actor_row_rects = []
         actor_card_x = self.section_rects["editor"].x + self.section_pad
         actor_card_w = self.section_rects["editor"].width - 2 * self.section_pad
@@ -1075,14 +1099,14 @@ class GUI:
     def current_map_help_text(self):
         if self.map_click_mode == "anchor":
             return "Click on the map to place the scenario anchor."
-        if self.map_click_mode == "actor_start":
+        if self.map_click_mode == "actor_route":
             actor_name = (self.pending_actor_type or "actor").replace("agent", "ego")
-            return f"Click on the map to place the {actor_name} start point."
-        if self.map_click_mode == "actor_end":
-            actor_name = (self.pending_actor_type or "actor").replace("agent", "ego")
-            return f"Click on the map to place the {actor_name} end point."
+            count = len(self.pending_actor_waypoints)
+            if count == 0:
+                return f"Click on the map to place the first {actor_name} waypoint."
+            return f"{actor_name.title()} route has {count} waypoint(s). Click to add more, then use Finish Route."
         if self.editor_tab == "actors":
-            return "Use the actor tools to place start and end points on the map."
+            return "Use the actor tools to place waypoint routes on the map."
         return "Use Anchor On Map or an actor placement button to start editing on the map."
 
     def draw_fov(self):
@@ -1191,6 +1215,7 @@ class GUI:
             self.place_ped_btn.draw(self.screen)
             self.place_light_btn.draw(self.screen)
             self.del_btn.draw(self.screen)
+            self.finish_route_btn.draw(self.screen)
             self._draw_actor_rows()
             if hasattr(self, "draw_actor_detail_panel"):
                 self.draw_actor_detail_panel(self.screen, self.actor_detail_rect)
@@ -1218,10 +1243,11 @@ class GUI:
             actor = self.designed_actors[actor_idx]
             label = actor["type"].replace("agent", "ego").replace("_", " ").title()
             role = actor.get("role")
-            start = actor["start"]
-            end = actor["end"]
+            waypoints = actor.get("waypoints") or [actor["start"], actor["end"]]
+            start = waypoints[0]
+            end = waypoints[-1]
             prefix = f"{label}/{role}" if role and role not in {actor["type"], "ego"} else label
-            text = f"{prefix}: ({start[0]}, {start[1]}) -> ({end[0]}, {end[1]})"
+            text = f"{prefix}: {len(waypoints)} pts ({start[0]}, {start[1]}) -> ({end[0]}, {end[1]})"
             dot_color = actor_colors.get(actor["type"], self.colors["accent"])
             pygame.draw.circle(self.screen, dot_color, (row_rect.x + 10, row_rect.centery), 4)
             surf = self.font_small.render(text, True, self.colors["text"])
@@ -1254,19 +1280,25 @@ class GUI:
             "traffic_light": (212, 162, 38),
         }
         for idx, actor in enumerate(self.designed_actors):
-            start = self.map_to_screen_pos(actor["start"])
-            end = self.map_to_screen_pos(actor["end"])
-            if start is None or end is None:
+            waypoints = actor.get("waypoints") or [actor["start"], actor["end"]]
+            screen_points = [self.map_to_screen_pos(point) for point in waypoints]
+            screen_points = [point for point in screen_points if point is not None]
+            if len(screen_points) < 2:
                 continue
             color = actor_colors.get(actor["type"], self.colors["accent"])
             width = 4 if idx == self.selected_actor_index else 2
-            pygame.draw.line(self.screen, color, start, end, width)
-            pygame.draw.circle(self.screen, (50, 180, 80), start, 6 if idx == self.selected_actor_index else 5)
-            pygame.draw.circle(self.screen, (215, 80, 80), end, 6 if idx == self.selected_actor_index else 5)
-        if self.pending_actor_start is not None:
-            start = self.map_to_screen_pos(self.screen_to_map_pos(self.pending_actor_start))
-            if start is not None:
-                pygame.draw.circle(self.screen, self.colors["accent"], start, 6)
+            pygame.draw.lines(self.screen, color, False, screen_points, width)
+            for point in screen_points[1:-1]:
+                pygame.draw.circle(self.screen, color, point, 4)
+            pygame.draw.circle(self.screen, (50, 180, 80), screen_points[0], 6 if idx == self.selected_actor_index else 5)
+            pygame.draw.circle(self.screen, (215, 80, 80), screen_points[-1], 6 if idx == self.selected_actor_index else 5)
+        if self.pending_actor_waypoints:
+            pending_points = [self.map_to_screen_pos(point) for point in self.pending_actor_waypoints]
+            pending_points = [point for point in pending_points if point is not None]
+            if len(pending_points) >= 2:
+                pygame.draw.lines(self.screen, self.colors["accent"], False, pending_points, 2)
+            for point in pending_points:
+                pygame.draw.circle(self.screen, self.colors["accent"], point, 5)
 
     def _draw_center_canvas(self):
         frame_rect = self.map_rect.inflate(self.frame_pad, self.frame_pad)

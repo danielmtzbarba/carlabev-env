@@ -3,6 +3,7 @@ import sys
 import logging
 import json
 import faulthandler
+from copy import deepcopy
 from random import randint
 
 
@@ -106,6 +107,7 @@ class SceneDesigner(GUI):
         self.anchor = None
         self.last_config = None
         self.loaded_scene_path = None
+        self.authored_scene_variation = None
         self._init_actor_behavior_widgets()
         self.refresh_saved_scene_list()
 
@@ -130,12 +132,74 @@ class SceneDesigner(GUI):
     def _default_actor_behavior(self, actor_type):
         return normalize_behavior_spec(actor_type, None)
 
+    def _default_scene_variation(self):
+        return {
+            "enabled": True,
+            "default_seed": 1337,
+            "seed_mode": "scene_default",
+            "global": {
+                "waypoint_jitter_px": 1.0,
+                "speed_scale": {"mode": "uniform", "low": 0.98, "high": 1.02},
+            },
+        }
+
+    def _default_actor_variation(self, actor_type, behavior=None):
+        if actor_type == "agent":
+            return {
+                "enabled": True,
+                "seed_offset": 1,
+                "speed": {"mode": "uniform", "low": 11.0, "high": 13.0},
+                "waypoint_jitter_px": 1.0,
+                "constraints": {"lock_endpoints": True},
+            }
+        if actor_type == "vehicle":
+            variation = {
+                "enabled": True,
+                "seed_offset": 100,
+                "speed": {"mode": "uniform", "low": 8.5, "high": 11.5},
+                "waypoint_jitter_px": 1.0,
+                "constraints": {"lock_endpoints": True},
+            }
+            behavior_type = (behavior or {}).get("type")
+            if behavior_type == "timed_brake":
+                variation["behavior_params"] = {
+                    "start_brake_t": {"mode": "uniform", "low": 2.8, "high": 4.2},
+                    "decel_mps2": {"mode": "uniform", "low": 0.8, "high": 1.5},
+                }
+            return variation
+        if actor_type == "pedestrian":
+            variation = {
+                "enabled": True,
+                "seed_offset": 200,
+                "speed": {"mode": "uniform", "low": 1.3, "high": 2.0},
+                "waypoint_jitter_px": 1.5,
+                "constraints": {"lock_endpoints": True},
+            }
+            behavior_type = (behavior or {}).get("type")
+            if behavior_type in {"cross", "stop_mid", "yield_return"}:
+                variation["behavior_params"] = {
+                    "start_delay": {"mode": "uniform", "low": 0.0, "high": 0.8},
+                }
+            if behavior_type == "yield_return":
+                variation.setdefault("behavior_params", {})["yield_duration"] = {
+                    "mode": "uniform",
+                    "low": 0.8,
+                    "high": 1.4,
+                }
+            return variation
+        if actor_type == "traffic_light":
+            return {"enabled": False, "seed_offset": 300}
+        return {"enabled": False}
+
     def _default_actor_role(self, actor_type):
         return self.ACTOR_ROLE_OPTIONS[actor_type][0]
 
     def _ensure_actor_defaults(self, actor):
         actor["speed"] = float(actor.get("speed", self.ACTOR_DEFAULT_SPEEDS[actor["type"]]))
         actor["role"] = actor.get("role", self._default_actor_role(actor["type"]))
+        actor["variation"] = deepcopy(
+            actor.get("variation", self._default_actor_variation(actor["type"], actor.get("behavior")))
+        )
         if actor["type"] == "traffic_light":
             actor["signal_state"] = actor.get("signal_state", "red")
             actor["behavior"] = {"type": "none", "params": {}}
@@ -460,6 +524,7 @@ class SceneDesigner(GUI):
 
     def _load_authored_actors(self, data):
         actors = []
+        self.authored_scene_variation = deepcopy(data.get("variation", self._default_scene_variation()))
         for actor_data in data.get("actors", []):
             actor_type = actor_data["type"]
             waypoints = actor_data.get("waypoints")
@@ -503,6 +568,7 @@ class SceneDesigner(GUI):
                             "params": actor_data.get("behavior_kwargs", {}),
                         } if isinstance(actor_data.get("behavior"), str) else actor_data.get("behavior"),
                     ),
+                    "variation": actor_data.get("variation"),
                 })
             )
         self.designed_actors = actors
@@ -572,7 +638,7 @@ class SceneDesigner(GUI):
             self._load_authored_actors(data)
             self.last_config = None
             self.editor_tab = "actors"
-            self.env.reset(options={"config_file": scene_path})
+            self.env.reset(options={"config_file": scene_path, "variation_enabled": False})
             print(f"Loaded authored scene from {scene_path}")
             self.set_status(
                 f"Loaded authored scene {self.scene_name.text}.",
@@ -582,6 +648,7 @@ class SceneDesigner(GUI):
 
         config = load_scenario_config_file(scene_path)
         self.last_config = config
+        self.authored_scene_variation = None
         self.designed_actors = []
         self.selected_actor_index = None
         self.editor_tab = "parameters"
@@ -598,6 +665,7 @@ class SceneDesigner(GUI):
     def add_authored_actor_route(self, actor_type, waypoints):
         if len(waypoints) < 2:
             return
+        self.authored_scene_variation = deepcopy(self.authored_scene_variation or self._default_scene_variation())
         normalized_waypoints = [[int(point[0]), int(point[1])] for point in waypoints]
         actor_entry = {
             "type": actor_type,
@@ -608,6 +676,7 @@ class SceneDesigner(GUI):
             "speed": self.ACTOR_DEFAULT_SPEEDS[actor_type],
             "signal_state": "red",
             "behavior": self._default_actor_behavior(actor_type),
+            "variation": self._default_actor_variation(actor_type, self._default_actor_behavior(actor_type)),
         }
         if actor_type == "agent":
             self.designed_actors = [actor for actor in self.designed_actors if actor["type"] != "agent"]
@@ -645,6 +714,7 @@ class SceneDesigner(GUI):
         map_x, map_y = map_pos
 
         self.anchor = {"x": map_x, "y": map_y}
+        self.authored_scene_variation = None
         parameters = self.get_form_values()
         self.last_config = build_scenario_config(
             scene_id=self.scene_name.text,
@@ -702,16 +772,21 @@ class SceneDesigner(GUI):
                         "cruise_speed": actor["speed"],
                         "signal_state": actor.get("signal_state", "red"),
                         "behavior": actor["behavior"],
+                        "variation": actor.get(
+                            "variation",
+                            self._default_actor_variation(actor["type"], actor.get("behavior")),
+                        ),
                     }
                 )
             config = {
-                "version": 1,
+                "version": 2,
                 "type": "authored_scene",
                 "scene_id": scene_id,
                 "scenario_id": self.scenario_selector.selection,
                 "level": int(self.level_selector.selection.replace("Level ", "")),
                 "anchor": self.anchor,
                 "parameters": self.get_form_values(),
+                "variation": deepcopy(self.authored_scene_variation or self._default_scene_variation()),
                 "actors": actor_records,
             }
         else:

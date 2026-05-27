@@ -1,5 +1,5 @@
 {
-    "version": 1,
+    "version": 2,
     "type": "authored_scene",
     "scene_id": "redlightrunner-01.01",
     "scenario_id": "red_light_runner",
@@ -98,6 +98,19 @@
             "behavior": {
                 "type": "none",
                 "params": {}
+            },
+            "variation": {
+                "enabled": true,
+                "seed_offset": 1,
+                "speed": {
+                    "mode": "uniform",
+                    "low": 11.0,
+                    "high": 13.0
+                },
+                "waypoint_jitter_px": 1.0,
+                "constraints": {
+                    "lock_endpoints": true
+                }
             }
         },
         {
@@ -140,6 +153,10 @@
             "behavior": {
                 "type": "none",
                 "params": {}
+            },
+            "variation": {
+                "enabled": false,
+                "seed_offset": 300
             }
         },
         {
@@ -180,6 +197,10 @@
             "behavior": {
                 "type": "none",
                 "params": {}
+            },
+            "variation": {
+                "enabled": false,
+                "seed_offset": 300
             }
         },
         {
@@ -330,7 +351,33 @@
             "behavior": {
                 "type": "constant_speed",
                 "params": {}
+            },
+            "variation": {
+                "enabled": true,
+                "seed_offset": 100,
+                "speed": {
+                    "mode": "uniform",
+                    "low": 8.5,
+                    "high": 11.5
+                },
+                "waypoint_jitter_px": 1.0,
+                "constraints": {
+                    "lock_endpoints": true
+                }
             }
         }
-    ]
+    ],
+    "variation": {
+        "enabled": true,
+        "default_seed": 1337,
+        "seed_mode": "scene_default",
+        "global": {
+            "waypoint_jitter_px": 1.0,
+            "speed_scale": {
+                "mode": "uniform",
+                "low": 0.98,
+                "high": 1.02
+            }
+        }
+    }
 }

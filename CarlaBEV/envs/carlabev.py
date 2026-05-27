@@ -78,13 +78,15 @@ class CarlaBEV(gym.Env):
         self.current_info = {}
         self._current_step = 0
         self.stats.reset()
-        self._scenario_context = self._extract_scenario_context(options)
+        self._scenario_context = {}
         max_reset_attempts = options.get("max_reset_attempts", 10)
         last_spawn_info = None
 
         for _ in range(max_reset_attempts):
             # Load scene
             actors, len_route = self.scene_generator.build_scene(options)
+            self._scenario_context = self._extract_scenario_context(options)
+            self._scenario_context.update(getattr(self.scene_generator, "last_scene_context", {}) or {})
             self.len_ego_route = len_route
             self.num_vehicles = len(actors["vehicle"])
             self.map.reset(actors)

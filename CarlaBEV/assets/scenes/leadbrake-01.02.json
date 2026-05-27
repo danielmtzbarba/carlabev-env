@@ -1,5 +1,5 @@
 {
-    "version": 1,
+    "version": 2,
     "type": "authored_scene",
     "scene_id": "leadbrake-01.02",
     "scenario_id": "lead_brake",
@@ -78,6 +78,29 @@
             "behavior": {
                 "type": "none",
                 "params": {}
+            },
+            "waypoints": [
+                [
+                    190,
+                    928
+                ],
+                [
+                    192,
+                    785
+                ]
+            ],
+            "variation": {
+                "enabled": true,
+                "seed_offset": 1,
+                "speed": {
+                    "mode": "uniform",
+                    "low": 11.0,
+                    "high": 13.0
+                },
+                "waypoint_jitter_px": 1.0,
+                "constraints": {
+                    "lock_endpoints": true
+                }
             }
         },
         {
@@ -116,6 +139,41 @@
                 "params": {
                     "start_brake_t": 3.5,
                     "decel_mps2": 1.0
+                }
+            },
+            "waypoints": [
+                [
+                    190,
+                    891
+                ],
+                [
+                    190,
+                    850
+                ]
+            ],
+            "variation": {
+                "enabled": true,
+                "seed_offset": 100,
+                "speed": {
+                    "mode": "uniform",
+                    "low": 8.5,
+                    "high": 11.5
+                },
+                "waypoint_jitter_px": 1.0,
+                "constraints": {
+                    "lock_endpoints": true
+                },
+                "behavior_params": {
+                    "start_brake_t": {
+                        "mode": "uniform",
+                        "low": 2.8,
+                        "high": 4.2
+                    },
+                    "decel_mps2": {
+                        "mode": "uniform",
+                        "low": 0.8,
+                        "high": 1.5
+                    }
                 }
             }
         },
@@ -169,7 +227,43 @@
             "behavior": {
                 "type": "constant_speed",
                 "params": {}
+            },
+            "waypoints": [
+                [
+                    198,
+                    781
+                ],
+                [
+                    196,
+                    892
+                ]
+            ],
+            "variation": {
+                "enabled": true,
+                "seed_offset": 100,
+                "speed": {
+                    "mode": "uniform",
+                    "low": 8.5,
+                    "high": 11.5
+                },
+                "waypoint_jitter_px": 1.0,
+                "constraints": {
+                    "lock_endpoints": true
+                }
             }
         }
-    ]
+    ],
+    "variation": {
+        "enabled": true,
+        "default_seed": 1337,
+        "seed_mode": "scene_default",
+        "global": {
+            "waypoint_jitter_px": 1.0,
+            "speed_scale": {
+                "mode": "uniform",
+                "low": 0.98,
+                "high": 1.02
+            }
+        }
+    }
 }

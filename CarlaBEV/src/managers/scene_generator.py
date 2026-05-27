@@ -65,8 +65,10 @@ class SceneGenerator:
             "jaywalk": JaywalkScenario(map_size=128),
             "red_light_runner": RedLightRunningScenario(map_size=128)
         }
+        self.last_scene_context = {}
 
     def build_scene(self, options):
+        self.last_scene_context = {}
         scene = options.get("scene", "rdm")
         config_file = options.get("config_file")
         num_vehicles = options.get("num_vehicles", self.cfg.get("max_vehicles", 25))
@@ -87,7 +89,11 @@ class SceneGenerator:
                     )
                 authored_options = dict(options)
                 authored_options["config_file"] = config_file
-                return self.scenarios[scenario_id].sample(**authored_options)
+                actors, len_route = self.scenarios[scenario_id].sample(**authored_options)
+                self.last_scene_context = dict(getattr(self.scenarios[scenario_id], "last_loaded_context", {}) or {})
+                self.last_scene_context.setdefault("scene", scenario_id)
+                self.last_scene_context.setdefault("config_file", config_file)
+                return actors, len_route
 
             config = load_scenario_config_file(config_file)
             scenario_id = config["scenario_id"]

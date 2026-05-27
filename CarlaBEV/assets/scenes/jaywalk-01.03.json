@@ -1,0 +1,125 @@
+{
+    "version": 1,
+    "type": "authored_scene",
+    "scene_id": "jaywalk-01.03",
+    "scenario_id": "jaywalk",
+    "level": 1,
+    "anchor": {
+        "x": 622,
+        "y": 411
+    },
+    "parameters": {
+        "ego_speed": 12.0,
+        "cross_delay": 1.5,
+        "pedestrian_speed": 1.6,
+        "cross_offset": 0.0,
+        "yield_duration": 1.2,
+        "rear_gap": 5.0,
+        "rear_speed": 10.0
+    },
+    "actors": [
+        {
+            "type": "agent",
+            "role": "ego",
+            "start": {
+                "x": 655,
+                "y": 413
+            },
+            "goal": {
+                "x": 463,
+                "y": 412
+            },
+            "rx": [
+                655,
+                647,
+                639,
+                631,
+                623,
+                615,
+                607,
+                599,
+                591,
+                583,
+                575,
+                567,
+                559,
+                551,
+                543,
+                535,
+                527,
+                519,
+                511,
+                503,
+                495,
+                487,
+                479,
+                471,
+                463
+            ],
+            "ry": [
+                413,
+                413,
+                413,
+                413,
+                413,
+                413,
+                413,
+                413,
+                413,
+                413,
+                413,
+                413,
+                412,
+                412,
+                412,
+                412,
+                412,
+                412,
+                412,
+                412,
+                412,
+                412,
+                412,
+                412,
+                412
+            ],
+            "speed": 12.0,
+            "initial_speed": 12.0,
+            "cruise_speed": 12.0,
+            "behavior": {
+                "type": "none",
+                "params": {}
+            }
+        },
+        {
+            "type": "pedestrian",
+            "role": "jaywalker",
+            "start": {
+                "x": 564,
+                "y": 408
+            },
+            "goal": {
+                "x": 561,
+                "y": 420
+            },
+            "rx": [
+                564,
+                561
+            ],
+            "ry": [
+                408,
+                420
+            ],
+            "speed": 1.6,
+            "initial_speed": 1.6,
+            "cruise_speed": 1.6,
+            "behavior": {
+                "type": "yield_return",
+                "params": {
+                    "start_delay": 0.0,
+                    "yield_duration": 1.0
+                }
+            }
+        }
+    ]
+}

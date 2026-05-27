@@ -39,6 +39,7 @@ from CarlaBEV.src.gui.components import TextBox, ChoiceBox
 from CarlaBEV.src.gui.settings import Settings
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.actors.pedestrian import Pedestrian
+from CarlaBEV.src.actors.traffic_light import TrafficLight, TrafficLightState
 from CarlaBEV.src.actors.behavior.registry import (
     behavior_options_for_actor,
     behavior_label_map_for_actor,
@@ -71,11 +72,13 @@ class SceneDesigner(GUI):
         "agent": 12.0,
         "vehicle": 10.0,
         "pedestrian": 1.6,
+        "traffic_light": 0.0,
     }
     ACTOR_ROLE_OPTIONS = {
         "agent": ["ego"],
         "vehicle": ["vehicle", "lead_vehicle", "rear_vehicle", "cross_traffic"],
         "pedestrian": ["pedestrian", "jaywalker"],
+        "traffic_light": ["traffic_light"],
     }
     ACTOR_ROLE_LABELS = {
         "ego": "Ego",
@@ -85,7 +88,10 @@ class SceneDesigner(GUI):
         "cross_traffic": "Cross Traffic",
         "pedestrian": "Pedestrian",
         "jaywalker": "Jaywalker",
+        "traffic_light": "Traffic Light",
     }
+    SIGNAL_OPTIONS = ["red", "yellow", "green"]
+    SIGNAL_LABELS = {"red": "Red", "yellow": "Yellow", "green": "Green"}
 
     def __init__(self, env, settings=None):
         GUI.__init__(self, settings=settings)
@@ -107,6 +113,7 @@ class SceneDesigner(GUI):
         self.actor_speed_box = TextBox((0, 0, 100, 34), self.font, "")
         self.actor_role_selector = ChoiceBox((0, 0, 100, 34), self.font, ["ego"], labels=self.ACTOR_ROLE_LABELS)
         self.actor_behavior_selector = ChoiceBox((0, 0, 100, 34), self.font, ["none"])
+        self.actor_signal_selector = ChoiceBox((0, 0, 100, 34), self.font, self.SIGNAL_OPTIONS, labels=self.SIGNAL_LABELS)
         self.actor_behavior_fields = {}
         self.actor_behavior_active_fields = []
 
@@ -116,6 +123,7 @@ class SceneDesigner(GUI):
         self.actor_speed_box.font = self.font
         self.actor_role_selector.font = self.font
         self.actor_behavior_selector.font = self.font
+        self.actor_signal_selector.font = self.font
         for box in self.actor_behavior_fields.values():
             box.font = self.font
 
@@ -128,7 +136,11 @@ class SceneDesigner(GUI):
     def _ensure_actor_defaults(self, actor):
         actor["speed"] = float(actor.get("speed", self.ACTOR_DEFAULT_SPEEDS[actor["type"]]))
         actor["role"] = actor.get("role", self._default_actor_role(actor["type"]))
-        actor["behavior"] = normalize_behavior_spec(actor["type"], actor.get("behavior"))
+        if actor["type"] == "traffic_light":
+            actor["signal_state"] = actor.get("signal_state", "red")
+            actor["behavior"] = {"type": "none", "params": {}}
+        else:
+            actor["behavior"] = normalize_behavior_spec(actor["type"], actor.get("behavior"))
         return actor
 
     def _selected_actor(self):
@@ -146,12 +158,28 @@ class SceneDesigner(GUI):
             self.actor_role_selector.selected = 0
             self.actor_behavior_selector.update_options(["none"], labels={"none": "None"})
             self.actor_behavior_selector.selected = 0
+            self.actor_signal_selector.update_options(self.SIGNAL_OPTIONS, labels=self.SIGNAL_LABELS)
+            self.actor_signal_selector.selected = 0
             self.actor_behavior_fields = {}
             self.actor_behavior_active_fields = []
             return
 
         self._ensure_actor_defaults(actor)
         actor_type = actor["type"]
+        if actor_type == "traffic_light":
+            self.actor_role_selector.update_options(["traffic_light"], labels=self.ACTOR_ROLE_LABELS)
+            self.actor_role_selector.selected = 0
+            self.actor_signal_selector.update_options(self.SIGNAL_OPTIONS, labels=self.SIGNAL_LABELS)
+            self.actor_signal_selector.set_selected_by_value(actor.get("signal_state", "red"))
+            self.actor_behavior_selector.update_options(["none"], labels={"none": "None"})
+            self.actor_behavior_selector.selected = 0
+            self.actor_speed_box.text = ""
+            self.actor_behavior_fields = {}
+            self.actor_behavior_active_fields = []
+            if getattr(self, "_layout_ready", False):
+                self.update_layout(self._map_surface_size)
+            return
+
         behavior_spec = actor["behavior"]
         role_options = self.ACTOR_ROLE_OPTIONS[actor_type]
         self.actor_role_selector.update_options(role_options, labels=self.ACTOR_ROLE_LABELS)
@@ -178,6 +206,11 @@ class SceneDesigner(GUI):
     def _update_selected_actor_from_widgets(self):
         actor = self._selected_actor()
         if actor is None:
+            return
+        if actor["type"] == "traffic_light":
+            actor["role"] = "traffic_light"
+            actor["signal_state"] = self.actor_signal_selector.selection or "red"
+            self.loaded_scene_path = None
             return
         actor["speed"] = max(0.0, float(self.actor_speed_box.text or self.ACTOR_DEFAULT_SPEEDS[actor["type"]]))
         actor["role"] = self.actor_role_selector.selection or self._default_actor_role(actor["type"])
@@ -208,6 +241,11 @@ class SceneDesigner(GUI):
         col_gap = self.spacing_sm
         field_w = (detail_rect.width - col_gap) // 2
         y = detail_rect.y + label_h + field_gap
+        actor = self._selected_actor()
+        if actor is not None and actor["type"] == "traffic_light":
+            self.actor_signal_selector.rect = pygame.Rect(detail_rect.x, y, field_w, control_h)
+            self.actor_role_selector.rect = pygame.Rect(detail_rect.x + field_w + col_gap, y, field_w, control_h)
+            return
         self.actor_speed_box.rect = pygame.Rect(detail_rect.x, y, field_w, control_h)
         self.actor_behavior_selector.rect = pygame.Rect(
             detail_rect.x + field_w + col_gap,
@@ -230,6 +268,12 @@ class SceneDesigner(GUI):
         if actor is None:
             self._draw_label("Select an actor to edit speed and behavior.", rect.x, rect.y, small=True)
             return
+        if actor["type"] == "traffic_light":
+            self._draw_label("Signal State", self.actor_signal_selector.rect.x, self.actor_signal_selector.rect.y - self.spacing_xs - self.font_small.get_height(), small=True)
+            self.actor_signal_selector.draw(screen)
+            self._draw_label("Role", self.actor_role_selector.rect.x, self.actor_role_selector.rect.y - self.spacing_xs - self.font_small.get_height(), small=True)
+            self.actor_role_selector.draw(screen)
+            return
         self._draw_label("Speed (m/s)", self.actor_speed_box.rect.x, self.actor_speed_box.rect.y - self.spacing_xs - self.font_small.get_height(), small=True)
         self.actor_speed_box.draw(screen)
         self._draw_label("Behavior", self.actor_behavior_selector.rect.x, self.actor_behavior_selector.rect.y - self.spacing_xs - self.font_small.get_height(), small=True)
@@ -248,9 +292,22 @@ class SceneDesigner(GUI):
 
         previous_behavior = self.actor_behavior_selector.selected
         previous_role = self.actor_role_selector.selected
+        previous_signal = self.actor_signal_selector.selected
         previous_speed = self.actor_speed_box.text
-        self.actor_speed_box.handle_event(event)
         self.actor_role_selector.handle_event(event)
+        actor_type = actor["type"]
+        if actor_type == "traffic_light":
+            self.actor_signal_selector.handle_event(event)
+            if (
+                self.actor_signal_selector.selected != previous_signal
+                or self.actor_role_selector.selected != previous_role
+            ):
+                self._update_selected_actor_from_widgets()
+                self.refresh_scene_preview()
+                return True
+            return False
+
+        self.actor_speed_box.handle_event(event)
         self.actor_behavior_selector.handle_event(event)
         if self.actor_role_selector.selected != previous_role:
             self._update_selected_actor_from_widgets()
@@ -315,6 +372,28 @@ class SceneDesigner(GUI):
                 actor["behavior"] = normalized
                 scene_dict["pedestrian"].append(
                     Pedestrian(self.env.map.size, routeX=rx, routeY=ry, target_speed=speed, behavior=behavior)
+                )
+            elif actor["type"] == "traffic_light":
+                dx = actor["end"][0] - actor["start"][0]
+                dy = actor["end"][1] - actor["start"][1]
+                center_x = 0.5 * (actor["start"][0] + actor["end"][0])
+                center_y = 0.5 * (actor["start"][1] + actor["end"][1])
+                orientation = "horizontal" if abs(dx) >= abs(dy) else "vertical"
+                length = max(4.0, float(math.hypot(dx, dy)))
+                state_map = {
+                    "red": TrafficLightState.RED,
+                    "yellow": TrafficLightState.YELLOW,
+                    "green": TrafficLightState.GREEN,
+                }
+                scene_dict["traffic_light"].append(
+                    TrafficLight(
+                        pos_x=center_x,
+                        pos_y=center_y,
+                        map_size=self.env.map.size,
+                        orientation=orientation,
+                        signal_state=state_map.get(actor.get("signal_state", "red"), TrafficLightState.RED),
+                        length=length,
+                    )
                 )
         return scene_dict
 
@@ -383,6 +462,7 @@ class SceneDesigner(GUI):
                     "start": [int(round(start["x"])), int(round(start["y"]))],
                     "end": [int(round(goal["x"])), int(round(goal["y"]))],
                     "speed": float(actor_data.get("cruise_speed", actor_data.get("initial_speed", actor_data.get("speed", self.ACTOR_DEFAULT_SPEEDS[actor_type])))),
+                    "signal_state": actor_data.get("signal_state", "red"),
                     "behavior": actor_data.get(
                         "behavior",
                         {
@@ -493,6 +573,7 @@ class SceneDesigner(GUI):
             "start": [int(start[0]), int(start[1])],
             "end": [int(end[0]), int(end[1])],
             "speed": self.ACTOR_DEFAULT_SPEEDS[actor_type],
+            "signal_state": "red",
             "behavior": self._default_actor_behavior(actor_type),
         }
         if actor_type == "agent":
@@ -584,6 +665,7 @@ class SceneDesigner(GUI):
                         "speed": actor["speed"],
                         "initial_speed": actor["speed"],
                         "cruise_speed": actor["speed"],
+                        "signal_state": actor.get("signal_state", "red"),
                         "behavior": actor["behavior"],
                     }
                 )

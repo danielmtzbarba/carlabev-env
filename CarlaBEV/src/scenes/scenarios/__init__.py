@@ -53,6 +53,7 @@ class Scenario:
         # We need to construct actors
         from CarlaBEV.src.actors.vehicle import Vehicle
         from CarlaBEV.src.actors.pedestrian import Pedestrian
+        from CarlaBEV.src.actors.traffic_light import TrafficLight, TrafficLightState
 
         for actor_data in data["actors"]:
             atype = actor_data["type"]
@@ -88,6 +89,39 @@ class Scenario:
                     behavior=behavior,
                 )
                 scene_dict["pedestrian"].append(p)
+            elif atype == "traffic_light":
+                start = actor_data.get("start")
+                goal = actor_data.get("goal")
+                if start is None and rx and ry:
+                    start = {"x": rx[0], "y": ry[0]}
+                if goal is None and rx and ry:
+                    goal = {"x": rx[-1], "y": ry[-1]}
+                if start is None or goal is None:
+                    continue
+                dx = float(goal["x"]) - float(start["x"])
+                dy = float(goal["y"]) - float(start["y"])
+                center_x = 0.5 * (float(start["x"]) + float(goal["x"]))
+                center_y = 0.5 * (float(start["y"]) + float(goal["y"]))
+                orientation = actor_data.get(
+                    "orientation",
+                    "horizontal" if abs(dx) >= abs(dy) else "vertical",
+                )
+                state_map = {
+                    "red": TrafficLightState.RED,
+                    "yellow": TrafficLightState.YELLOW,
+                    "green": TrafficLightState.GREEN,
+                }
+                scene_dict["traffic_light"].append(
+                    TrafficLight(
+                        pos_x=center_x,
+                        pos_y=center_y,
+                        map_size=self.map_size,
+                        orientation=orientation,
+                        signal_state=state_map.get(actor_data.get("signal_state", "red"), TrafficLightState.RED),
+                        length=actor_data.get("length"),
+                        width=actor_data.get("width"),
+                    )
+                )
 
         # len_route calculation can just use agent
         if scene_dict.get("agent"):

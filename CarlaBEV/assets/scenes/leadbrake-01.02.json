@@ -1,0 +1,175 @@
+{
+    "version": 1,
+    "type": "authored_scene",
+    "scene_id": "leadbrake-01.02",
+    "scenario_id": "lead_brake",
+    "level": 1,
+    "anchor": {
+        "x": 193,
+        "y": 903
+    },
+    "parameters": {
+        "ego_speed": 12.0,
+        "lead_gap": 7.5,
+        "lead_speed": 12.0,
+        "brake_delay": 2.5,
+        "brake_strength": 4.0,
+        "left_speed": 14.0,
+        "rear_gap": 5.0,
+        "rear_speed": 10.0,
+        "rear_brake_delay": 3.0
+    },
+    "actors": [
+        {
+            "type": "agent",
+            "role": "ego",
+            "start": {
+                "x": 190,
+                "y": 928
+            },
+            "goal": {
+                "x": 192,
+                "y": 785
+            },
+            "rx": [
+                190,
+                190,
+                190,
+                190,
+                190,
+                191,
+                191,
+                191,
+                191,
+                191,
+                191,
+                191,
+                191,
+                192,
+                192,
+                192,
+                192,
+                192
+            ],
+            "ry": [
+                928,
+                920,
+                911,
+                903,
+                894,
+                886,
+                878,
+                869,
+                861,
+                852,
+                844,
+                835,
+                827,
+                819,
+                810,
+                802,
+                793,
+                785
+            ],
+            "speed": 12.0,
+            "initial_speed": 12.0,
+            "cruise_speed": 12.0,
+            "signal_state": "red",
+            "behavior": {
+                "type": "none",
+                "params": {}
+            }
+        },
+        {
+            "type": "vehicle",
+            "role": "vehicle",
+            "start": {
+                "x": 190,
+                "y": 891
+            },
+            "goal": {
+                "x": 190,
+                "y": 850
+            },
+            "rx": [
+                190,
+                190,
+                190,
+                190,
+                190,
+                190
+            ],
+            "ry": [
+                891,
+                883,
+                875,
+                866,
+                858,
+                850
+            ],
+            "speed": 10.0,
+            "initial_speed": 10.0,
+            "cruise_speed": 10.0,
+            "signal_state": "red",
+            "behavior": {
+                "type": "timed_brake",
+                "params": {
+                    "start_brake_t": 3.5,
+                    "decel_mps2": 1.0
+                }
+            }
+        },
+        {
+            "type": "vehicle",
+            "role": "vehicle",
+            "start": {
+                "x": 198,
+                "y": 781
+            },
+            "goal": {
+                "x": 196,
+                "y": 892
+            },
+            "rx": [
+                198,
+                198,
+                198,
+                198,
+                197,
+                197,
+                197,
+                197,
+                197,
+                197,
+                196,
+                196,
+                196,
+                196
+            ],
+            "ry": [
+                781,
+                790,
+                798,
+                807,
+                815,
+                824,
+                832,
+                841,
+                849,
+                858,
+                866,
+                875,
+                883,
+                892
+            ],
+            "speed": 10.0,
+            "initial_speed": 10.0,
+            "cruise_speed": 10.0,
+            "signal_state": "red",
+            "behavior": {
+                "type": "constant_speed",
+                "params": {}
+            }
+        }
+    ]
+}

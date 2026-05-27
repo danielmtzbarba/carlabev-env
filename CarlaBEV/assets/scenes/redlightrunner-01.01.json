@@ -1,0 +1,156 @@
+{
+    "version": 1,
+    "type": "authored_scene",
+    "scene_id": "redlightrunner-01.01",
+    "scenario_id": "red_light_runner",
+    "level": 1,
+    "anchor": {
+        "x": 308,
+        "y": 901
+    },
+    "parameters": {
+        "ego_speed": 12.0,
+        "adv_speed": 16.0,
+        "intersection_index": 11
+    },
+    "actors": [
+        {
+            "type": "agent",
+            "role": "ego",
+            "start": {
+                "x": 308,
+                "y": 826
+            },
+            "goal": {
+                "x": 306,
+                "y": 626
+            },
+            "rx": [
+                308,
+                308,
+                308,
+                308,
+                308,
+                308,
+                308,
+                307,
+                307,
+                307,
+                307,
+                307,
+                307,
+                307,
+                307,
+                307,
+                307,
+                307,
+                307,
+                306,
+                306,
+                306,
+                306,
+                306,
+                306,
+                306
+            ],
+            "ry": [
+                826,
+                818,
+                810,
+                802,
+                794,
+                786,
+                778,
+                770,
+                762,
+                754,
+                746,
+                738,
+                730,
+                722,
+                714,
+                706,
+                698,
+                690,
+                682,
+                674,
+                666,
+                658,
+                650,
+                642,
+                634,
+                626
+            ],
+            "speed": 12.0,
+            "initial_speed": 12.0,
+            "cruise_speed": 12.0,
+            "signal_state": "red",
+            "behavior": {
+                "type": "none",
+                "params": {}
+            }
+        },
+        {
+            "type": "traffic_light",
+            "role": "traffic_light",
+            "start": {
+                "x": 294,
+                "y": 763
+            },
+            "goal": {
+                "x": 293,
+                "y": 787
+            },
+            "rx": [
+                294,
+                294,
+                293,
+                293
+            ],
+            "ry": [
+                763,
+                771,
+                779,
+                787
+            ],
+            "speed": 0.0,
+            "initial_speed": 0.0,
+            "cruise_speed": 0.0,
+            "signal_state": "red",
+            "behavior": {
+                "type": "none",
+                "params": {}
+            }
+        },
+        {
+            "type": "traffic_light",
+            "role": "traffic_light",
+            "start": {
+                "x": 297,
+                "y": 759
+            },
+            "goal": {
+                "x": 319,
+                "y": 757
+            },
+            "rx": [
+                297,
+                308,
+                319
+            ],
+            "ry": [
+                759,
+                758,
+                757
+            ],
+            "speed": 0.0,
+            "initial_speed": 0.0,
+            "cruise_speed": 0.0,
+            "signal_state": "green",
+            "behavior": {
+                "type": "none",
+                "params": {}
+            }
+        }
+    ]
+}

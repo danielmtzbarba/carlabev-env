@@ -79,6 +79,9 @@ class GUI:
         self.designed_actors = []
         self.selected_actor_index = None
         self.actor_row_rects = []
+        self.actor_list_rect = pygame.Rect(0, 0, 0, 0)
+        self.actor_list_scroll_offset = 0
+        self.actor_list_max_visible_rows = 3
         self.editor_tab = "parameters"
         self.editor_tab_rects = {}
 
@@ -94,6 +97,7 @@ class GUI:
         self.place_ego_btn = Button((0, 0, 120, 34), self.font, "Place Ego")
         self.place_vehicle_btn = Button((0, 0, 120, 34), self.font, "Place Vehicle")
         self.place_ped_btn = Button((0, 0, 120, 34), self.font, "Place Ped")
+        self.place_light_btn = Button((0, 0, 120, 34), self.font, "Place Light")
         self.listbox = ListBox((0, 0, 100, 100), self.font)
         self.save_btn = Button((0, 0, 120, 34), self.font, "Save Config")
         self.load_btn = Button((0, 0, 120, 34), self.font, "Load Config")
@@ -142,6 +146,12 @@ class GUI:
         desktop_sizes = pygame.display.get_desktop_sizes()
         display_index = self._get_display_index()
         if desktop_sizes:
+            if "PYGAME_DISPLAY" not in os.environ:
+                width, height = max(
+                    desktop_sizes,
+                    key=lambda size: size[0] * size[1],
+                )
+                return width, height
             if 0 <= display_index < len(desktop_sizes):
                 width, height = desktop_sizes[display_index]
             else:
@@ -408,6 +418,7 @@ class GUI:
             "place_ego_btn",
             "place_vehicle_btn",
             "place_ped_btn",
+            "place_light_btn",
         ):
             if hasattr(self, widget):
                 getattr(self, widget).font = self.font_button
@@ -488,11 +499,16 @@ class GUI:
         selected_scene = self.listbox.handle_event(event)
         if selected_scene:
             self.scene_name.text = selected_scene
+        if self._handle_actor_list_scroll(event):
+            return None
 
         if event.type == pygame.MOUSEBUTTONUP:
-            for idx, row_rect in enumerate(self.actor_row_rects):
+            for visible_idx, row_rect in enumerate(self.actor_row_rects):
                 if row_rect.collidepoint(event.pos):
-                    self.selected_actor_index = idx
+                    actor_idx = self.actor_list_scroll_offset + visible_idx
+                    if actor_idx >= len(self.designed_actors):
+                        continue
+                    self.selected_actor_index = actor_idx
                     if hasattr(self, "on_selected_actor_changed"):
                         self.on_selected_actor_changed()
                     return None
@@ -522,6 +538,7 @@ class GUI:
                     self.place_ego_btn.rect,
                     self.place_vehicle_btn.rect,
                     self.place_ped_btn.rect,
+                    self.place_light_btn.rect,
                     self.add_rdm_actor_btn.rect,
                     self.play_btn.rect,
                 ]
@@ -600,6 +617,13 @@ class GUI:
             self.pending_actor_type = "pedestrian"
             self.pending_actor_start = None
             self.set_status("Click the pedestrian start position.", "Second click sets the pedestrian end position.")
+            return None
+
+        if self.place_light_btn.handle_event(event):
+            self.map_click_mode = "actor_start"
+            self.pending_actor_type = "traffic_light"
+            self.pending_actor_start = None
+            self.set_status("Click the traffic-light strip start position.", "Second click sets the strip end position.")
             return None
 
         if self.del_btn.handle_event(event):
@@ -720,6 +744,29 @@ class GUI:
         self._layout_ready = True
         self._layout_dirty = False
 
+    def _clamp_actor_list_scroll(self):
+        max_scroll = max(0, len(self.designed_actors) - max(1, len(self.actor_row_rects)))
+        self.actor_list_scroll_offset = max(0, min(self.actor_list_scroll_offset, max_scroll))
+
+    def _handle_actor_list_scroll(self, event):
+        if self.actor_list_rect.width <= 0 or self.actor_list_rect.height <= 0:
+            return False
+        mouse_pos = pygame.mouse.get_pos()
+        if event.type == pygame.MOUSEBUTTONDOWN and self.actor_list_rect.collidepoint(mouse_pos):
+            if event.button == 4:
+                self.actor_list_scroll_offset -= 1
+                self._clamp_actor_list_scroll()
+                return True
+            if event.button == 5:
+                self.actor_list_scroll_offset += 1
+                self._clamp_actor_list_scroll()
+                return True
+        if event.type == pygame.MOUSEWHEEL and self.actor_list_rect.collidepoint(mouse_pos):
+            self.actor_list_scroll_offset -= int(event.y)
+            self._clamp_actor_list_scroll()
+            return True
+        return False
+
     def layout_controls(self):
         left_x = self.left_panel_rect.x + self.panel_padding
         left_w = self.left_panel_rect.width - 2 * self.panel_padding
@@ -742,7 +789,7 @@ class GUI:
         field_w = left_w if col_count == 1 else (left_w - gap) // 2
         row_h = label_h + field_label_gap + param_textbox_h + field_row_gap
         actor_row_h = self.font_small.get_height() + self.spacing_sm
-        actor_list_rows = 3
+        actor_list_rows = min(max(1, len(self.designed_actors)), self.actor_list_max_visible_rows)
         actor_list_h = actor_row_h * actor_list_rows + self.spacing_sm
         actor_button_gap = self.spacing_sm
         actor_button_w = (left_w - actor_button_gap) // 2
@@ -775,8 +822,8 @@ class GUI:
             card_top_pad
             + tab_h
             + card_header_gap
-            + 2 * self.button_height
-            + actor_button_gap
+            + 3 * self.button_height
+            + 2 * actor_button_gap
             + self.spacing_md
             + actor_list_h
             + self.spacing_md
@@ -893,20 +940,28 @@ class GUI:
             actor_button_w,
             self.button_height,
         )
-        self.del_btn.rect = pygame.Rect(
+        self.place_light_btn.rect = pygame.Rect(
             left_x + actor_button_w + actor_button_gap,
             actor_buttons_y + self.button_height + actor_button_gap,
             actor_button_w,
             self.button_height,
         )
-        actor_list_y = actor_buttons_y + 2 * self.button_height + actor_button_gap + self.spacing_md
+        self.del_btn.rect = pygame.Rect(
+            left_x,
+            actor_buttons_y + 2 * (self.button_height + actor_button_gap),
+            left_w,
+            self.button_height,
+        )
+        actor_list_y = actor_buttons_y + 3 * self.button_height + 2 * actor_button_gap + self.spacing_md
         self.actor_row_rects = []
         actor_card_x = self.section_rects["editor"].x + self.section_pad
         actor_card_w = self.section_rects["editor"].width - 2 * self.section_pad
+        self.actor_list_rect = pygame.Rect(actor_card_x, actor_list_y, actor_card_w, actor_list_h)
         for idx in range(actor_list_rows):
             self.actor_row_rects.append(
                 pygame.Rect(actor_card_x, actor_list_y + idx * actor_row_h, actor_card_w, actor_row_h)
             )
+        self._clamp_actor_list_scroll()
         self.actor_detail_rect = pygame.Rect(
             actor_card_x,
             actor_list_y + actor_list_h + self.spacing_md,
@@ -958,14 +1013,14 @@ class GUI:
         self.play_btn.rect = pygame.Rect(right_x, action_y, right_w, self.button_height)
         self.add_rdm_actor_btn.rect = pygame.Rect(right_x, self.play_btn.rect.bottom + self.spacing_md, right_w, self.button_height)
 
-        list_rows = max(1, min(5, len(self.listbox.items)))
+        visible_scene_rows = min(max(1, len(self.listbox.items)), 5)
         listbox_row_h = max(24, self.option_height - 4)
         listbox_gap = max(4, self.option_gap)
-        self.listbox.set_metrics(listbox_row_h, listbox_gap, padding=self.section_pad)
+        self.listbox.set_metrics(listbox_row_h, listbox_gap, padding=self.section_pad, max_visible_rows=5)
         listbox_h = (
             2 * self.section_pad
-            + list_rows * listbox_row_h
-            + max(0, list_rows - 1) * listbox_gap
+            + visible_scene_rows * listbox_row_h
+            + max(0, visible_scene_rows - 1) * listbox_gap
         )
         self.saved_scenes_rect = pygame.Rect(
             right_x - self.section_pad,
@@ -1134,6 +1189,7 @@ class GUI:
             self.place_ego_btn.draw(self.screen)
             self.place_vehicle_btn.draw(self.screen)
             self.place_ped_btn.draw(self.screen)
+            self.place_light_btn.draw(self.screen)
             self.del_btn.draw(self.screen)
             self._draw_actor_rows()
             if hasattr(self, "draw_actor_detail_panel"):
@@ -1146,17 +1202,21 @@ class GUI:
             "agent": (29, 110, 235),
             "vehicle": (0, 118, 182),
             "pedestrian": (201, 63, 63),
+            "traffic_light": (212, 162, 38),
         }
-        for idx, row_rect in enumerate(self.actor_row_rects):
-            is_selected = idx == self.selected_actor_index
+        previous_clip = self.screen.get_clip()
+        self.screen.set_clip(self.actor_list_rect)
+        for visible_idx, row_rect in enumerate(self.actor_row_rects):
+            actor_idx = self.actor_list_scroll_offset + visible_idx
+            is_selected = actor_idx == self.selected_actor_index
             bg = (227, 238, 255) if is_selected else (246, 247, 249)
             border = self.colors["accent"] if is_selected else (204, 209, 216)
             pygame.draw.rect(self.screen, bg, row_rect, border_radius=self.button_radius)
             pygame.draw.rect(self.screen, border, row_rect, 1, border_radius=self.button_radius)
-            if idx >= len(self.designed_actors):
+            if actor_idx >= len(self.designed_actors):
                 continue
-            actor = self.designed_actors[idx]
-            label = actor["type"].replace("agent", "ego").title()
+            actor = self.designed_actors[actor_idx]
+            label = actor["type"].replace("agent", "ego").replace("_", " ").title()
             role = actor.get("role")
             start = actor["start"]
             end = actor["end"]
@@ -1166,12 +1226,32 @@ class GUI:
             pygame.draw.circle(self.screen, dot_color, (row_rect.x + 10, row_rect.centery), 4)
             surf = self.font_small.render(text, True, self.colors["text"])
             self.screen.blit(surf, (row_rect.x + 20, row_rect.y + (row_rect.height - surf.get_height()) // 2))
+        self.screen.set_clip(previous_clip)
+
+        visible_rows = max(1, len(self.actor_row_rects))
+        max_scroll = max(0, len(self.designed_actors) - visible_rows)
+        if max_scroll > 0:
+            track_w = 4
+            track_rect = pygame.Rect(
+                self.actor_list_rect.right - self.section_pad // 2,
+                self.actor_list_rect.y + self.spacing_xs,
+                track_w,
+                self.actor_list_rect.height - 2 * self.spacing_xs,
+            )
+            pygame.draw.rect(self.screen, (220, 225, 232), track_rect, border_radius=track_w // 2)
+            thumb_h = max(18, int(track_rect.height * (visible_rows / max(1, len(self.designed_actors)))))
+            thumb_y = track_rect.y + int(
+                (track_rect.height - thumb_h) * (self.actor_list_scroll_offset / max(1, max_scroll))
+            )
+            thumb_rect = pygame.Rect(track_rect.x, thumb_y, track_rect.width, thumb_h)
+            pygame.draw.rect(self.screen, (178, 186, 197), thumb_rect, border_radius=track_w // 2)
 
     def _draw_actor_overlay(self):
         actor_colors = {
             "agent": (29, 110, 235),
             "vehicle": (0, 118, 182),
             "pedestrian": (201, 63, 63),
+            "traffic_light": (212, 162, 38),
         }
         for idx, actor in enumerate(self.designed_actors):
             start = self.map_to_screen_pos(actor["start"])

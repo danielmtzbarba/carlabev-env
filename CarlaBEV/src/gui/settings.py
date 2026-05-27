@@ -5,10 +5,10 @@ from dataclasses import dataclass, field, replace
 class DesignerLayoutConfig:
     min_window_width: int = 1080
     min_window_height: int = 720
-    window_width_ratio: float = 0.92
-    window_height_ratio: float = 0.90
-    window_margin_x: int = 32
-    window_margin_y: int = 48
+    window_width_ratio: float = 0.96
+    window_height_ratio: float = 0.94
+    window_margin_x: int = 24
+    window_margin_y: int = 32
 
     scale_ref_width: float = 1440.0
     scale_ref_height: float = 960.0
@@ -73,8 +73,8 @@ DESIGNER_LAYOUT_PRESETS = {
     "wide": DesignerLayoutConfig(
         min_window_width=1280,
         min_window_height=820,
-        window_width_ratio=0.94,
-        window_height_ratio=0.92,
+        window_width_ratio=0.97,
+        window_height_ratio=0.95,
         scale_min=0.90,
         scale_max=1.18,
         font_title_base=40,
@@ -105,6 +105,8 @@ DESIGNER_LAYOUT_PRESETS = {
         crop_padding=10,
     ),
     "comfortable": DesignerLayoutConfig(
+        window_width_ratio=0.96,
+        window_height_ratio=0.94,
         font_title_base=40,
         font_title_min=34,
         font_section_base=26,
@@ -134,6 +136,8 @@ DESIGNER_LAYOUT_PRESETS = {
     "compact": DesignerLayoutConfig(
         min_window_width=1024,
         min_window_height=680,
+        window_width_ratio=0.95,
+        window_height_ratio=0.93,
         scale_min=0.66,
         font_title_base=36,
         font_title_min=30,
@@ -163,6 +167,8 @@ DESIGNER_LAYOUT_PRESETS = {
     "dense": DesignerLayoutConfig(
         min_window_width=960,
         min_window_height=640,
+        window_width_ratio=0.94,
+        window_height_ratio=0.92,
         scale_min=0.62,
         font_title_base=32,
         font_title_min=28,

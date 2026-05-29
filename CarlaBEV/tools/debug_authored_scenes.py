@@ -21,6 +21,7 @@ cfg = tyro.cli(ArgsCarlaBEV)
 AUTHORED_SCENE_DIR = Path(
     os.environ.get("CARLABEV_AUTHORED_SCENE_DIR", "CarlaBEV/assets/scenes")
 )
+AUTHORED_MODE = os.environ.get("CARLABEV_AUTHORED_MODE", "train").strip().lower()
 AUTHORED_SCENE_FILTER = os.environ.get("CARLABEV_AUTHORED_SCENE_FILTER", "").strip()
 AUTHORED_SCENARIO_FILTER = os.environ.get("CARLABEV_AUTHORED_SCENARIO_ID", "").strip()
 VARIATION_ENABLED = os.environ.get("CARLABEV_VARIATION_ENABLED", "1").lower() not in {"0", "false", "no"}
@@ -59,31 +60,65 @@ def list_authored_scene_files(scene_dir: Path):
     return scene_files
 
 
-def build_authored_reset_options(reset_mask, scene_pool, rng):
+def resolve_mode_variation_enabled():
+    if AUTHORED_MODE == "eval":
+        return False
+    return VARIATION_ENABLED
+
+
+def build_train_reset_options(reset_mask, scene_pool, rng):
     scene_path, scene_data = rng.choice(scene_pool)
+    variation_enabled = resolve_mode_variation_enabled()
     options = {
         "config_file": str(scene_path),
         "reset_mask": reset_mask,
-        "variation_enabled": VARIATION_ENABLED,
+        "variation_enabled": variation_enabled,
     }
     variation_seed = None
-    if VARIATION_ENABLED:
+    if variation_enabled:
         variation_seed = rng.randint(VARIATION_SEED_MIN, VARIATION_SEED_MAX)
         options["variation_seed"] = variation_seed
     meta = {
+        "mode": "train",
         "scene_path": str(scene_path),
         "scene_id": scene_data.get("scene_id", scene_path.stem),
         "scenario_id": scene_data.get("scenario_id"),
-        "variation_enabled": VARIATION_ENABLED,
+        "variation_enabled": variation_enabled,
         "variation_seed": variation_seed,
     }
     return options, meta
+
+
+def build_eval_reset_options(reset_mask, scene_pool, scene_index):
+    scene_path, scene_data = scene_pool[scene_index % len(scene_pool)]
+    options = {
+        "config_file": str(scene_path),
+        "reset_mask": reset_mask,
+        "variation_enabled": False,
+    }
+    meta = {
+        "mode": "eval",
+        "scene_path": str(scene_path),
+        "scene_id": scene_data.get("scene_id", scene_path.stem),
+        "scenario_id": scene_data.get("scenario_id"),
+        "variation_enabled": False,
+        "variation_seed": None,
+        "scene_index": scene_index % len(scene_pool),
+    }
+    return options, meta
+
+
+def build_authored_reset_options(reset_mask, scene_pool, rng, scene_index):
+    if AUTHORED_MODE == "eval":
+        return build_eval_reset_options(reset_mask, scene_pool, scene_index)
+    return build_train_reset_options(reset_mask, scene_pool, rng)
 
 
 def debug_print_reset(meta):
     print(
         "[authored-debug] reset",
         {
+            "mode": meta["mode"],
             "scene_id": meta["scene_id"],
             "scenario_id": meta["scenario_id"],
             "variation_enabled": meta["variation_enabled"],
@@ -94,25 +129,36 @@ def debug_print_reset(meta):
 
 
 def main():
+    if AUTHORED_MODE not in {"train", "eval"}:
+        raise ValueError(
+            f"Unsupported CARLABEV_AUTHORED_MODE={AUTHORED_MODE!r}. Use 'train' or 'eval'."
+        )
     pygame.init()
     keys_held = init_key_tracking()
     envs = make_env(cfg)
     rng = random.Random(cfg.seed)
     scene_pool = list_authored_scene_files(AUTHORED_SCENE_DIR)
+    scene_index = 0
 
     print("Observation space:", envs.observation_space)
     print(
         "[authored-debug] scene-pool",
         {
+            "mode": AUTHORED_MODE,
             "count": len(scene_pool),
             "dir": str(AUTHORED_SCENE_DIR),
             "scene_filter": AUTHORED_SCENE_FILTER,
             "scenario_filter": AUTHORED_SCENARIO_FILTER,
-            "variation_enabled": VARIATION_ENABLED,
+            "variation_enabled": resolve_mode_variation_enabled(),
         },
     )
 
-    options, meta = build_authored_reset_options(np.array([True], dtype=bool), scene_pool, rng)
+    options, meta = build_authored_reset_options(
+        np.array([True], dtype=bool),
+        scene_pool,
+        rng,
+        scene_index,
+    )
     debug_print_reset(meta)
     observation, info = envs.reset(options=options)
     spawn_info = info.get("spawn_validation", {})
@@ -158,10 +204,13 @@ def main():
         for i, ended in enumerate(terminated):
             if ended:
                 sim_logger.log_episode(info["episode_info"], i)
+                if AUTHORED_MODE == "eval":
+                    scene_index += 1
                 options, meta = build_authored_reset_options(
                     np.logical_or(terminated, trunks),
                     scene_pool,
                     rng,
+                    scene_index,
                 )
                 debug_print_reset(meta)
                 observation, info = envs.reset(options=options)

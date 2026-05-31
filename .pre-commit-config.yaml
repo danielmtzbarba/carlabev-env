@@ -1,0 +1,34 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+        stages: [pre-push, pre-commit]
+      - id: ruff-format
+        stages: [pre-push, pre-commit]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+        name: Validate YAML Files
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: pytest-check
+        name: Run CarlaBEV Pytest
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: simulator-semantics
+        name: Run CarlaBEV Simulator Validation
+        entry: uv run python CarlaBEV/tools/validate_simulator_semantics.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

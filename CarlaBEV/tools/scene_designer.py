@@ -22,17 +22,13 @@ configure_sdl_backend()
 import pygame
 
 import numpy as np
-import pandas as pd
 import math
 
-from CarlaBEV.envs.utils import asset_path, load_map
 
 from CarlaBEV.tools.debug.controls import (
     init_key_tracking,
     get_action_from_keys,
-    process_events,
 )
-from CarlaBEV.src.scenes.scene import Scene, Node
 from CarlaBEV.src.scenes.utils import *
 
 from CarlaBEV.src.gui import GUI
@@ -52,7 +48,6 @@ from CarlaBEV.src.scenes.scenarios.specs import (
     build_scenario_config,
     load_scenario_config_file,
 )
-from CarlaBEV.config.env import EnvConfig as PublicEnvConfig
 from CarlaBEV.config.reset import (
     AuthoredSceneReset,
     RandomNavigationReset,

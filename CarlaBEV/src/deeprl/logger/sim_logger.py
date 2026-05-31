@@ -1,5 +1,4 @@
 import json
-from rich.table import Table
 from .base_logger import BaseLogger
 
 

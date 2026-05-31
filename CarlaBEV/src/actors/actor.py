@@ -3,7 +3,6 @@ import math
 import numpy as np
 
 from CarlaBEV.src.gui.settings import Settings as cfg
-from CarlaBEV.src.planning.planner import Planner, scale_route
 from CarlaBEV.src.control.stanley_controller import Controller
 from CarlaBEV.envs.geometry import speed_mps_to_surface, speed_surface_to_mps
 

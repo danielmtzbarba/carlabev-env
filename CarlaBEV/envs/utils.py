@@ -74,7 +74,6 @@ def scale_coords(coord, factor):
 def scale_route(coords, factor, reverse=False):
     if reverse:
         coords.reverse()
-    offset = factor + 1
     scaled = []
     for coord in coords:
         coord = int(coord / factor) + 2

@@ -1,8 +1,5 @@
 import os
-from datetime import datetime
 from .base_logger import BaseLogger
-from .sim_logger import SimLogger
-from .train_logger import TrainLogger
 
 
 def create_loggers(cfg):

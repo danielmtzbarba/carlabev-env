@@ -4,7 +4,6 @@ import numpy as np
 import networkx as nx
 
 from CarlaBEV.src.planning.map_graph import MapGraph 
-from CarlaBEV.envs.utils import scale_coords, scale_route
 
 class GraphPlanner(MapGraph):
     def __init__(self, graph_path) -> None:
@@ -71,7 +70,7 @@ class GraphPlanner(MapGraph):
             try:
                 p1 = np.array([self.get_node_pos(start)])
                 p2 = np.array([self.get_node_pos(end)])
-            except:
+            except KeyError:
                 continue
 
             dist = np.linalg.norm(p1 - p2)

@@ -82,7 +82,7 @@ def find_route(planner, actor, lane):
     #
     if start.lane == end.lane:
         path, _ = planner.find_path(start.id, end.id, actor.id)
-        rx, ry, path_pos = [], [], []
+        rx, ry = [], []
         for node_id in path[1:-1]:
             x, y = planner.get_node_pos_surface(node_id)
             actor.set_route_wp(node_id, x, y)
@@ -94,7 +94,6 @@ def find_route(planner, actor, lane):
 def scale_route(coords, factor, reverse=False):
     if reverse:
         coords.reverse()
-    offset = factor + 1
     scaled = []
     for coord in coords:
         coord = int(coord / factor) + 2

@@ -30,7 +30,7 @@ def create_lane_graphs(G, offset):
         try:
             p1 = np.array(G.nodes[u]['pos'])
             p2 = np.array(G.nodes[v]['pos'])
-        except Exception as e:
+        except Exception:
             continue
 
         # offset endpoints

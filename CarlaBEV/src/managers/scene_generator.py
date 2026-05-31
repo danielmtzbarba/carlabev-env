@@ -1,11 +1,9 @@
 import json
 import os
-import numpy as np
 import warnings
 from random import choice
 from CarlaBEV.src.scenes.utils import get_random_node, find_route, find_route_in_range
 from CarlaBEV.src.actors.vehicle import Vehicle
-from CarlaBEV.src.actors.pedestrian import Pedestrian
 from CarlaBEV.src.planning.graph_planner import GraphPlanner
 from CarlaBEV.envs.utils import asset_path
 from  CarlaBEV.src.scenes.scenarios.lead_brake import LeadBrakeScenario

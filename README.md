@@ -137,18 +137,19 @@ This checks core simulator contracts such as:
 
 ### Git Hooks
 
-This repo includes versioned Git hooks under `.githooks/`.
+This repo uses `pre-commit` to run local quality checks.
 
-Install them once per clone:
+Install the hooks once per clone:
 
 ```bash
-./scripts/install-git-hooks.sh
+./scripts/setup-hooks.sh
 ```
 
 Hook behavior:
 
-- `pre-commit`: `uv run python -m compileall CarlaBEV`
-- `pre-push`: `uv run python -m unittest tests.test_public_config`
+- `pre-commit`: `ruff --fix` and `ruff-format`
+- `pre-push`: `ruff --fix` and `ruff-format`
+- `pre-push`: `uv run pytest`
 - `pre-push`: `uv run python CarlaBEV/tools/validate_simulator_semantics.py`
 
 ## Configuration

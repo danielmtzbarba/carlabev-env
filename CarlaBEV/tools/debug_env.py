@@ -80,9 +80,11 @@ def main(size: int = 128):
              
              # Logic from spaces.py (roughly)
              # 1: gas
-             if action_idx == 1: gas = 1.0
+             if action_idx == 1:
+                 gas = 1.0
              # 2: brake
-             elif action_idx == 2: brake = 1.0
+             elif action_idx == 2:
+                 brake = 1.0
              # 3: gas + steer left
              elif action_idx == 3: 
                  gas = 1.0
@@ -92,9 +94,11 @@ def main(size: int = 128):
                  gas = 1.0
                  steer = -1.0
              # 5: steer left
-             elif action_idx == 5: steer = 1.0
+             elif action_idx == 5:
+                 steer = 1.0
              # 6: steer right
-             elif action_idx == 6: steer = -1.0
+             elif action_idx == 6:
+                 steer = -1.0
              # 7: brake + steer left
              elif action_idx == 7:
                  brake = 1.0

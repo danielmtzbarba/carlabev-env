@@ -1,6 +1,5 @@
 import pygame 
 
-from CarlaBEV.src.gui.settings import Settings as cfg
 
 class Selector:
     def __init__(self, rect, font, options, selected=0):

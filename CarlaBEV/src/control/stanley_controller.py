@@ -121,13 +121,13 @@ class Controller(State):
         return target_idx, error_front_axle
 
     def next_wps(self, n):
-        try:
+        if self.target_idx + n <= len(self.cx):
             wps = (
                 self.cx[self.target_idx : self.target_idx + n],
                 self.cy[self.target_idx : self.target_idx + n],
                 self.cyaw[self.target_idx : self.target_idx + n],
             )
-        except:
+        else:
             wps = (
                 self.cx[self.target_idx : -1],
                 self.cy[self.target_idx : -1],

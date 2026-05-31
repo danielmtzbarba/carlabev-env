@@ -31,12 +31,12 @@ class MapGraph(object):
 
         try:
             self._nodes["R"] = [n for n in self._G.nodes if "R" in n]
-        except Exception as e:
+        except Exception:
             pass
 
         try:
             self._nodes["L"] = [n for n in self._G.nodes if "L" in n]
-        except Exception as e:
+        except Exception:
             pass
 
         for nodeid, data in self._G.nodes(data=True):

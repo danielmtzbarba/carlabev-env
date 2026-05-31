@@ -1,7 +1,5 @@
 import numpy as np
 
-from CarlaBEV.src.scenes.utils import *
-
 from CarlaBEV.envs.camera import Camera, Follow
 from CarlaBEV.envs.transforms import SurfaceFrame
 from CarlaBEV.src.managers.actor_manager import ActorManager

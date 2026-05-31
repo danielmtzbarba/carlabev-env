@@ -3,8 +3,8 @@ import sys
 import logging
 import json
 
-from datetime import datetime
 from rich.console import Console
+from rich.table import Table
 
 class BaseLogger:
     """Common interface for all logging modules (sim + training)."""
@@ -16,7 +16,6 @@ class BaseLogger:
             self.writer = None
             return
 
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         self.log_dir = os.path.join(log_dir, exp_name)
         os.makedirs(self.log_dir, exist_ok=True)
 

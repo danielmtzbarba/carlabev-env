@@ -753,10 +753,6 @@ class GUI:
         map_y = block_top
         self.map_rect = pygame.Rect(map_x, map_y, draw_w, draw_h)
 
-        fov_size = min(
-            self.right_panel_rect.width - 2 * self.panel_padding,
-            int(self.layout_cfg.preview_fov_max * self.ui_scale),
-        )
         self.timeline_rect = pygame.Rect(
             self.map_rect.x,
             self.map_rect.bottom + self.spacing_lg + help_h,
@@ -841,7 +837,6 @@ class GUI:
         if rows > 0:
             params_content_h = rows * (label_h + field_label_gap + param_textbox_h)
             params_content_h += max(0, rows - 1) * field_row_gap
-        params_section_h = card_top_pad + card_title_h + card_header_gap + params_content_h + card_bottom_pad
         actors_section_h = (
             card_top_pad
             + tab_h
@@ -854,7 +849,6 @@ class GUI:
             + actor_detail_h
             + card_bottom_pad
         )
-        editor_content_h = max(params_section_h, actors_section_h)
         section_heights = {
             "scene_name": card_top_pad + card_title_h + card_header_gap + self.textbox_height + card_bottom_pad,
             "setup": (
@@ -1014,9 +1008,6 @@ class GUI:
         right_card_title_h = self.font_section.get_height()
         right_card_top_pad = self.section_pad
         right_card_bottom_pad = self.section_pad
-        right_card_header_gap = self.spacing_sm
-        summary_line_h = self.font.get_height()
-        status_line_h = self.font_small.get_height()
         preview_card_y = self.right_body_rect.y + self.spacing_sm
         preview_card_h = right_card_top_pad + right_card_title_h + max(4, self.spacing_xs // 2) + fov_size + max(6, right_card_bottom_pad - self.spacing_xs)
         preview_card_w = min(

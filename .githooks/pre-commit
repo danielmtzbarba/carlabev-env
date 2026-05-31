@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-cd "$(git rev-parse --show-toplevel)"
-
-echo "[pre-commit] compile-checking CarlaBEV"
-uv run python -m compileall CarlaBEV

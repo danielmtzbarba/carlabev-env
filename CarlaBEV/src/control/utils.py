@@ -2,7 +2,6 @@ import math
 import numpy as np
 
 from scipy.signal import savgol_filter
-from scipy.interpolate import splprep, splev
 from scipy.spatial.transform import Rotation as Rot
 
 

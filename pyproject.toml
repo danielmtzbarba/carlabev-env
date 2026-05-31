@@ -23,3 +23,17 @@ dependencies = [
   "opencv-python",
   "pydantic>=2",
 ]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.0.0",
+  "ruff>=0.9.9",
+  "pre-commit>=4.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff.lint.per-file-ignores]
+"CarlaBEV/tools/scene_designer.py" = ["E402", "F403"]

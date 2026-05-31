@@ -5,7 +5,10 @@ from typing import Any
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
-from CarlaBEV.src.scenes.scenarios.specs import build_runtime_scenario_options
+from CarlaBEV.src.scenes.scenarios.specs import (
+    build_runtime_scenario_options,
+    build_scenario_options_from_config as _build_scenario_options_from_config,
+)
 
 
 class RandomNavigationReset(BaseModel):
@@ -106,6 +109,19 @@ def build_scenario_config_options(
     if request.anchor_y is not None:
         options["anchor_y"] = int(request.anchor_y)
     return _attach_reset_mask(options, reset_mask)
+
+
+def build_scenario_options_from_config(
+    config: dict[str, Any],
+    *,
+    overrides: dict[str, Any] | None = None,
+    reset_mask=None,
+) -> dict[str, Any]:
+    return _build_scenario_options_from_config(
+        config,
+        overrides=overrides,
+        reset_mask=reset_mask,
+    )
 
 
 def build_reset_options(request: ResetRequest, *, reset_mask=None) -> dict[str, Any]:

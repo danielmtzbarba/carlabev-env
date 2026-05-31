@@ -17,6 +17,7 @@ from CarlaBEV.config.reset import (
     build_authored_scene_options,
     build_random_navigation_options,
     build_reset_options,
+    build_scenario_options_from_config,
     build_scenario_config_options,
     build_scenario_preset_options,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "build_authored_scene_options",
     "build_random_navigation_options",
     "build_reset_options",
+    "build_scenario_options_from_config",
     "build_scenario_config_options",
     "build_scenario_preset_options",
     "get_env_capabilities",

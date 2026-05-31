@@ -69,7 +69,7 @@ Project documentation lives in `CarlaBEV/docs/`:
 - [Control And Actions](CarlaBEV/docs/control_and_actions.md)
 - [Coordinate Conventions](CarlaBEV/docs/coordinate_conventions.md)
 - [Scenario Specifications](CarlaBEV/docs/scenario_specifications.md)
-- [Downstream Integration API Proposal](CarlaBEV/docs/downstream_integration_api.md)
+- [Public Integration API](CarlaBEV/docs/downstream_integration_api.md)
 
 These docs describe the simulator as it exists in the repository today.
 
@@ -137,47 +137,54 @@ This checks core simulator contracts such as:
 
 ## Configuration
 
-Primary debug/training configuration lives in [cfg.py](CarlaBEV/tools/debug/cfg.py).
-
-For downstream integrations, a public Pydantic-backed config facade is also available:
+The supported integration surface is the public Pydantic-backed config facade:
 
 ```python
-from CarlaBEV.config import EnvConfig, RunConfig, validate_env_config
+from CarlaBEV.config import (
+    EnvConfig,
+    RunConfig,
+    validate_env_config,
+    validate_run_config,
+)
 ```
 
 Important environment options include:
 
-- `obs_space`: `bev` or `vector`
-- `masked`: semantic-mask observations vs grayscale pipeline
-- `action_space`: `discrete` or `continuous`
-- `reward_type`: `carl` or default reward
+- `map_name`
+- `obs_mode`: `bev_rgb`, `bev_semantic`, or `vector`
+- `action_mode`: `discrete` or `continuous`
+- `reward_mode`: `shaping` or `carl`
 - `size`: base BEV size
 - `obs_size`: final resized observation size
+- `frame_stack`
 - `traffic_enabled`
 - `max_vehicles`
+
+Legacy names such as `obs_space`, `masked`, `action_space`, and `reward_type` are accepted for compatibility, but new integrations should use the canonical `*_mode` fields.
 
 ## Example Reset
 
 ```python
-import numpy as np
-
+from CarlaBEV.config import (
+    EnvConfig,
+    RunConfig,
+    RandomNavigationReset,
+    build_random_navigation_options,
+)
 from CarlaBEV.envs import make_env
-from CarlaBEV.tools.debug.cfg import ArgsCarlaBEV, EnvConfig, LoggerConfig
 
-cfg = ArgsCarlaBEV(
-    env=EnvConfig(render_mode="rgb_array"),
-    logging=LoggerConfig(),
+cfg = RunConfig(
+    env=EnvConfig(render_mode="rgb_array", obs_mode="bev_semantic"),
+    num_envs=1,
 )
 
 envs = make_env(cfg)
 
 obs, info = envs.reset(
-    options={
-        "scene": "red_light_runner",
-        "num_vehicles": 10,
-        "route_dist_range": [30, 100],
-        "reset_mask": np.array([True], dtype=bool),
-    }
+    options=build_random_navigation_options(
+        RandomNavigationReset(num_vehicles=10, route_dist_range=(30, 100)),
+        reset_mask=[True],
+    )
 )
 ```
 

@@ -246,7 +246,15 @@ def load_scenario_config_file(path: str) -> dict:
         return normalize_scenario_config(json.load(handle))
 
 
-def scenario_config_to_options(config: dict, overrides: dict | None = None) -> dict:
+def build_scenario_options_from_config(
+    config: dict,
+    overrides: dict | None = None,
+    *,
+    reset_mask=None,
+) -> dict:
+    overrides = dict(overrides or {})
+    if reset_mask is None and "reset_mask" in overrides:
+        reset_mask = overrides.pop("reset_mask")
     options = dict(config.get("parameters", {}))
     anchor = config.get("anchor", {}) or {}
     if anchor.get("x") is not None:
@@ -256,8 +264,14 @@ def scenario_config_to_options(config: dict, overrides: dict | None = None) -> d
     options["level"] = int(config.get("level", 1))
     options["scene"] = config["scenario_id"]
 
-    for key, value in (overrides or {}).items():
-        if key in {"config_file", "scene"} or value is None:
+    for key, value in overrides.items():
+        if key in {"config_file", "scene", "reset_mask"} or value is None:
             continue
         options[key] = value
+    if reset_mask is not None:
+        options["reset_mask"] = np.asarray(reset_mask, dtype=bool)
     return options
+
+
+def scenario_config_to_options(config: dict, overrides: dict | None = None) -> dict:
+    return build_scenario_options_from_config(config, overrides)

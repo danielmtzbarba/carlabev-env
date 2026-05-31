@@ -3,8 +3,8 @@ import random
 from copy import deepcopy
 
 from CarlaBEV.src.scenes.scenarios.specs import (
+    build_scenario_options_from_config,
     load_scenario_config_file,
-    scenario_config_to_options,
 )
 from CarlaBEV.src.actors.behavior.registry import build_behavior
 
@@ -221,7 +221,9 @@ class Scenario:
                 raise ValueError(
                     f"Config scenario '{scenario_id}' does not match loader '{self.name}'."
                 )
-            return self.sample(**scenario_config_to_options(config, overrides))
+            return self.sample(
+                **build_scenario_options_from_config(config, overrides=overrides)
+            )
 
         scene_variation = _resolve_variation_settings(data, overrides)
         realized_variations = []

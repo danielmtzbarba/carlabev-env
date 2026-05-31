@@ -1,10 +1,12 @@
-# CarlaBEV Downstream Integration API Proposal
+# CarlaBEV Public Integration API
 
 ## Purpose
 
-This document proposes a stable public integration API for downstream libraries such as `carlabev-lab`.
+This document describes the stable public integration API for downstream libraries such as `carlabev-lab`.
 
-The current codebase is usable from external projects, but the effective API surface is spread across:
+The supported external API surface lives under `CarlaBEV.config` and `CarlaBEV.scenarios`.
+
+Older internal and debug modules still exist for compatibility, but downstream code should not treat them as the contract. Historically the effective API surface was spread across:
 
 - `CarlaBEV/tools/debug/cfg.py`
 - `CarlaBEV/envs/__init__.py`
@@ -12,7 +14,7 @@ The current codebase is usable from external projects, but the effective API sur
 - `CarlaBEV/src/scenes/scenarios/specs.py`
 - raw `env.reset(options=...)` dictionaries
 
-That forces downstream users to know internal option names and duplicate config models. The goal of this proposal is to shrink that surface into a small, documented, validated public contract.
+The public facade shrinks that surface into a small, documented, validated contract.
 
 ## Current Pain Points
 

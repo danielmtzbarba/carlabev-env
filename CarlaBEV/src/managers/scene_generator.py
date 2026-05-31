@@ -11,7 +11,10 @@ from CarlaBEV.envs.utils import asset_path
 from  CarlaBEV.src.scenes.scenarios.lead_brake import LeadBrakeScenario
 from  CarlaBEV.src.scenes.scenarios.jaywalk import JaywalkScenario 
 from  CarlaBEV.src.scenes.scenarios.red_light_running import RedLightRunningScenario
-from CarlaBEV.src.scenes.scenarios.specs import load_scenario_config_file, scenario_config_to_options
+from CarlaBEV.src.scenes.scenarios.specs import (
+    build_scenario_options_from_config,
+    load_scenario_config_file,
+)
 
 
 
@@ -106,7 +109,7 @@ class SceneGenerator:
             if scenario_id not in self.scenarios:
                 raise KeyError(f"Unknown scenario '{scenario_id}' in config '{config_file}'")
             return self.scenarios[scenario_id].sample(
-                **scenario_config_to_options(config, options)
+                **build_scenario_options_from_config(config, overrides=options)
             )
 
         # --- Case 1: Random scene generation ---

@@ -38,6 +38,7 @@ class EnvConfig:
     # Traffic generation
     traffic_enabled: bool = True
     max_vehicles: int = 50
+    route_direction_metrics_enabled: bool = False
     # Curriculum
     curriculum_enabled: bool = False
     start_ep: int = 100
@@ -122,6 +123,7 @@ def to_public_env_config(env_cfg: EnvConfig) -> PublicEnvConfig:
         reward_mode=env_cfg.reward_type,
         traffic_enabled=env_cfg.traffic_enabled,
         max_vehicles=env_cfg.max_vehicles,
+        route_direction_metrics_enabled=env_cfg.route_direction_metrics_enabled,
     )
 
 

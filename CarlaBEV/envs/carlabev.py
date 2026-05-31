@@ -10,6 +10,9 @@ from CarlaBEV.envs.renderer import Renderer
 from CarlaBEV.src.deeprl.reward import RewardFn
 from CarlaBEV.src.deeprl.carl_reward_fn import CaRLRewardFn
 from CarlaBEV.src.deeprl.stats import Stats
+from CarlaBEV.src.control.route_metrics import (
+    compute_smoothed_route_direction_fractions,
+)
 
 
 from CarlaBEV.src.managers.scene_generator import SceneGenerator
@@ -91,6 +94,7 @@ class CarlaBEV(gym.Env):
             self.num_vehicles = len(actors["vehicle"])
             self.map.reset(actors)
             if actors and actors.get("agent") is not None:
+                self._maybe_attach_route_direction_metrics()
                 last_spawn_info = self.map.spawn_validation_info()
             else:
                 last_spawn_info = {"valid": True, "reason": "no_agent"}
@@ -117,6 +121,21 @@ class CarlaBEV(gym.Env):
         if last_spawn_info is not None:
             info["spawn_validation"] = last_spawn_info
         return self._get_obs(), info
+
+    def _maybe_attach_route_direction_metrics(self):
+        if not getattr(self.cfg, "route_direction_metrics_enabled", False):
+            return
+
+        hero = getattr(self.map, "hero", None)
+        if hero is None:
+            return
+
+        metrics = compute_smoothed_route_direction_fractions(
+            hero.cx,
+            hero.cy,
+            hero.cyaw,
+        )
+        self._scenario_context.update(metrics)
 
     def _preprocess_action(self, action):
         if self.action_mode == "discrete":

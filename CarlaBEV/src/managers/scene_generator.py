@@ -139,6 +139,11 @@ class SceneGenerator:
         """
         num_cars = num_cars if self.traffic_enabled else 0
         ego_target_speed = float(self.cfg.get("ego_target_speed", 12.0))
+        self.last_scene_context = {
+            "scene": "rdm",
+            "scenario_param_num_vehicles": int(num_cars),
+            "scenario_param_route_dist_range": list(dist_range),
+        }
 
         actors = {
             "agent": None,

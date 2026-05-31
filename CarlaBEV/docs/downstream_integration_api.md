@@ -146,6 +146,7 @@ Suggested `EnvConfig` fields:
 - `max_actions: int`
 - `traffic_enabled: bool`
 - `max_vehicles: int`
+- `route_direction_metrics_enabled: bool`
 
 Notably absent:
 

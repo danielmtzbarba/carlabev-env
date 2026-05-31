@@ -176,6 +176,8 @@ Important environment options include:
 - `frame_stack`
 - `traffic_enabled`
 - `max_vehicles`
+- `route_direction_metrics_enabled`: attach one-time smoothed-route fractions
+  (`straight_fraction`, `left_turn_fraction`, `right_turn_fraction`) to reset info
 
 Legacy names such as `obs_space`, `masked`, `action_space`, and `reward_type` are accepted for compatibility, but new integrations should use the canonical `*_mode` fields.
 

@@ -44,6 +44,7 @@ class EnvConfig(BaseModel):
 
     traffic_enabled: bool = True
     max_vehicles: int = 50
+    route_direction_metrics_enabled: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -175,6 +176,7 @@ def _to_env_mapping(value: Any):
         "scenes_path",
         "traffic_enabled",
         "max_vehicles",
+        "route_direction_metrics_enabled",
     }}
     if "obs_mode" in raw:
         env["obs_mode"] = raw["obs_mode"]

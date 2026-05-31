@@ -2,6 +2,10 @@ import math
 import logging
 import os
 import pygame
+from CarlaBEV.config.reset import (
+    RandomNavigationReset,
+    build_random_navigation_options,
+)
 import numpy as np
 
 from CarlaBEV.src.gui.components import Button, Selector, TextBox, ListBox
@@ -566,7 +570,9 @@ class GUI:
                 return None
 
         if self.add_rdm_actor_btn.handle_event(event):
-            self.env.reset(options={"scene": "rdm"})
+            self.env.reset(
+                options=build_random_navigation_options(RandomNavigationReset())
+            )
             self.set_status("Loaded a random traffic scene.", "Choose a scenario and click the map to return to authored mode.")
             return "rdm"
 

@@ -2,6 +2,14 @@ import numpy as np
 from enum import Enum
 from gymnasium import spaces
 
+
+def _action_mode(cfg):
+    return getattr(cfg, "action_mode", getattr(cfg, "action_space", "discrete"))
+
+
+def _obs_mode(cfg):
+    return getattr(cfg, "obs_mode", getattr(cfg, "obs_space", "bev"))
+
 class Actions(Enum):
     nothing = 0
     gas = 1
@@ -16,7 +24,7 @@ class Actions(Enum):
 
 def get_action_space(cfg):
     # Action Space
-    if cfg.action_space == "discrete":
+    if _action_mode(cfg) == "discrete":
         action_space = spaces.Discrete(9)
         actions = {
             0: np.array([0, 0, 0]),  # nothing
@@ -39,9 +47,10 @@ def get_action_space(cfg):
 
 
 def get_obs_space(cfg):
-    if cfg.obs_space == "bev":
+    obs_mode = _obs_mode(cfg)
+    if obs_mode in {"bev", "bev_rgb", "bev_semantic"}:
         return spaces.Box(
             low=0, high=255, shape=(cfg.size, cfg.size, 3), dtype=np.uint8
         )
-    elif cfg.obs_space == "vector":
+    elif obs_mode == "vector":
         return spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)

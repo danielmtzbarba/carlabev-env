@@ -39,21 +39,23 @@ class CarlaBEV(gym.Env):
         self._setup()
 
     def _setup(self):
+        self.obs_mode = getattr(self.cfg, "obs_mode", getattr(self.cfg, "obs_space", "bev"))
+        self.action_mode = getattr(self.cfg, "action_mode", getattr(self.cfg, "action_space", "discrete"))
+        self.reward_mode = getattr(self.cfg, "reward_mode", getattr(self.cfg, "reward_type", "shaping"))
         # Render mode
         assert self.cfg.render_mode in self.metadata["render_modes"]
         self.render_mode = self.cfg.render_mode
         self.renderer = Renderer(self.cfg.size, fps=self.cfg.fps)
         # Observation Space
-        assert self.cfg.obs_space in self.metadata["observation_space"]
-        self.obs_mode = self.cfg.obs_space
+        assert self.obs_mode in {"bev", "bev_rgb", "bev_semantic", "vector"}
         self.observation_space = get_obs_space(self.cfg)
         # Action space
-        assert self.cfg.action_space in self.metadata["action_space"]
+        assert self.action_mode in self.metadata["action_space"]
         self.action_space, self.action_to_direction = get_action_space(self.cfg)
         # Experiment Stats
         self.stats = Stats()
         # Reward Function
-        if self.cfg.reward_type == "carl":
+        if self.reward_mode == "carl":
             self.reward_fn = CaRLRewardFn()
         else:
             self.reward_fn = RewardFn()
@@ -103,12 +105,12 @@ class CarlaBEV(gym.Env):
 
         if actors and actors.get("agent") is not None:
             rx, ry = self.map.route
-            if self.cfg.reward_type == "carl":
+            if self.reward_mode == "carl":
                 self.reward_fn.reset(rx, ry)
             else:
                 self.reward_fn.reset()
         else:
-            if self.cfg.reward_type == "carl":
+            if self.reward_mode == "carl":
                 self.reward_fn.reset([], [])
             else:
                 self.reward_fn.reset()
@@ -119,7 +121,7 @@ class CarlaBEV(gym.Env):
         return self._get_obs(), info
 
     def _preprocess_action(self, action):
-        if self.cfg.action_space == "discrete":
+        if self.action_mode == "discrete":
             action = self.action_to_direction[action]
         return action
 

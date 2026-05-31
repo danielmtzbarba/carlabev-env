@@ -51,7 +51,15 @@ from CarlaBEV.src.actors.behavior.registry import (
 from CarlaBEV.src.scenes.scenarios.specs import (
     build_scenario_config,
     load_scenario_config_file,
-    scenario_config_to_options,
+)
+from CarlaBEV.config.env import EnvConfig as PublicEnvConfig
+from CarlaBEV.config.reset import (
+    AuthoredSceneReset,
+    RandomNavigationReset,
+    ScenarioConfigReset,
+    build_authored_scene_options,
+    build_random_navigation_options,
+    build_scenario_config_options,
 )
 
 from CarlaBEV.envs import CarlaBEV
@@ -59,6 +67,22 @@ from CarlaBEV.envs import CarlaBEV
 device = "cuda:0"
 # -----------------------------------------
 logger = logging.getLogger("carlabev.scene_designer")
+
+
+def _reward_mode(cfg):
+    return getattr(cfg, "reward_mode", getattr(cfg, "reward_type", "shaping"))
+
+
+def _build_config_options(config):
+    return build_scenario_config_options(
+        ScenarioConfigReset(
+            scenario_id=config["scenario_id"],
+            level=int(config.get("level", 1)),
+            anchor_x=(config.get("anchor") or {}).get("x"),
+            anchor_y=(config.get("anchor") or {}).get("y"),
+            parameters=dict(config.get("parameters", {})),
+        )
+    )
 
 
 def configure_logging():
@@ -485,7 +509,7 @@ class SceneDesigner(GUI):
                 self.env.num_vehicles = len(actor_scene["vehicle"])
                 self.env.len_ego_route = self.env.map.actor_manager.route_length
                 rx, ry = self.env.map.route
-                if self.env.cfg.reward_type == "carl":
+                if _reward_mode(self.env.cfg) == "carl":
                     self.env.reward_fn.reset(rx, ry)
                 else:
                     self.env.reward_fn.reset()
@@ -495,7 +519,7 @@ class SceneDesigner(GUI):
                 )
                 return
         if self.last_config is not None:
-            self.env.reset(options=scenario_config_to_options(self.last_config))
+            self.env.reset(options=_build_config_options(self.last_config))
 
     def _reset_interaction_state(self):
         self.map_click_mode = None
@@ -638,7 +662,14 @@ class SceneDesigner(GUI):
             self._load_authored_actors(data)
             self.last_config = None
             self.editor_tab = "actors"
-            self.env.reset(options={"config_file": scene_path, "variation_enabled": False})
+            self.env.reset(
+                options=build_authored_scene_options(
+                    AuthoredSceneReset(
+                        config_file=scene_path,
+                        variation_enabled=False,
+                    )
+                )
+            )
             print(f"Loaded authored scene from {scene_path}")
             self.set_status(
                 f"Loaded authored scene {self.scene_name.text}.",
@@ -655,7 +686,7 @@ class SceneDesigner(GUI):
         self._sync_actor_behavior_widgets()
         for field in self.active_fields:
             self.field_boxes[field.key].text = str(config["parameters"].get(field.key, field.default))
-        self.env.reset(options=scenario_config_to_options(config))
+        self.env.reset(options=_build_config_options(config))
         print(f"Loaded scenario config from {scene_path}")
         self.set_status(
             f"Loaded scenario config {self.scene_name.text}.",
@@ -724,7 +755,7 @@ class SceneDesigner(GUI):
             parameters=parameters,
         )
         self.loaded_scene_path = None
-        options = scenario_config_to_options(self.last_config)
+        options = _build_config_options(self.last_config)
 
         print(f"Anchoring {scenario_key} at ({map_x}, {map_y}) | Level {level}")
         self.env.reset(options=options)
@@ -740,7 +771,7 @@ class SceneDesigner(GUI):
             self.env.num_vehicles = len(self.loaded_scene["vehicle"])
             self.env.len_ego_route = self.env.map.actor_manager.route_length
             rx, ry = self.env.map.route
-            if self.env.cfg.reward_type == "carl":
+            if _reward_mode(self.env.cfg) == "carl":
                 self.env.reward_fn.reset(rx, ry)
             else:
                 self.env.reward_fn.reset()
@@ -820,7 +851,7 @@ class SceneDesigner(GUI):
 # Main loop
 def main():
     import tyro
-    from CarlaBEV.tools.debug.cfg import ArgsCarlaBEV
+    from CarlaBEV.tools.debug.cfg import ArgsCarlaBEV, to_public_env_config
     
     configure_logging()
     faulthandler.enable()
@@ -836,13 +867,13 @@ def main():
     cfg = tyro.cli(ArgsCarlaBEV)
     cfg.env.render_mode = "rgb_array"
     
-    env = CarlaBEV(cfg.env)
+    env = CarlaBEV(to_public_env_config(cfg.env))
     #
     keys_held = init_key_tracking()
     pygame.init()
     designer_settings = Settings(designer_layout_preset="auto")
     app = SceneDesigner(env=env, settings=designer_settings)
-    env.reset(options={})
+    env.reset(options=build_random_navigation_options(RandomNavigationReset()))
     #
     running = True
     total_reward = 0
@@ -892,7 +923,9 @@ def main():
                 flag = app.handle_event(event)
 
                 if flag == "rdm":
-                    observation, info = env.reset(options={"scene": "rdm"})
+                    observation, info = env.reset(
+                        options=build_random_navigation_options(RandomNavigationReset())
+                    )
                     total_reward = 0
                 elif isinstance(flag, dict) and flag.get("action") == "anchor":
                     app.add_anchor(flag["pos"])
@@ -924,9 +957,9 @@ def main():
                         app.refresh_scene_preview()
                     else:
                         reset_options = (
-                            scenario_config_to_options(app.last_config)
+                            _build_config_options(app.last_config)
                             if app.last_config is not None
-                            else {}
+                            else build_random_navigation_options(RandomNavigationReset())
                         )
                         observation, info = env.reset(options=reset_options)
 

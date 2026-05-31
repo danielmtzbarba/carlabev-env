@@ -34,7 +34,8 @@ class BaseMap(Scene):
         self.crop_resolution = (self.size + self._pad, self.size + self._pad)
 
         # --- Initialize base Scene
-        super().__init__(size=cfg.size, screen=self._map_img, action_space=cfg.action_space)
+        action_space = getattr(cfg, "action_mode", getattr(cfg, "action_space", "discrete"))
+        super().__init__(size=cfg.size, screen=self._map_img, action_space=action_space)
 
         # --- Internal state
         self._theta = 0.0

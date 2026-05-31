@@ -55,7 +55,10 @@ class SceneGenerator:
     """
 
     def __init__(self, config=None):
-        self.cfg = config.__dict__ or {}
+        if hasattr(config, "model_dump"):
+            self.cfg = config.model_dump(mode="python")
+        else:
+            self.cfg = getattr(config, "__dict__", {}) or {}
         self.size = self.cfg.get("map_size", 128)
         self.map_name = self.cfg.get("map_name", "Town01")
         self.traffic_enabled = self.cfg.get("traffic_enabled", True)

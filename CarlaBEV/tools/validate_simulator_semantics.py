@@ -6,6 +6,7 @@ from pathlib import Path
 import traceback
 
 import numpy as np
+from CarlaBEV.config.env import EnvConfig
 
 from CarlaBEV.envs.carlabev import CarlaBEV
 from CarlaBEV.envs.geometry import (
@@ -24,9 +25,6 @@ from CarlaBEV.src.actors.hero import ContinuousAgent
 from CarlaBEV.src.managers.actor_manager import ActorManager
 from CarlaBEV.src.control.stanley_controller import Controller
 from CarlaBEV.src.deeprl.carl_reward_fn import CaRLRewardFn
-from CarlaBEV.tools.debug.cfg import EnvConfig
-
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -249,7 +247,7 @@ def check_jaywalk_behavior_fsm() -> CheckResult:
 
 
 def check_vector_observation_contract() -> CheckResult:
-    cfg = EnvConfig(obs_space="vector", render_mode="rgb_array")
+    cfg = EnvConfig(obs_mode="vector", render_mode="rgb_array")
     declared = get_obs_space(cfg).shape
     env = CarlaBEV(cfg)
 

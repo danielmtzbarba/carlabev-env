@@ -7,8 +7,6 @@ from CarlaBEV.envs.transforms import SurfaceFrame
 from CarlaBEV.src.managers.actor_manager import ActorManager
 from CarlaBEV.src.scenes.utils import set_targets
 
-from CarlaBEV.src.managers.scene_serializer import SceneSerializer
-
 
 class Scene:
     """Main scene orchestrator connecting planners and actors."""
@@ -27,7 +25,6 @@ class Scene:
 
         # --- Managers ---
         self.actor_manager = ActorManager(size, action_space=self.action_space)
-        self.serializer = SceneSerializer()
         self._idx = 0
 
         # --- hero agent placeholder ---

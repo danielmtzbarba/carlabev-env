@@ -1,21 +1,13 @@
 import pygame
-from copy import deepcopy
 import numpy as np
 
-import os
-import ast
-import yaml
-import pandas as pd
-
 from CarlaBEV.envs.geometry import (
-    raw_to_surface,
     route_length_meters,
     surface_to_raw,
 )
 from CarlaBEV.src.gui.settings import Settings as cfg
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.scenes.target import Target
-from CarlaBEV.src.actors.pedestrian import Pedestrian
 
 actors_dict = {"agent": None, "vehicle": [], "pedestrian": [], "target": []}
 
@@ -76,7 +68,6 @@ def select_node(event, planner, lane, actor):
 
 
 def get_random_node(planner, actor_type, lane):
-    actor_cls = "sidewalk" if actor_type == "Pedestrian" else "vehicle"
     planner_id = "pedestrian" if actor_type == "Pedestrian" else f"vehicle-{lane}"
     planner = planner[planner_id]
     rdm_node_id = planner.get_random_node(lane)
@@ -120,119 +111,6 @@ def set_targets(actors_dict, rx, ry):
             id, size = "goal", 4
         actors_dict["target"].append(Target(id=id, target_pos=(x, y), size=size))
     return actors_dict
-
-
-def build_scene(df, map_size):
-    actors = deepcopy(actors_dict)
-    factor = int(1024 / map_size)
-    for idx, row in df.iterrows():
-        _, class_id, _, _, rx, ry = row
-        for i in actors_dict.keys():
-            if i in class_id:
-                class_id = i
-        routeX = scale_route(rx, factor=factor, reverse=False)
-        routeY = scale_route(ry, factor=factor, reverse=False)
-        if class_id == "agent":
-            actors[class_id] = (routeX, routeY)
-            actors = set_targets(actors, routeX, routeY)
-            continue
-        Ditto = Pedestrian if class_id == "pedestrian" else Vehicle
-        if len(rx) < 2:
-            continue
-        actors[class_id].append(Ditto(map_size=map_size, routeX=rx, routeY=ry))
-    return actors
-
-
-def load_scene_from_csv(csv_path, size=128, verbose=True):
-    """
-    Loads a scenario CSV file and instantiates the actors.
-
-    Returns:
-        actors (dict): {
-            "agent": (rx, ry),
-            "vehicle": [Vehicle(), ...],
-            "pedestrian": [Pedestrian(), ...],
-            "target": []
-        }
-    """
-    if not os.path.exists(csv_path):
-        raise FileNotFoundError(f"Scene CSV not found: {csv_path}")
-
-    df = pd.read_csv(csv_path)
-    actors = {"agent": None, "vehicle": [], "pedestrian": [], "target": []}
-
-    for _, row in df.iterrows():
-        actor_class = row["class"].strip().lower()
-        start = ast.literal_eval(row["start"])
-        goal = ast.literal_eval(row["goal"])
-        rx = ast.literal_eval(row["rx"])
-        ry = ast.literal_eval(row["ry"])
-
-        # Convert to Node objects (required by Vehicle/Pedestrian)
-        start_node = Node(id=0, position=start)
-        goal_node = Node(id=1, position=goal)
-
-        if actor_class == "agent":
-            # store only the route for Scene.Agent
-            actors["agent"] = (rx, ry)
-            if verbose:
-                print(f"[SceneLoader] ✅ Loaded Agent route ({len(rx)} waypoints)")
-
-        elif actor_class == "vehicle":
-            vehicle = Vehicle(
-                start_node=start_node,
-                end_node=goal_node,
-                map_size=size,
-                routeX=rx,
-                routeY=ry,
-            )
-            vehicle.reset()  # <-- ensures .state exists
-            actors["vehicle"].append(vehicle)
-            if verbose:
-                print(f"[SceneLoader] 🚗 Vehicle added: start={start}, goal={goal}")
-
-        elif actor_class == "pedestrian":
-            ped = Pedestrian(
-                start_node=start_node,
-                end_node=goal_node,
-                map_size=size,
-                routeX=rx,
-                routeY=ry,
-            )
-            ped.reset()  # same reason
-            actors["pedestrian"].append(ped)
-            if verbose:
-                print(f"[SceneLoader] 🚶 Pedestrian added: start={start}, goal={goal}")
-
-        else:
-            print(f"[WARN] Unknown actor class '{actor_class}' — skipping.")
-
-    return actors
-
-
-def load_meta_yaml(meta_path):
-    """
-    Reads a meta.yaml file for scenario info.
-
-    Returns:
-        dict with scenario info
-    """
-    if not os.path.exists(meta_path):
-        print(f"[SceneLoader] No meta.yaml found at {meta_path}")
-        return {}
-    with open(meta_path, "r") as f:
-        meta = yaml.safe_load(f)
-    print(f"[SceneLoader] Loaded metadata for {meta.get('scenario_id', 'unknown')}")
-    return meta
-
-
-def load_scenario_folder(folder_path, size=1024):
-    csv_path = os.path.join(folder_path, "scene.csv")
-    meta_path = os.path.join(folder_path, "meta.yaml")
-
-    actors = load_scene_from_csv(csv_path, size=size)
-    meta = load_meta_yaml(meta_path)
-    return actors, meta
 
 
 def find_route_in_range(

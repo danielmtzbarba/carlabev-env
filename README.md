@@ -135,6 +135,22 @@ This checks core simulator contracts such as:
 - observation-shape correctness
 - valid scenario spawns
 
+### Git Hooks
+
+This repo includes versioned Git hooks under `.githooks/`.
+
+Install them once per clone:
+
+```bash
+./scripts/install-git-hooks.sh
+```
+
+Hook behavior:
+
+- `pre-commit`: `uv run python -m compileall CarlaBEV`
+- `pre-push`: `uv run python -m unittest tests.test_public_config`
+- `pre-push`: `uv run python CarlaBEV/tools/validate_simulator_semantics.py`
+
 ## Configuration
 
 The supported integration surface is the public Pydantic-backed config facade:

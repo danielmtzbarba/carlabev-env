@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+echo "[pre-push] running CarlaBEV public-config tests"
+uv run python -m unittest tests.test_public_config
+
+echo "[pre-push] running CarlaBEV simulator validation"
+uv run python CarlaBEV/tools/validate_simulator_semantics.py

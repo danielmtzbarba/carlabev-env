@@ -13,7 +13,11 @@ from CarlaBEV.tools.debug.controls import (
     init_key_tracking,
     process_events,
 )
-from CarlaBEV.tools.debug.cfg import ArgsCarlaBEV
+from CarlaBEV.tools.debug.cfg import (
+    ArgsCarlaBEV,
+    build_debug_authored_options,
+    to_public_run_config,
+)
 from CarlaBEV.src.deeprl.logger import create_loggers
 
 
@@ -69,15 +73,15 @@ def resolve_mode_variation_enabled():
 def build_train_reset_options(reset_mask, scene_pool, rng):
     scene_path, scene_data = rng.choice(scene_pool)
     variation_enabled = resolve_mode_variation_enabled()
-    options = {
-        "config_file": str(scene_path),
-        "reset_mask": reset_mask,
-        "variation_enabled": variation_enabled,
-    }
     variation_seed = None
     if variation_enabled:
         variation_seed = rng.randint(VARIATION_SEED_MIN, VARIATION_SEED_MAX)
-        options["variation_seed"] = variation_seed
+    options = build_debug_authored_options(
+        str(scene_path),
+        reset_mask=reset_mask,
+        variation_enabled=variation_enabled,
+        variation_seed=variation_seed,
+    )
     meta = {
         "mode": "train",
         "scene_path": str(scene_path),
@@ -91,11 +95,11 @@ def build_train_reset_options(reset_mask, scene_pool, rng):
 
 def build_eval_reset_options(reset_mask, scene_pool, scene_index):
     scene_path, scene_data = scene_pool[scene_index % len(scene_pool)]
-    options = {
-        "config_file": str(scene_path),
-        "reset_mask": reset_mask,
-        "variation_enabled": False,
-    }
+    options = build_debug_authored_options(
+        str(scene_path),
+        reset_mask=reset_mask,
+        variation_enabled=False,
+    )
     meta = {
         "mode": "eval",
         "scene_path": str(scene_path),
@@ -135,7 +139,7 @@ def main():
         )
     pygame.init()
     keys_held = init_key_tracking()
-    envs = make_env(cfg)
+    envs = make_env(to_public_run_config(cfg))
     rng = random.Random(cfg.seed)
     scene_pool = list_authored_scene_files(AUTHORED_SCENE_DIR)
     scene_index = 0

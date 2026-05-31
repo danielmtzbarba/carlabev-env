@@ -21,18 +21,19 @@ class PlannerManager:
     def __init__(self, town_name: str = "Town01"):
         self.town_name = town_name
         base_path = os.path.join(asset_path, town_name)
+        planner_prefix = town_name.lower()
 
         # --- Load all graph planners ---
         self.graphs = {
-            "pedestrian": GraphPlanner(os.path.join(base_path, "town01.pkl")),
+            "pedestrian": GraphPlanner(os.path.join(base_path, f"{planner_prefix}.pkl")),
             "vehicle": GraphPlanner(
-                os.path.join(base_path, "town01-vehicles-2lanes-100.pkl")
+                os.path.join(base_path, f"{planner_prefix}-vehicles-2lanes-100.pkl")
             ),
             "vehicle-R": GraphPlanner(
-                os.path.join(base_path, "town01-vehicles-right-100.pkl")
+                os.path.join(base_path, f"{planner_prefix}-vehicles-right-100.pkl")
             ),
             "vehicle-L": GraphPlanner(
-                os.path.join(base_path, "town01-vehicles-left-100.pkl")
+                os.path.join(base_path, f"{planner_prefix}-vehicles-left-100.pkl")
             ),
         }
 
@@ -56,14 +57,16 @@ class SceneGenerator:
     def __init__(self, config=None):
         self.cfg = config.__dict__ or {}
         self.size = self.cfg.get("map_size", 128)
-        self.town_name = self.cfg.get("town_name", "Town01")
+        self.map_name = self.cfg.get("map_name", "Town01")
         self.traffic_enabled = self.cfg.get("traffic_enabled", True)
-        self.planners = PlannerManager(self.town_name)
+        self.planners = PlannerManager(self.map_name)
     
         self.scenarios = {
             "lead_brake": LeadBrakeScenario(map_size=128),
             "jaywalk": JaywalkScenario(map_size=128),
-            "red_light_runner": RedLightRunningScenario(map_size=128)
+            "red_light_runner": RedLightRunningScenario(
+                map_size=128, map_name=self.map_name
+            ),
         }
         self.last_scene_context = {}
 

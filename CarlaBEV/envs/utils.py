@@ -52,15 +52,15 @@ def map_to_rgb(image):
 
 
 def load_map(map_name, size):
-    map_path = os.path.join(asset_path, f"Town01/Town01-{size}-sem.png")
+    map_path = os.path.join(asset_path, map_name, f"{map_name}-{size}-sem.png")
     arr = np.array(Image.open(map_path))
     arr = map_to_rgb(arr)
     #    rgb_surface = pygame.surfarray.make_surface(arr)
-    map_path = os.path.join(asset_path, f"Town01/Town01-{size}-rgb.png")
+    map_path = os.path.join(asset_path, map_name, f"{map_name}-{size}-rgb.png")
     map_img = pygame.image.load(map_path)
 
     # Planning Map
-    map_path = os.path.join(asset_path, "Town01/Town01-1024-sem.png")
+    map_path = os.path.join(asset_path, map_name, f"{map_name}-1024-sem.png")
     planning_map = Image.open(map_path)
     x, y = planning_map.size
     pmap = np.array(planning_map.resize((int(x / 8), int(y / 8))), dtype=np.uint8)

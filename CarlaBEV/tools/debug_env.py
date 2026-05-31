@@ -11,8 +11,12 @@ from CarlaBEV.tools.debug.controls import (
 )
 
 from CarlaBEV.src.deeprl.logger import create_loggers
-from CarlaBEV.src.scenes.scenarios.specs import build_runtime_scenario_options
-from CarlaBEV.tools.debug.cfg import ArgsCarlaBEV
+from CarlaBEV.tools.debug.cfg import (
+    ArgsCarlaBEV,
+    build_debug_authored_options,
+    build_debug_preset_options,
+    to_public_run_config,
+)
 
 
 cfg = tyro.cli(ArgsCarlaBEV)
@@ -32,21 +36,23 @@ def get_base_env(env):
 
 def build_debug_reset_options(reset_mask, overrides=None):
     if DEBUG_CONFIG_FILE:
-        options = {"config_file": DEBUG_CONFIG_FILE, "reset_mask": reset_mask}
+        options = build_debug_authored_options(
+            DEBUG_CONFIG_FILE,
+            reset_mask=reset_mask,
+            variation_enabled=False,
+        )
         if overrides:
             options.update(overrides)
         return options
-    return build_runtime_scenario_options(
-        DEBUG_PRESET_ID,
-        reset_mask=reset_mask,
-        overrides=overrides,
+    return build_debug_preset_options(
+        DEBUG_PRESET_ID, reset_mask=reset_mask, overrides=overrides
     )
 
 
 def main(size: int = 128):
     pygame.init()
     keys_held = init_key_tracking()
-    envs = make_env(cfg)
+    envs = make_env(to_public_run_config(cfg))
     print("Observation space:", envs.observation_space)
     options = build_debug_reset_options(np.array([True], dtype=bool))
     observation, info = envs.reset(options=options)

@@ -69,6 +69,7 @@ Project documentation lives in `CarlaBEV/docs/`:
 - [Control And Actions](CarlaBEV/docs/control_and_actions.md)
 - [Coordinate Conventions](CarlaBEV/docs/coordinate_conventions.md)
 - [Scenario Specifications](CarlaBEV/docs/scenario_specifications.md)
+- [Downstream Integration API Proposal](CarlaBEV/docs/downstream_integration_api.md)
 
 These docs describe the simulator as it exists in the repository today.
 
@@ -137,6 +138,12 @@ This checks core simulator contracts such as:
 ## Configuration
 
 Primary debug/training configuration lives in [cfg.py](CarlaBEV/tools/debug/cfg.py).
+
+For downstream integrations, a public Pydantic-backed config facade is also available:
+
+```python
+from CarlaBEV.config import EnvConfig, RunConfig, validate_env_config
+```
 
 Important environment options include:
 

@@ -9,6 +9,14 @@ from CarlaBEV.envs.carlabev import CarlaBEV
 from CarlaBEV.wrappers.rgb_to_semantic import SemanticMaskWrapper, FlattenStackedFrames
 
 
+def _get_env_cfg(cfg):
+    return getattr(cfg, "env", cfg)
+
+
+def _get_cfg_attr(cfg, key, default):
+    return getattr(cfg, key, default)
+
+
 def make_carlabev_env_muzero(seed, idx, capture_video, run_name, size):
     def thunk():
         if capture_video and idx == 0:
@@ -31,29 +39,30 @@ def make_carlabev_env_muzero(seed, idx, capture_video, run_name, size):
 
 
 def wrap_env(cfg, env, capture=False, eval=False):
+    env_cfg = _get_env_cfg(cfg)
     if capture:
-        base_dir = f"videos/{cfg.exp_name}"
+        base_dir = f"videos/{_get_cfg_attr(cfg, 'exp_name', 'carlabev-run')}"
         save_dir = f"{base_dir}/eval" if eval else base_dir
-        every = 50 if eval else cfg.capture_every
+        every = 50 if eval else _get_cfg_attr(cfg, "capture_every", 50)
 
         env = gym.wrappers.RecordVideo(
             env, save_dir, episode_trigger=lambda x: x % every == 0
         )
 
-    env = ResizeObservation(env, cfg.env.obs_size)
+    env = ResizeObservation(env, env_cfg.obs_size)
 
-    if cfg.env.masked:
+    if env_cfg.masked:
         env = SemanticMaskWrapper(env)
     else:
         env = GrayscaleObservation(env)
 
-    env = FrameStackObservation(env, stack_size=4)
-    if cfg.env.masked:
+    env = FrameStackObservation(env, stack_size=env_cfg.frame_stack)
+    if env_cfg.masked:
         env = FlattenStackedFrames(env)
 
     env = gym.wrappers.RecordEpisodeStatistics(env)
 
-    seed = cfg.seed
+    seed = _get_cfg_attr(cfg, "seed", getattr(env_cfg, "seed", 0))
     if eval:
         seed = 999
     env.action_space.seed(seed)
@@ -62,12 +71,14 @@ def wrap_env(cfg, env, capture=False, eval=False):
 
 
 def make_carlabev_env(idx, cfg, eval=False):
+    env_cfg = _get_env_cfg(cfg)
+
     def thunk():
         capture = False
-        if cfg.capture_video and idx == 0:
+        if _get_cfg_attr(cfg, "capture_video", False) and idx == 0:
             capture = True
 
-        env = CarlaBEV(cfg.env)
+        env = CarlaBEV(env_cfg)
         env = wrap_env(cfg, env, capture, eval)
         return env
 
@@ -75,7 +86,13 @@ def make_carlabev_env(idx, cfg, eval=False):
 
 
 def make_env(cfg, eval=False):
-    num_envs = cfg.num_envs
+    from CarlaBEV.config import validate_run_config
+
+    if not hasattr(cfg, "env"):
+        cfg = validate_run_config({"env": cfg})
+    else:
+        validate_run_config(cfg)
+    num_envs = _get_cfg_attr(cfg, "num_envs", 1)
     envs = gym.vector.SyncVectorEnv(
         [make_carlabev_env(i, cfg, eval) for i in range(num_envs)],
         autoreset_mode=gym.vector.AutoresetMode.DISABLED,

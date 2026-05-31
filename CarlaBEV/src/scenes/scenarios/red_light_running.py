@@ -15,8 +15,9 @@ class RedLightRunningScenario(Scenario):
     Scenario where another vehicle runs a red light at a legal 4-way intersection
     while ego has green.
     """
-    def __init__(self, map_size):
+    def __init__(self, map_size, map_name="Town01"):
         super().__init__("red_light_runner", map_size)
+        self.map_name = map_name
         
         # Intersection coordinates (y, x) provided by user
         self.intersections = [
@@ -38,8 +39,9 @@ class RedLightRunningScenario(Scenario):
             (2446, 6757),
         ]
         self._graph = None
+        planner_prefix = self.map_name.lower()
         self._graph_path = os.path.join(
-            asset_path, "Town01", "town01-vehicles-2lanes-100.pkl"
+            asset_path, self.map_name, f"{planner_prefix}-vehicles-2lanes-100.pkl"
         )
 
     def _load_graph(self):

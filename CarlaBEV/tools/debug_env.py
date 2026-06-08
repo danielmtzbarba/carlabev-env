@@ -52,7 +52,16 @@ def build_debug_reset_options(reset_mask, overrides=None):
 def main(size: int = 128):
     pygame.init()
     keys_held = init_key_tracking()
-    envs = make_env(to_public_run_config(cfg))
+    run_cfg = to_public_run_config(cfg)
+    envs = make_env(run_cfg)
+    print(
+        "[debug-env] fov-anchor",
+        {
+            "x_frac": run_cfg.env.ego_anchor_x_frac,
+            "y_frac": run_cfg.env.ego_anchor_y_frac,
+            "lookahead_20": cfg.env.ego_anchor_lookahead_20,
+        },
+    )
     print("Observation space:", envs.observation_space)
     options = build_debug_reset_options(np.array([True], dtype=bool))
     observation, info = envs.reset(options=options)

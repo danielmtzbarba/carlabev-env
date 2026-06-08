@@ -18,12 +18,16 @@ class Hero(pygame.sprite.Sprite):
     def _setup(self):
         center = self.window_center
         self.fov_rect = pygame.Rect(0, 0, self.w, self.l)
-        self.fov_rect.center = (center, center)
+        self.set_fov_anchor((center, center))
         self.rect = pygame.Rect(0, 0, self.w, self.l)
 
     def draw(self, display_fov, display):
         pygame.draw.rect(display_fov, self.color, self.fov_rect)
         #pygame.draw.rect(display, self.color, self.rect)
+
+    def set_fov_anchor(self, anchor):
+        ax, ay = anchor
+        self.fov_rect.center = (int(round(ax)), int(round(ay)))
 
     def sync_rect(self, frame):
         self.rect = frame.rect_from_world_center((self.x, self.y), (self.w, self.l))

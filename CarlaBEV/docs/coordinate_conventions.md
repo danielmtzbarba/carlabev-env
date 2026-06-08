@@ -6,7 +6,7 @@ This document describes the coordinate conventions used by CarlaBEV.
 
 Rendering, collision, camera, and semantic lookup should all agree on the same ego reference point.
 
-The simulator now enforces that the FOV center corresponds to the true ego scene position at reset and during stepping.
+The simulator now enforces that the configured FOV ego anchor corresponds to the true ego scene position at reset and during stepping.
 
 ## Frames
 
@@ -37,26 +37,29 @@ Used by:
 
 - cropped and rotated BEV observations
 - the DRL input image
-- the ego marker drawn at the center of the FOV
+- the ego marker drawn at the configured ego anchor of the FOV
 
-The ego is rendered at the FOV center, and the cropped map content is now centered on the same world pose.
+The ego is rendered at the configured FOV anchor, and the cropped map content is aligned to the same world pose.
 
-## Ego Centering Rule
+## Ego Anchor Rule
 
 The camera follows the ego world position through [camera.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/camera.py).
 
-Because the crop region is larger than the final FOV, the camera centers on the crop resolution, not on the final display resolution.
+The world-aligned crop remains centered on the ego pose before rotation. The final rotated image is then composed so the ego lands at the configured anchor in image space.
 
 That is important:
 
 - final FOV size: `128 x 128`
-- crop size before rotation: `192 x 192`
+- crop size before rotation: derived from the configured anchor and rotation support
 
-If the camera centers on the wrong size, the ego overlay may appear centered while the underlying map content is shifted.
+If the crop center and final image anchor are mixed together, the ego overlay may look correct while the underlying map content drifts with yaw.
 
 ## Semantic Tile Convention
 
 The semantic tile under the ego is taken from the authoritative semantic map using ego world position, not from the center pixel of the rotated FOV.
+
+That sampled tile is also normalized into a shared semantic class id
+(`collision.tile_class`) before reward/off-road logic consumes it.
 
 This avoids false obstacle/off-road detections caused by:
 

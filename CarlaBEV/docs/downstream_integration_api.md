@@ -137,6 +137,7 @@ Suggested `EnvConfig` fields:
 - `size: int`
 - `obs_size: tuple[int, int]`
 - `obs_mode: Literal["bev_rgb", "bev_semantic", "vector"]`
+- `semantic_mask_ch: Literal["binary", "2-class", "4-class", "5-class", "6-class", "7-class"]`
 - `frame_stack: int`
 - `fov_masked: bool`
 - `action_mode: Literal["discrete", "continuous"]`
@@ -166,6 +167,16 @@ Proposal:
 - `obs_mode="bev_rgb"`
 - `obs_mode="bev_semantic"`
 - `obs_mode="vector"`
+
+For `obs_mode="bev_semantic"`, semantic channel layout is a second explicit
+choice:
+
+- `semantic_mask_ch="binary"` -> `drivable`
+- `semantic_mask_ch="2-class"` -> `drivable`, `route`
+- `semantic_mask_ch="4-class"` -> `drivable`, `vehicle`, `pedestrian`, `route`
+- `semantic_mask_ch="5-class"` -> `drivable`, `sidewalk`, `vehicle`, `pedestrian`, `route`
+- `semantic_mask_ch="6-class"` -> `non_drivable`, `drivable`, `sidewalk`, `vehicle`, `pedestrian`, `route`
+- `semantic_mask_ch="7-class"` -> `non_drivable`, `drivable`, `sidewalk`, `vehicle`, `pedestrian`, `route`, `traffic_light_red`
 
 That is clearer for downstream users and easier to validate.
 
@@ -306,6 +317,7 @@ def get_env_capabilities() -> dict:
         "maps": ["Town01"],
         "action_modes": ["discrete", "continuous"],
         "obs_modes": ["bev_rgb", "bev_semantic", "vector"],
+        "semantic_mask_ch": ["binary", "2-class", "4-class", "5-class", "6-class", "7-class"],
         "reward_modes": ["shaping", "carl"],
         "scenario_ids": [...],
         "scenario_preset_ids": [...],
@@ -368,6 +380,7 @@ from CarlaBEV.envs import make_env
 env_cfg = EnvConfig(
     map_name="Town01",
     obs_mode="bev_semantic",
+    semantic_mask_ch="5-class",
     action_mode="discrete",
     reward_mode="carl",
     frame_stack=4,
@@ -387,6 +400,24 @@ obs, info = envs.reset(
     options=build_reset_options(reset_request, reset_mask=[True])
 )
 ```
+
+## Semantic Runtime Boundary
+
+The simulator now centralizes semantic class ids and canonical colors in
+`CarlaBEV/semantics.py`.
+
+That shared semantic schema is used by:
+
+- map label decoding in `envs/utils.py`
+- semantic observation decoding in `wrappers/rgb_to_semantic.py`
+- actor/render semantic colors such as route markers and traffic lights
+- reward/off-road checks via semantic tile classes sampled from the map
+
+Important implication:
+
+- `semantic_mask_ch` changes the semantic observation tensor seen by the NN
+- reward logic does not consume that wrapper output directly
+- reward logic uses `collision.tile_class` from the authoritative semantic map
 
 ## Summary
 

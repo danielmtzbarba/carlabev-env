@@ -36,6 +36,8 @@ class EnvConfig(BaseModel):
     obs_mode: ObsMode = "bev_semantic"
     semantic_mask_ch: SemanticMaskCh = "6-class"
     fov_masked: bool = False
+    ego_anchor_x_frac: float = 0.5
+    ego_anchor_y_frac: float = 0.5
     frame_stack: int = 4
 
     action_mode: ActionMode = "discrete"
@@ -82,6 +84,10 @@ class EnvConfig(BaseModel):
             raise ValueError("frame_stack must be >= 1")
         if self.obs_size[0] < 1 or self.obs_size[1] < 1:
             raise ValueError("obs_size dimensions must be >= 1")
+        if not 0.0 <= self.ego_anchor_x_frac <= 1.0:
+            raise ValueError("ego_anchor_x_frac must be within [0.0, 1.0]")
+        if not 0.0 <= self.ego_anchor_y_frac <= 1.0:
+            raise ValueError("ego_anchor_y_frac must be within [0.0, 1.0]")
 
         map_dir = Path(asset_path) / self.map_name
         sem_path = map_dir / f"{self.map_name}-{self.size}-sem.png"
@@ -173,6 +179,8 @@ def _to_env_mapping(value: Any):
         "obs_size",
         "semantic_mask_ch",
         "fov_masked",
+        "ego_anchor_x_frac",
+        "ego_anchor_y_frac",
         "frame_stack",
         "render_mode",
         "max_actions",

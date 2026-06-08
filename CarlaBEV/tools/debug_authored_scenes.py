@@ -139,7 +139,16 @@ def main():
         )
     pygame.init()
     keys_held = init_key_tracking()
-    envs = make_env(to_public_run_config(cfg))
+    run_cfg = to_public_run_config(cfg)
+    envs = make_env(run_cfg)
+    print(
+        "[authored-debug] fov-anchor",
+        {
+            "x_frac": run_cfg.env.ego_anchor_x_frac,
+            "y_frac": run_cfg.env.ego_anchor_y_frac,
+            "lookahead_20": cfg.env.ego_anchor_lookahead_20,
+        },
+    )
     rng = random.Random(cfg.seed)
     scene_pool = list_authored_scene_files(AUTHORED_SCENE_DIR)
     scene_index = 0

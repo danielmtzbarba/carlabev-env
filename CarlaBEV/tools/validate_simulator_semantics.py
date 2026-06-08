@@ -321,6 +321,57 @@ def check_scene_generator_exception_visibility() -> CheckResult:
     )
 
 
+def check_fov_anchor_stability() -> CheckResult:
+    anchors_checked = []
+    for anchor_y in (0.5, 0.2):
+        env = CarlaBEV(
+            EnvConfig(
+                render_mode="rgb_array",
+                ego_anchor_x_frac=0.5,
+                ego_anchor_y_frac=anchor_y,
+            )
+        )
+        try:
+            env.reset(options={"scene": "jaywalk"})
+            anchor = env.map.fov_renderer.anchor_px
+            hero = env.map.hero
+            if hero.fov_rect.center != anchor:
+                return fail_result(
+                    "fov_anchor_stability",
+                    f"Hero overlay was initialized at {hero.fov_rect.center}, expected anchor {anchor}.",
+                )
+
+            centers = []
+            for yaw in (0.0, math.pi / 6.0, -math.pi / 4.0):
+                hero.yaw = yaw
+                env.map._theta = yaw
+                env.map.draw_fov()
+                centers.append(hero.fov_rect.center)
+                pixel = tuple(env.map.canvas.get_at(anchor)[:3])
+                if pixel != hero.color:
+                    return fail_result(
+                        "fov_anchor_stability",
+                        (
+                            f"Rendered ego anchor pixel mismatch for anchor_y={anchor_y:.2f}, "
+                            f"yaw={yaw:.3f}. expected={hero.color}, actual={pixel}, anchor={anchor}"
+                        ),
+                    )
+
+            if any(center != anchor for center in centers):
+                return fail_result(
+                    "fov_anchor_stability",
+                    f"Hero overlay drifted across yaw values for anchor_y={anchor_y:.2f}: {centers}",
+                )
+            anchors_checked.append({"anchor_y": anchor_y, "anchor_px": anchor})
+        finally:
+            env.close()
+
+    return pass_result(
+        "fov_anchor_stability",
+        f"Hero overlay remains pinned to configured anchors across yaw changes: {anchors_checked}",
+    )
+
+
 def check_geometry_roundtrip() -> CheckResult:
     raw = np.array([1564.0, 8642.0], dtype=float)
     surface = raw_to_surface(raw)
@@ -400,6 +451,7 @@ def main() -> int:
             "scene_generator_exception_visibility",
             check_scene_generator_exception_visibility,
         ),
+        run_check("fov_anchor_stability", check_fov_anchor_stability),
         run_check("geometry_roundtrip", check_geometry_roundtrip),
         run_check("scenario_spawn_validity", check_scenario_spawn_validity),
     ]

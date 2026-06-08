@@ -861,8 +861,17 @@ def main():
     )
     cfg = tyro.cli(ArgsCarlaBEV)
     cfg.env.render_mode = "rgb_array"
-    
-    env = CarlaBEV(to_public_env_config(cfg.env))
+    public_env_cfg = to_public_env_config(cfg.env)
+    print(
+        "[scene-designer] fov-anchor",
+        {
+            "x_frac": public_env_cfg.ego_anchor_x_frac,
+            "y_frac": public_env_cfg.ego_anchor_y_frac,
+            "lookahead_20": cfg.env.ego_anchor_lookahead_20,
+        },
+    )
+
+    env = CarlaBEV(public_env_cfg)
     #
     keys_held = init_key_tracking()
     pygame.init()

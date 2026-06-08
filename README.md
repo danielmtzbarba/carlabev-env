@@ -169,6 +169,15 @@ Important environment options include:
 
 - `map_name`
 - `obs_mode`: `bev_rgb`, `bev_semantic`, or `vector`
+- `semantic_mask_ch`: semantic channel layout used when
+  `obs_mode="bev_semantic"`
+  - `binary`: drivable
+  - `2-class`: drivable, route
+  - `4-class`: drivable, vehicle, pedestrian, route
+  - `5-class`: drivable, sidewalk, vehicle, pedestrian, route
+  - `6-class`: non_drivable, drivable, sidewalk, vehicle, pedestrian, route
+  - `7-class`: non_drivable, drivable, sidewalk, vehicle, pedestrian, route,
+    traffic_light_red
 - `action_mode`: `discrete` or `continuous`
 - `reward_mode`: `shaping` or `carl`
 - `size`: base BEV size
@@ -180,6 +189,14 @@ Important environment options include:
   (`straight_fraction`, `left_turn_fraction`, `right_turn_fraction`) to reset info
 
 Legacy names such as `obs_space`, `masked`, `action_space`, and `reward_type` are accepted for compatibility, but new integrations should use the canonical `*_mode` fields.
+
+Semantic observations are produced by wrapper-time decoding of the rendered BEV
+using the shared definitions in `CarlaBEV/semantics.py`.
+
+Reward and collision/off-road logic do not read `semantic_mask_ch` directly.
+They use semantic tile classes sampled from the authoritative map under the ego,
+so changing the semantic observation layout changes the NN input contract, not
+the reward contract.
 
 ## Example Reset
 
@@ -193,7 +210,11 @@ from CarlaBEV.config import (
 from CarlaBEV.envs import make_env
 
 cfg = RunConfig(
-    env=EnvConfig(render_mode="rgb_array", obs_mode="bev_semantic"),
+    env=EnvConfig(
+        render_mode="rgb_array",
+        obs_mode="bev_semantic",
+        semantic_mask_ch="5-class",
+    ),
     num_envs=1,
 )
 

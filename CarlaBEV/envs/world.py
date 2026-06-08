@@ -1,8 +1,8 @@
 import numpy as np
-import math
 import pygame
 
 from .utils import load_map
+from .fov import FovRenderSpec, FovRenderer
 from .transforms import SurfaceFrame
 from CarlaBEV.src.scenes.scene import Scene
 from CarlaBEV.semantics import BLOCKING_CLASSES, semantic_class_from_rgb
@@ -21,6 +21,14 @@ class BaseMap(Scene):
         self.map_name = cfg.map_name
         self.AgentClass = agent_class
         self.size = cfg.size
+        self.fov_renderer = FovRenderer(
+            FovRenderSpec(
+                output_size=self.size,
+                ego_anchor_x_frac=getattr(self.cfg, "ego_anchor_x_frac", 0.5),
+                ego_anchor_y_frac=getattr(self.cfg, "ego_anchor_y_frac", 0.5),
+                mask_fov=self.mask_fov,
+            )
+        )
 
         # --- Load map and create surfaces
         self._map_arr, self._map_img, _ = load_map(cfg.map_name, cfg.size)
@@ -29,10 +37,8 @@ class BaseMap(Scene):
         self.surface_frame = SurfaceFrame()
 
         # --- Rendering surfaces
-        self.center = (self.size // 2, self.size // 2)
-        self._fov_surface = pygame.Surface((self.size, self.size))
-        self._pad = self.center[0]
-        self.crop_resolution = (self.size + self._pad, self.size + self._pad)
+        self._fov_surface = pygame.Surface(self.fov_renderer.output_resolution)
+        self.crop_resolution = self.fov_renderer.crop_resolution
 
         # --- Initialize base Scene
         action_space = getattr(cfg, "action_mode", getattr(cfg, "action_space", "discrete"))
@@ -58,21 +64,29 @@ class BaseMap(Scene):
     # =====================================================
     # --- FOV Handling ---
     # =====================================================
-    def crop_fov(self, topleft):
-        """Crop the field-of-view patch centered around hero."""
-        self._xmin = np.clip(int(topleft.x), 0, self._X - self.size - self._pad - 1)
-        self._ymin = np.clip(int(topleft.y), 0, self._Y - self.size - self._pad - 1)
-        fov = self._scene.subsurface(
-            (self._xmin, self._ymin, self.crop_resolution[0], self.crop_resolution[1])
+    def compute_crop_rect(self):
+        """Compute the world-aligned crop rectangle centered on the ego pose."""
+        crop_center = (
+            self.camera.offset.x + self.fov_renderer.crop_size / 2.0,
+            self.camera.offset.y + self.fov_renderer.crop_size / 2.0,
         )
-        return fov
+        return self.fov_renderer.compute_crop_rect(crop_center, (self._X, self._Y))
 
-    def rotate_fov(self, fov):
-        """Rotate the cropped FOV according to hero yaw."""
-        angle = math.degrees(self._theta) + 90
-        rotated = pygame.transform.rotate(fov, angle)
-        rect = rotated.get_rect(center=self.center)
-        return rotated, rect
+    def extract_crop(self, crop_rect):
+        """Extract the world-aligned crop patch from the scene surface."""
+        return self.fov_renderer.extract_crop(self._scene, crop_rect)
+
+    def rotate_crop(self, crop_surface):
+        """Rotate the crop into the ego-aligned observation frame."""
+        return self.fov_renderer.rotate_crop(crop_surface, self._theta)
+
+    def compose_fov(self, rotated_surface, rotated_rect):
+        """Compose the rotated crop into the final square observation surface."""
+        self._fov_surface = self.fov_renderer.compose_output(rotated_surface, rotated_rect)
+
+    def apply_fov_mask(self):
+        """Apply static mask geometry after composing the observation image."""
+        self.fov_renderer.apply_mask(self._fov_surface)
 
     # =====================================================
     # --- Simulation Step ---
@@ -86,24 +100,22 @@ class BaseMap(Scene):
         if not getattr(self, "camera", None) or not getattr(self, "hero", None):
             self._fov_surface.fill((0, 0, 0))
             if self.mask_fov:
-                apply_corner_fov_mask(self._fov_surface, mask_frac=0.5)
+                self.apply_fov_mask()
             self._agent_tile = np.array([0, 0, 0], dtype=np.uint8)
             self._agent_tile_class = None
             return
 
-        # Crop around ego vehicle
-        fov = self.crop_fov(self.camera.offset)
-        rotated_fov, rect = self.rotate_fov(fov)
-        # Blit rotated FOV onto camera surface
-        self._fov_surface.fill((0, 0, 0))
-        self._fov_surface.blit(rotated_fov, rect)
+        crop_rect = self.compute_crop_rect()
+        crop_surface = self.extract_crop(crop_rect)
+        rotated_fov, rect = self.rotate_crop(crop_surface)
+        self.compose_fov(rotated_fov, rect)
         if self.mask_fov:
-            # 👇 APPLY MASK HERE
-            apply_corner_fov_mask(self._fov_surface, mask_frac=0.5)
+            self.apply_fov_mask()
         # Store semantic tile from authoritative map coordinates.
         self._agent_tile = self.semantic_tile_at(self.hero.position)
         self._agent_tile_class = self.semantic_class_at(self.hero.position)
         # Draw ego
+        self.hero.set_fov_anchor(self.fov_renderer.anchor_px)
         self.hero.draw(self.canvas, self.map_surface)
 
     def semantic_tile_at(self, position):
@@ -139,53 +151,3 @@ class BaseMap(Scene):
         if getattr(self, "hero", None) is None:
             return None
         return self.semantic_class_at(self.hero.position)
-
-
-def apply_corner_fov_mask(surface, mask_frac=0.25):
-    """
-    Apply four black triangular masks to the corners of a square surface,
-    emulating the invalid regions caused by a 90-degree rotation.
-
-    Args:
-        surface (pygame.Surface): Square FOV surface (H x W)
-        mask_frac (float): Fraction of size used for each corner mask (0.2–0.35 typical)
-
-    Returns:
-        pygame.Surface: Masked surface (in-place modification)
-    """
-    w, h = surface.get_size()
-    assert w == h, "FOV surface must be square"
-
-    m = int(w * mask_frac)
-
-    mask_color = (0, 0, 0)
-
-    # Top-left triangle
-    pygame.draw.polygon(
-        surface,
-        mask_color,
-        [(0, 0), (m, 0), (0, m)]
-    )
-
-    # Top-right triangle
-    pygame.draw.polygon(
-        surface,
-        mask_color,
-        [(w, 0), (w - m, 0), (w, m)]
-    )
-
-    # Bottom-left triangle
-    pygame.draw.polygon(
-        surface,
-        mask_color,
-        [(0, h), (0, h - m), (m, h)]
-    )
-
-    # Bottom-right triangle
-    pygame.draw.polygon(
-        surface,
-        mask_color,
-        [(w, h), (w - m, h), (w, h - m)]
-    )
-
-    return surface

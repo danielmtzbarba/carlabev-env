@@ -27,7 +27,10 @@ class EnvConfig:
     obs_size: tuple = (96, 96)
     masked: bool = True
     semantic_mask_ch: str = "6-class"
-    fov_masked: bool = False 
+    fov_masked: bool = False
+    ego_anchor_x_frac: float = 0.5
+    ego_anchor_y_frac: float = 0.5
+    ego_anchor_lookahead_20: bool = False
     frame_stack: int = 4
 
     action_space: str = "discrete" #or "continuous"
@@ -107,6 +110,12 @@ def to_public_env_config(env_cfg: EnvConfig) -> PublicEnvConfig:
     else:
         obs_mode = "bev_rgb"
 
+    ego_anchor_x_frac = env_cfg.ego_anchor_x_frac
+    ego_anchor_y_frac = env_cfg.ego_anchor_y_frac
+    if env_cfg.ego_anchor_lookahead_20:
+        ego_anchor_x_frac = 0.5
+        ego_anchor_y_frac = 0.2
+
     return PublicEnvConfig(
         seed=env_cfg.seed,
         fps=env_cfg.fps,
@@ -117,6 +126,8 @@ def to_public_env_config(env_cfg: EnvConfig) -> PublicEnvConfig:
         obs_mode=obs_mode,
         semantic_mask_ch=env_cfg.semantic_mask_ch,
         fov_masked=env_cfg.fov_masked,
+        ego_anchor_x_frac=ego_anchor_x_frac,
+        ego_anchor_y_frac=ego_anchor_y_frac,
         frame_stack=env_cfg.frame_stack,
         action_mode=env_cfg.action_space,
         render_mode=env_cfg.render_mode,

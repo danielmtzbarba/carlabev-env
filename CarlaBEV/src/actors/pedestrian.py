@@ -1,4 +1,5 @@
 from CarlaBEV.src.actors.actor import Actor
+from CarlaBEV.semantics import SemanticClass, semantic_color_tuple
 
 
 class Pedestrian(Actor):
@@ -12,7 +13,7 @@ class Pedestrian(Actor):
         behavior=None,
         target_speed=1.5,
     ):
-        self._color = (255, 0, 0)
+        self._color = semantic_color_tuple(SemanticClass.PEDESTRIAN)
         self._map_size = map_size
         self._scale = int(1024 / self._map_size)
         super().__init__(

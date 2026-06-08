@@ -1,6 +1,8 @@
 import gymnasium as gym
 import numpy as np
 
+from CarlaBEV.semantics import SemanticClass, semantic_color_array
+
 SEMANTIC_MASK_CHANNELS = {
     "binary": ("drivable",),
     "2-class": (
@@ -66,13 +68,13 @@ def rgb_to_semantic_mask(rgb_image, mode="6-class"):
     rgb = rgb_image.astype(np.uint8)
     h, w, _ = rgb.shape
 
-    white = np.array([255, 255, 255])
-    red = np.array([255, 0, 0])
-    red_light = np.array([255, 64, 64])
-    blue = np.array([0, 7, 175])
-    green = np.array([0, 255, 0])
-    gray = np.array([150, 150, 150])
-    grays = np.array([220, 220, 220])
+    white = semantic_color_array(SemanticClass.DRIVABLE)
+    red = semantic_color_array(SemanticClass.PEDESTRIAN)
+    red_light = semantic_color_array(SemanticClass.TRAFFIC_LIGHT_RED)
+    blue = semantic_color_array(SemanticClass.VEHICLE)
+    green = semantic_color_array(SemanticClass.ROUTE)
+    gray = semantic_color_array(SemanticClass.NON_DRIVABLE)
+    grays = semantic_color_array(SemanticClass.SIDEWALK)
 
     is_white = np.all(rgb == white, axis=-1)
     is_red = np.all(rgb == red, axis=-1)

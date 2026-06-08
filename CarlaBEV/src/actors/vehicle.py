@@ -1,4 +1,5 @@
 from CarlaBEV.src.actors.actor import Actor
+from CarlaBEV.semantics import SemanticClass, semantic_color_tuple
 
 
 class Vehicle(Actor):
@@ -13,7 +14,7 @@ class Vehicle(Actor):
         target_speed=12.0,
     ):
         self._map_size = map_size
-        self._color = (0, 7, 175)
+        self._color = semantic_color_tuple(SemanticClass.VEHICLE)
         self._scale = int(1024 / self._map_size)
         super().__init__(
             start_node,

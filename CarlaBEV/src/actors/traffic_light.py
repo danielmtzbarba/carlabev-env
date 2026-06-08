@@ -1,14 +1,12 @@
 import pygame
 from CarlaBEV.src.actors.actor import Actor
 from CarlaBEV.envs.geometry import distance_meters_to_surface
+from CarlaBEV.semantics import SemanticClass, semantic_color_tuple
 
 class TrafficLightState:
     RED = 0
     YELLOW = 1
     GREEN = 2
-
-
-SEMANTIC_RED_LIGHT = (255, 64, 64)
 
 class TrafficLight(Actor):
     def __init__(
@@ -47,11 +45,11 @@ class TrafficLight(Actor):
 
     def _set_color(self):
         if self.signal_state == TrafficLightState.RED:
-            self._color = SEMANTIC_RED_LIGHT
+            self._color = semantic_color_tuple(SemanticClass.TRAFFIC_LIGHT_RED)
         elif self.signal_state == TrafficLightState.YELLOW:
             self._color = (255, 255, 0)
         elif self.signal_state == TrafficLightState.GREEN:
-            self._color = (0, 255, 0)
+            self._color = semantic_color_tuple(SemanticClass.ROUTE)
         else:
             self._color = (100, 100, 100)
     

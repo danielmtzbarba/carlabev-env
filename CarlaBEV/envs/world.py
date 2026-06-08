@@ -5,6 +5,7 @@ import pygame
 from .utils import load_map
 from .transforms import SurfaceFrame
 from CarlaBEV.src.scenes.scene import Scene
+from CarlaBEV.semantics import BLOCKING_CLASSES, semantic_class_from_rgb
 
 
 class BaseMap(Scene):
@@ -87,6 +88,7 @@ class BaseMap(Scene):
             if self.mask_fov:
                 apply_corner_fov_mask(self._fov_surface, mask_frac=0.5)
             self._agent_tile = np.array([0, 0, 0], dtype=np.uint8)
+            self._agent_tile_class = None
             return
 
         # Crop around ego vehicle
@@ -100,6 +102,7 @@ class BaseMap(Scene):
             apply_corner_fov_mask(self._fov_surface, mask_frac=0.5)
         # Store semantic tile from authoritative map coordinates.
         self._agent_tile = self.semantic_tile_at(self.hero.position)
+        self._agent_tile_class = self.semantic_class_at(self.hero.position)
         # Draw ego
         self.hero.draw(self.canvas, self.map_surface)
 
@@ -108,8 +111,11 @@ class BaseMap(Scene):
         y = int(np.clip(round(float(position.y)), 0, self._Y - 1))
         return np.array(self._map_arr[y, x], dtype=np.uint8)
 
+    def semantic_class_at(self, position):
+        return semantic_class_from_rgb(self.semantic_tile_at(position))
+
     def is_obstacle_tile(self, tile):
-        return np.array_equal(tile, np.array([150, 150, 150], dtype=np.uint8))
+        return semantic_class_from_rgb(tile) in BLOCKING_CLASSES
 
     # =====================================================
     # --- Properties ---
@@ -127,6 +133,12 @@ class BaseMap(Scene):
         if getattr(self, "hero", None) is None:
             return np.array([0, 0, 0], dtype=np.uint8)
         return self.semantic_tile_at(self.hero.position)
+
+    @property
+    def agent_tile_class(self):
+        if getattr(self, "hero", None) is None:
+            return None
+        return self.semantic_class_at(self.hero.position)
 
 
 def apply_corner_fov_mask(surface, mask_frac=0.25):

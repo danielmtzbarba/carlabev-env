@@ -1,31 +1,16 @@
-from enum import Enum
 import numpy as np
 
 from CarlaBEV.src.control.utils import lateral_error
 from CarlaBEV.src.deeprl.reward_signals import compute_ttc
-
-
-class Tiles(Enum):
-    obstacle = 0
-    free = 1
-    sidewalk = 2
-    vehicle = 3
-    pedestrian = 4
-    roadlines = 5
-    target = 6
+from CarlaBEV.semantics import (
+    BLOCKING_CLASSES,
+    OFFROAD_CLASSES,
+    SemanticClass,
+    semantic_class_from_rgb,
+)
 
 
 class RewardFn(object):
-    tiles_to_color = {
-        Tiles.obstacle.value: np.array([150, 150, 150]),
-        Tiles.free.value: np.array([255, 255, 255]),
-        Tiles.sidewalk.value: np.array([220, 220, 220]),
-        Tiles.vehicle.value: np.array([0, 7, 165]),
-        Tiles.pedestrian.value: np.array([200, 35, 0]),
-        Tiles.roadlines.value: np.array([255, 209, 103]),
-        Tiles.target.value: np.array([0, 255, 0]),
-    }
-
     def __init__(
         self,
         max_actions: int = 5000,
@@ -95,7 +80,7 @@ class RewardFn(object):
     def step(self, info):
         self._k += 1
         reward, terminated, cause = -0.002, False, None  # base step cost softened
-        tile = info["collision"]["tile"]
+        tile_class = self._tile_class(info["collision"])
 
         reward_details = {
             "base_reward": reward,
@@ -111,7 +96,7 @@ class RewardFn(object):
             reward, terminated, cause = -1.0, True, "out_of_bounds"
 
         # --- collision by map tile ---
-        elif np.array_equal(tile, self.tiles_to_color[Tiles.obstacle.value]):
+        elif tile_class in BLOCKING_CLASSES:
             reward, terminated, cause = -1.0, True, "collision"
 
         # --- collision by dynamic actor ---
@@ -124,9 +109,7 @@ class RewardFn(object):
             # -------------------------------
             # OFFROAD / SIDEWALK HANDLING
             # -------------------------------
-            on_sidewalk = np.array_equal(
-                tile, self.tiles_to_color[Tiles.sidewalk.value]
-            )
+            on_sidewalk = tile_class in OFFROAD_CLASSES
 
             if on_sidewalk:
                 self._consecutive_offroad += 1
@@ -172,6 +155,13 @@ class RewardFn(object):
         info["reward"] = reward_details
 
         return reward, terminated, cause, info
+
+    @staticmethod
+    def _tile_class(collision_info):
+        tile_class = collision_info.get("tile_class")
+        if tile_class is not None:
+            return SemanticClass(tile_class)
+        return semantic_class_from_rgb(collision_info.get("tile"))
 
     def non_terminal(self, info, offroad_mask: bool):
         r = 0.0

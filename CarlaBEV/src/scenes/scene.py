@@ -209,5 +209,12 @@ class Scene:
                 "route_length": self.actor_manager.route_length,
                 "speed_limit": 35,
             },
-            "collision": {"tile": self.agent_tile},
+            "collision": {
+                "tile": self.agent_tile,
+                "tile_class": (
+                    int(self.agent_tile_class)
+                    if self.agent_tile_class is not None
+                    else None
+                ),
+            },
         }

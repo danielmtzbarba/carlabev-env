@@ -1,8 +1,13 @@
-from enum import Enum
 import numpy as np
 
 from CarlaBEV.src.control.utils import lateral_error
 from CarlaBEV.src.deeprl.reward_signals import carl_ttc_penalty
+from CarlaBEV.semantics import (
+    BLOCKING_CLASSES,
+    OFFROAD_CLASSES,
+    SemanticClass,
+    semantic_class_from_rgb,
+)
 
 
 # 0.625 or 0.39 or 0.47  if bev.size in meters is 40, 50, or 60 respectively
@@ -50,27 +55,6 @@ def compute_route_progress(px, py, route, route_lengths):
             best_s = route_lengths[i] + t * seg_length
 
     return best_s
-
-
-class Tiles(Enum):
-    obstacle = 0
-    free = 1
-    sidewalk = 2
-    vehicle = 3
-    pedestrian = 4
-    roadlines = 5
-    target = 6
-
-
-tiles_to_color = {
-    Tiles.obstacle.value: np.array([150, 150, 150]),
-    Tiles.free.value: np.array([255, 255, 255]),
-    Tiles.sidewalk.value: np.array([220, 220, 220]),
-    Tiles.vehicle.value: np.array([0, 7, 165]),
-    Tiles.pedestrian.value: np.array([200, 35, 0]),
-    Tiles.roadlines.value: np.array([255, 209, 103]),
-    Tiles.target.value: np.array([0, 255, 0]),
-}
 
 
 class CaRLRewardFn:
@@ -167,14 +151,14 @@ class CaRLRewardFn:
         info = self._update_kinematics(info)
 
         collision = info["collision"]["collided"]
-        tile = info["collision"]["tile"]
+        tile_class = self._tile_class(info["collision"])
         target_id = info["collision"]["actor_id"]
 
         # -------------------------
         # 1. Hard terminations
         # -------------------------
         # collision by map tile
-        if np.array_equal(tile, tiles_to_color[Tiles.obstacle.value]):
+        if tile_class in BLOCKING_CLASSES:
             info["reward"]["cause"] = "collision"
             info["reward"]["reward"] = self.terminal_penalty
             return self.terminal_penalty, True, "collision", info
@@ -249,7 +233,7 @@ class CaRLRewardFn:
 
         # 3.2 off-lane
         far_from_route = dist_m > (1.5 * lane_half_width_m)
-        off_lane = self._is_off_lane(tile) or far_from_route
+        off_lane = self._is_off_lane(tile_class) or far_from_route
         p_factors["off_lane"] = 0.0 if off_lane else 1.0
 
         # 3.3 speeding
@@ -341,10 +325,15 @@ class CaRLRewardFn:
     # -----------------------------------------------------
     # tile check: off-lane/sidewalk
     # -----------------------------------------------------
-    def _is_off_lane(self, tile_rgb):
-        on_sidewalk = np.array_equal(tile_rgb, tiles_to_color[Tiles.sidewalk.value])
-        # You can extend this to handle "opposite lane" using color/semantic map
-        return bool(on_sidewalk)
+    @staticmethod
+    def _tile_class(collision_info):
+        tile_class = collision_info.get("tile_class")
+        if tile_class is not None:
+            return SemanticClass(tile_class)
+        return semantic_class_from_rgb(collision_info.get("tile"))
+
+    def _is_off_lane(self, tile_class):
+        return tile_class in OFFROAD_CLASSES
 
     # -----------------------------------------------------
     # kinematic metrics (for comfort)

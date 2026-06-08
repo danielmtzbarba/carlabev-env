@@ -1,8 +1,17 @@
 import pygame
 
+from CarlaBEV.semantics import SemanticClass, semantic_color_tuple
+
 
 class Target(pygame.sprite.Sprite):
-    def __init__(self, id, target_pos, color=(0, 255, 0), size=1, scale=1):
+    def __init__(
+        self,
+        id,
+        target_pos,
+        color=semantic_color_tuple(SemanticClass.ROUTE),
+        size=1,
+        scale=1,
+    ):
         pygame.sprite.Sprite.__init__(self)
         self.id = id
         self.color = color

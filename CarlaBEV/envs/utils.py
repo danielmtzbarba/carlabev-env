@@ -3,6 +3,8 @@ import pygame
 import numpy as np
 from PIL import Image
 
+from CarlaBEV.semantics import MAP_LABEL_TO_CLASS, semantic_color_array
+
 # Dynamically resolve asset path relative to this file's location (CarlaBEV/envs/utils.py -> CarlaBEV/assets)
 _ENVS_DIR = os.path.dirname(os.path.abspath(__file__))
 _CARLABEV_DIR = os.path.dirname(_ENVS_DIR)
@@ -31,22 +33,15 @@ def map_to_rgb(image):
     Returns:
         np.ndarray: (5, H, W) semantic mask (binary channels).
     """
-    color_map = np.array(
-        [
-            [150, 150, 150],  # Black for label 0
-            [255, 255, 255],  # Red for label 1
-            [220, 220, 220],  # Green for label 2
-        ]
-    )
     mask_0 = image == 0
     mask_127 = image == 127
     mask_255 = image == 255
 
     height, width = image.shape
     rgb_image = np.zeros((height, width, 3), dtype=np.uint8)
-    rgb_image[mask_0] = color_map[0]
-    rgb_image[mask_127] = color_map[1]
-    rgb_image[mask_255] = color_map[2]
+    rgb_image[mask_0] = semantic_color_array(MAP_LABEL_TO_CLASS[0])
+    rgb_image[mask_127] = semantic_color_array(MAP_LABEL_TO_CLASS[127])
+    rgb_image[mask_255] = semantic_color_array(MAP_LABEL_TO_CLASS[255])
 
     return rgb_image
 

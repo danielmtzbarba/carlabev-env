@@ -3,14 +3,15 @@ import math
 import numpy as np
 
 from CarlaBEV.src.control.stanley_controller import Controller
+from CarlaBEV.semantics import SemanticClass, semantic_color_tuple
 
 
 class Hero(pygame.sprite.Sprite):
-    def __init__(self, window_size, color=(0, 7, 175), car_size=32):
+    def __init__(self, window_size, color=None, car_size=32):
         pygame.sprite.Sprite.__init__(self)
         self.window_center = int(window_size / 2)
         self.scale = int(1024 / window_size)
-        self.color = color
+        self.color = color if color is not None else semantic_color_tuple(SemanticClass.EGO)
         #
         self.w = int(car_size / self.scale)
         self.l = self.w
@@ -53,7 +54,7 @@ class BaseAgent(Controller, Hero):
         window_size,
         target_speed=0.0,
         initial_speed=0.0,
-        color=(0, 7, 175),
+        color=None,
         car_size=32,
     ):
         Controller.__init__(self, target_speed=target_speed)

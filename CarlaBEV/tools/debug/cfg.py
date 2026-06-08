@@ -27,6 +27,7 @@ class EnvConfig:
     obs_size: tuple = (96, 96)
     masked: bool = True
     semantic_mask_ch: str = "6-class"
+    temporal_fusion_mode: str = "stack"
     fov_masked: bool = False
     ego_anchor_x_frac: float = 0.5
     ego_anchor_y_frac: float = 0.5
@@ -125,6 +126,7 @@ def to_public_env_config(env_cfg: EnvConfig) -> PublicEnvConfig:
         obs_size=env_cfg.obs_size,
         obs_mode=obs_mode,
         semantic_mask_ch=env_cfg.semantic_mask_ch,
+        temporal_fusion_mode=env_cfg.temporal_fusion_mode,
         fov_masked=env_cfg.fov_masked,
         ego_anchor_x_frac=ego_anchor_x_frac,
         ego_anchor_y_frac=ego_anchor_y_frac,

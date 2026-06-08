@@ -26,6 +26,7 @@ from CarlaBEV.src.actors.hero import ContinuousAgent
 from CarlaBEV.src.managers.actor_manager import ActorManager
 from CarlaBEV.src.control.stanley_controller import Controller
 from CarlaBEV.src.deeprl.carl_reward_fn import CaRLRewardFn
+from CarlaBEV.wrappers.rgb_to_semantic import semantic_mask_channels
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -307,6 +308,47 @@ def check_semantic_observation_modes() -> CheckResult:
     )
 
 
+def check_semantic_temporal_fusion_modes() -> CheckResult:
+    observed = {}
+
+    for temporal_fusion_mode in ("vehicle_temporal", "vehicle_weighted"):
+        cfg = EnvConfig(
+            obs_mode="bev_semantic",
+            semantic_mask_ch="6-class",
+            temporal_fusion_mode=temporal_fusion_mode,
+            render_mode="rgb_array",
+            obs_size=(32, 32),
+            frame_stack=3,
+        )
+        env = wrap_env(cfg, CarlaBEV(cfg))
+        channels = len(semantic_mask_channels(cfg.semantic_mask_ch))
+        if temporal_fusion_mode == "vehicle_temporal":
+            expected = (channels - 1 + 3, *cfg.obs_size)
+        else:
+            expected = (channels, *cfg.obs_size)
+
+        try:
+            obs, _ = env.reset(options={"scene": "unknown"})
+            actual = tuple(obs.shape)
+        finally:
+            env.close()
+
+        observed[temporal_fusion_mode] = actual
+        if actual != expected:
+            return fail_result(
+                "semantic_temporal_fusion_modes",
+                (
+                    f"temporal_fusion_mode={temporal_fusion_mode!r} produced shape {actual}, "
+                    f"expected {expected}."
+                ),
+            )
+
+    return pass_result(
+        "semantic_temporal_fusion_modes",
+        f"Temporal fusion observation shapes match config: {observed}",
+    )
+
+
 def check_scene_generator_exception_visibility() -> CheckResult:
     path = REPO_ROOT / "CarlaBEV" / "src" / "managers" / "scene_generator.py"
     text = path.read_text(encoding="utf-8")
@@ -447,6 +489,7 @@ def main() -> int:
         ),
         run_check("vector_observation_contract", check_vector_observation_contract),
         run_check("semantic_observation_modes", check_semantic_observation_modes),
+        run_check("semantic_temporal_fusion_modes", check_semantic_temporal_fusion_modes),
         run_check(
             "scene_generator_exception_visibility",
             check_scene_generator_exception_visibility,

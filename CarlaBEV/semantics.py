@@ -13,6 +13,7 @@ class SemanticClass(IntEnum):
     PEDESTRIAN = 4
     ROUTE = 5
     TRAFFIC_LIGHT_RED = 6
+    EGO = 7
 
 
 SEMANTIC_COLOR_TUPLES = {
@@ -23,6 +24,7 @@ SEMANTIC_COLOR_TUPLES = {
     SemanticClass.PEDESTRIAN: (255, 0, 0),
     SemanticClass.ROUTE: (0, 255, 0),
     SemanticClass.TRAFFIC_LIGHT_RED: (255, 64, 64),
+    SemanticClass.EGO: (255, 255, 0),
 }
 
 SEMANTIC_COLOR_ARRAYS = {

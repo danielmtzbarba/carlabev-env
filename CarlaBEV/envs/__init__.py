@@ -6,7 +6,12 @@ from gymnasium.wrappers import (
 )
 
 from CarlaBEV.envs.carlabev import CarlaBEV
-from CarlaBEV.wrappers.rgb_to_semantic import SemanticMaskWrapper, FlattenStackedFrames
+from CarlaBEV.wrappers.rgb_to_semantic import (
+    FlattenStackedFrames,
+    SemanticMaskWrapper,
+    VehicleTemporalFusionWrapper,
+    WeightedVehicleHistoryWrapper,
+)
 
 
 def _get_env_cfg(cfg):
@@ -15,27 +20,6 @@ def _get_env_cfg(cfg):
 
 def _get_cfg_attr(cfg, key, default):
     return getattr(cfg, key, default)
-
-
-def make_carlabev_env_muzero(seed, idx, capture_video, run_name, size):
-    def thunk():
-        if capture_video and idx == 0:
-            env = CarlaBEV(render_mode="rgb_array", size=size)
-            env = gym.wrappers.RecordVideo(
-                env, f"videos/{run_name}", episode_trigger=lambda x: x % 50 == 0
-            )
-        else:
-            env = CarlaBEV(render_mode="rgb_array", size=size)
-
-        env = ResizeObservation(env, (64, 64))
-        env = SemanticMaskWrapper(env, mode="6-class")
-        env = FrameStackObservation(env, stack_size=4)
-        env = gym.wrappers.RecordEpisodeStatistics(env)
-        env.action_space.seed(seed)
-
-        return env
-
-    return thunk
 
 
 def wrap_env(cfg, env, capture=False, eval=False):
@@ -61,7 +45,14 @@ def wrap_env(cfg, env, capture=False, eval=False):
 
     env = FrameStackObservation(env, stack_size=env_cfg.frame_stack)
     if env_cfg.masked:
-        env = FlattenStackedFrames(env)
+        temporal_fusion_mode = _get_cfg_attr(env_cfg, "temporal_fusion_mode", "stack")
+        semantic_mask_ch = _get_cfg_attr(env_cfg, "semantic_mask_ch", "6-class")
+        if temporal_fusion_mode == "vehicle_temporal":
+            env = VehicleTemporalFusionWrapper(env, mode=semantic_mask_ch)
+        elif temporal_fusion_mode == "vehicle_weighted":
+            env = WeightedVehicleHistoryWrapper(env, mode=semantic_mask_ch)
+        else:
+            env = FlattenStackedFrames(env)
 
     env = gym.wrappers.RecordEpisodeStatistics(env)
 

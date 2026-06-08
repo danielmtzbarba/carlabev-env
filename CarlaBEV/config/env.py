@@ -15,6 +15,7 @@ from CarlaBEV.src.scenes.scenarios.specs import (
 
 ObsMode = Literal["bev_rgb", "bev_semantic", "vector"]
 SemanticMaskCh = Literal["binary", "2-class", "4-class", "5-class", "6-class", "7-class"]
+TemporalFusionMode = Literal["stack", "vehicle_temporal", "vehicle_weighted"]
 ActionMode = Literal["discrete", "continuous"]
 RewardMode = Literal["shaping", "carl"]
 RenderMode = Literal["human", "rgb_array"]
@@ -35,6 +36,7 @@ class EnvConfig(BaseModel):
     obs_size: tuple[int, int] = (96, 96)
     obs_mode: ObsMode = "bev_semantic"
     semantic_mask_ch: SemanticMaskCh = "6-class"
+    temporal_fusion_mode: TemporalFusionMode = "stack"
     fov_masked: bool = False
     ego_anchor_x_frac: float = 0.5
     ego_anchor_y_frac: float = 0.5
@@ -82,6 +84,16 @@ class EnvConfig(BaseModel):
     def _validate_values(self):
         if self.frame_stack < 1:
             raise ValueError("frame_stack must be >= 1")
+        if self.temporal_fusion_mode != "stack":
+            if self.obs_mode != "bev_semantic":
+                raise ValueError("temporal_fusion_mode requires obs_mode='bev_semantic'")
+            if self.frame_stack < 3:
+                raise ValueError("temporal_fusion_mode requires frame_stack >= 3")
+            if self.semantic_mask_ch not in {"4-class", "5-class", "6-class", "7-class"}:
+                raise ValueError(
+                    "temporal_fusion_mode requires a semantic_mask_ch with a vehicle channel "
+                    "(one of: '4-class', '5-class', '6-class', '7-class')"
+                )
         if self.obs_size[0] < 1 or self.obs_size[1] < 1:
             raise ValueError("obs_size dimensions must be >= 1")
         if not 0.0 <= self.ego_anchor_x_frac <= 1.0:
@@ -178,6 +190,7 @@ def _to_env_mapping(value: Any):
         "map_name",
         "obs_size",
         "semantic_mask_ch",
+        "temporal_fusion_mode",
         "fov_masked",
         "ego_anchor_x_frac",
         "ego_anchor_y_frac",
@@ -264,6 +277,7 @@ def get_env_capabilities() -> dict[str, object]:
         "action_modes": ["discrete", "continuous"],
         "obs_modes": ["bev_rgb", "bev_semantic", "vector"],
         "semantic_mask_ch": ["binary", "2-class", "4-class", "5-class", "6-class", "7-class"],
+        "temporal_fusion_mode": ["stack", "vehicle_temporal", "vehicle_weighted"],
         "reward_modes": ["shaping", "carl"],
         "scenario_ids": list_scenario_ids(),
         "scenario_preset_ids": list_scenario_preset_ids(),

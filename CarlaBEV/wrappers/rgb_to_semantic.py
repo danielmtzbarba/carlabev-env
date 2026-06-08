@@ -1,45 +1,132 @@
 import gymnasium as gym
 import numpy as np
 
-def rgb_to_semantic_mask(rgb_image):
+SEMANTIC_MASK_CHANNELS = {
+    "binary": ("drivable",),
+    "2-class": (
+        "drivable",
+        "route",
+    ),
+    "4-class": (
+        "drivable",
+        "vehicle",
+        "pedestrian",
+        "route",
+    ),
+    "5-class": (
+        "drivable",
+        "sidewalk",
+        "vehicle",
+        "pedestrian",
+        "route",
+    ),
+    "6-class": (
+        "non_drivable",
+        "drivable",
+        "sidewalk",
+        "vehicle",
+        "pedestrian",
+        "route",
+    ),
+    "7-class": (
+        "non_drivable",
+        "drivable",
+        "sidewalk",
+        "vehicle",
+        "pedestrian",
+        "route",
+        "traffic_light_red",
+    ),
+}
+
+
+def semantic_mask_channels(mode: str) -> tuple[str, ...]:
+    try:
+        return SEMANTIC_MASK_CHANNELS[mode]
+    except KeyError as exc:
+        choices = ", ".join(sorted(SEMANTIC_MASK_CHANNELS))
+        raise ValueError(
+            f"Unsupported semantic_mask_ch={mode!r}. Expected one of: {choices}"
+        ) from exc
+
+
+def rgb_to_semantic_mask(rgb_image, mode="6-class"):
     """
-    Convert RGB frame from simulator into a 5-channel semantic mask.
+    Convert an RGB frame into one of the supported semantic channel layouts.
 
     Args:
         rgb_image (np.ndarray): (H, W, 3) RGB image.
+        mode (str): semantic channel layout to emit.
 
     Returns:
-        np.ndarray: (5, H, W) semantic mask (binary channels).
+        np.ndarray: (C, H, W) semantic mask (binary channels).
     """
-    # Normalize input if needed (assume 0-255)
+    semantic_mask_channels(mode)
+
     rgb = rgb_image.astype(np.uint8)
     h, w, _ = rgb.shape
-    mask = np.zeros((6, h, w), dtype=np.float32)
 
-    # Define color thresholds (loose matching in case of slight rendering variation)
     white = np.array([255, 255, 255])
     red = np.array([255, 0, 0])
+    red_light = np.array([255, 64, 64])
     blue = np.array([0, 7, 175])
     green = np.array([0, 255, 0])
-    gray = np.array([150, 150, 150])  # Adjusted if your gray is different
-    grays = np.array([220, 220, 220])  # Adjusted if your gray is different
+    gray = np.array([150, 150, 150])
+    grays = np.array([220, 220, 220])
 
-    # Create masks
     is_white = np.all(rgb == white, axis=-1)
     is_red = np.all(rgb == red, axis=-1)
+    is_red_light = np.all(rgb == red_light, axis=-1)
     is_blue = np.all(rgb == blue, axis=-1)
     is_green = np.all(rgb == green, axis=-1)
     is_gray = np.all(rgb == gray, axis=-1)
     is_grays = np.all(rgb == grays, axis=-1)
 
-    # Fill semantic channels
-    mask[0, is_gray] = 1.0  # Non-drivable
-    mask[1, is_white] = 1.0  # Drivable
-    mask[2, is_grays] = 1.0  # Non-drivable
-    mask[3, is_blue] = 1.0  # Vehicle
-    mask[4, is_red] = 1.0  # Pedestrian
-    mask[5, is_green] = 1.0  # Checkpoint
+    if mode == "binary":
+        mask = np.zeros((1, h, w), dtype=np.float32)
+        mask[0, np.logical_or(is_white, is_green)] = 1.0
+        return mask
 
+    if mode == "2-class":
+        mask = np.zeros((2, h, w), dtype=np.float32)
+        mask[0, np.logical_or(is_white, is_green)] = 1.0
+        mask[1, is_green] = 1.0
+        return mask
+
+    if mode == "4-class":
+        mask = np.zeros((4, h, w), dtype=np.float32)
+        mask[0, np.logical_or(is_white, is_green)] = 1.0
+        mask[1, is_blue] = 1.0
+        mask[2, is_red] = 1.0
+        mask[3, is_green] = 1.0
+        return mask
+
+    if mode == "5-class":
+        mask = np.zeros((5, h, w), dtype=np.float32)
+        mask[0, np.logical_or(is_white, is_green)] = 1.0
+        mask[1, is_grays] = 1.0
+        mask[2, is_blue] = 1.0
+        mask[3, is_red] = 1.0
+        mask[4, is_green] = 1.0
+        return mask
+
+    mask = np.zeros((6, h, w), dtype=np.float32)
+    mask[0, is_gray] = 1.0
+    mask[1, np.logical_or(is_white, is_green)] = 1.0
+    mask[2, is_grays] = 1.0
+    mask[3, is_blue] = 1.0
+    mask[4, is_red] = 1.0
+    mask[5, is_green] = 1.0
+    if mode == "7-class":
+        mask = np.zeros((7, h, w), dtype=np.float32)
+        mask[0, is_gray] = 1.0
+        mask[1, np.logical_or(is_white, is_green)] = 1.0
+        mask[2, is_grays] = 1.0
+        mask[3, is_blue] = 1.0
+        mask[4, is_red] = 1.0
+        mask[5, is_green] = 1.0
+        mask[6, is_red_light] = 1.0
+        return mask
     return mask
 
 class SemanticMaskWrapper(gym.ObservationWrapper):
@@ -47,16 +134,20 @@ class SemanticMaskWrapper(gym.ObservationWrapper):
     A Gym wrapper to convert RGB observations into semantic masks.
 
     This wrapper assumes the environment's observation is an RGB image
-    and converts it into a 6-channel semantic mask using the rgb_to_semantic_mask function.
+    and converts it into the configured semantic mask layout.
     """
 
-    def __init__(self, env):
+    def __init__(self, env, mode="6-class"):
         super(SemanticMaskWrapper, self).__init__(env)
-        # Update the observation space to reflect the semantic mask shape
+        self.mode = mode
+        self.channel_names = semantic_mask_channels(mode)
         obs_shape = self.observation_space.shape
         h, w = obs_shape[:2]
         self.observation_space = gym.spaces.Box(
-            low=0.0, high=1.0, shape=(6, h, w), dtype=np.float32
+            low=0.0,
+            high=1.0,
+            shape=(len(self.channel_names), h, w),
+            dtype=np.float32,
         )
 
     def observation(self, observation):
@@ -67,9 +158,9 @@ class SemanticMaskWrapper(gym.ObservationWrapper):
             observation (np.ndarray): (H, W, 3) RGB image.
 
         Returns:
-            np.ndarray: (6, H, W) semantic mask.
+            np.ndarray: (C, H, W) semantic mask.
         """
-        return rgb_to_semantic_mask(observation)
+        return rgb_to_semantic_mask(observation, mode=self.mode)
 
 
 class FlattenStackedFrames(gym.ObservationWrapper):

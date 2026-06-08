@@ -7,6 +7,9 @@ class TrafficLightState:
     YELLOW = 1
     GREEN = 2
 
+
+SEMANTIC_RED_LIGHT = (255, 64, 64)
+
 class TrafficLight(Actor):
     def __init__(
         self,
@@ -44,7 +47,7 @@ class TrafficLight(Actor):
 
     def _set_color(self):
         if self.signal_state == TrafficLightState.RED:
-            self._color = (255, 0, 0)
+            self._color = SEMANTIC_RED_LIGHT
         elif self.signal_state == TrafficLightState.YELLOW:
             self._color = (255, 255, 0)
         elif self.signal_state == TrafficLightState.GREEN:

@@ -14,6 +14,7 @@ from CarlaBEV.src.scenes.scenarios.specs import (
 
 
 ObsMode = Literal["bev_rgb", "bev_semantic", "vector"]
+SemanticMaskCh = Literal["binary", "2-class", "4-class", "5-class", "6-class", "7-class"]
 ActionMode = Literal["discrete", "continuous"]
 RewardMode = Literal["shaping", "carl"]
 RenderMode = Literal["human", "rgb_array"]
@@ -33,6 +34,7 @@ class EnvConfig(BaseModel):
     map_name: str = "Town01"
     obs_size: tuple[int, int] = (96, 96)
     obs_mode: ObsMode = "bev_semantic"
+    semantic_mask_ch: SemanticMaskCh = "6-class"
     fov_masked: bool = False
     frame_stack: int = 4
 
@@ -169,6 +171,7 @@ def _to_env_mapping(value: Any):
         "env_id",
         "map_name",
         "obs_size",
+        "semantic_mask_ch",
         "fov_masked",
         "frame_stack",
         "render_mode",
@@ -252,6 +255,7 @@ def get_env_capabilities() -> dict[str, object]:
         "maps": sorted(maps),
         "action_modes": ["discrete", "continuous"],
         "obs_modes": ["bev_rgb", "bev_semantic", "vector"],
+        "semantic_mask_ch": ["binary", "2-class", "4-class", "5-class", "6-class", "7-class"],
         "reward_modes": ["shaping", "carl"],
         "scenario_ids": list_scenario_ids(),
         "scenario_preset_ids": list_scenario_preset_ids(),

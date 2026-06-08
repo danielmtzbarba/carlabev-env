@@ -21,6 +21,7 @@ dependencies = [
   "networkx",
   "rich",
   "opencv-python",
+  "matplotlib",
   "pydantic>=2",
 ]
 

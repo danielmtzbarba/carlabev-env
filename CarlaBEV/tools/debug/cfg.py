@@ -26,6 +26,7 @@ class EnvConfig:
     obs_space: str = "bev"  # "bev" or "vector"
     obs_size: tuple = (96, 96)
     masked: bool = True
+    semantic_mask_ch: str = "6-class"
     fov_masked: bool = False 
     frame_stack: int = 4
 
@@ -114,6 +115,7 @@ def to_public_env_config(env_cfg: EnvConfig) -> PublicEnvConfig:
         map_name=env_cfg.map_name,
         obs_size=env_cfg.obs_size,
         obs_mode=obs_mode,
+        semantic_mask_ch=env_cfg.semantic_mask_ch,
         fov_masked=env_cfg.fov_masked,
         frame_stack=env_cfg.frame_stack,
         action_mode=env_cfg.action_space,

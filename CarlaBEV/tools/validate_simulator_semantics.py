@@ -7,6 +7,7 @@ import traceback
 
 import numpy as np
 from CarlaBEV.config.env import EnvConfig
+from CarlaBEV.envs import wrap_env
 
 from CarlaBEV.envs.carlabev import CarlaBEV
 from CarlaBEV.envs.geometry import (
@@ -269,6 +270,43 @@ def check_vector_observation_contract() -> CheckResult:
     )
 
 
+def check_semantic_observation_modes() -> CheckResult:
+    channel_counts = {"binary": 1, "2-class": 2, "4-class": 4, "5-class": 5, "6-class": 6, "7-class": 7}
+    observed = {}
+
+    for mode, channels in channel_counts.items():
+        cfg = EnvConfig(
+            obs_mode="bev_semantic",
+            semantic_mask_ch=mode,
+            render_mode="rgb_array",
+            obs_size=(32, 32),
+            frame_stack=2,
+        )
+        env = wrap_env(cfg, CarlaBEV(cfg))
+        expected = (cfg.frame_stack * channels, *cfg.obs_size)
+
+        try:
+            obs, _ = env.reset(options={"scene": "unknown"})
+            actual = tuple(obs.shape)
+        finally:
+            env.close()
+
+        observed[mode] = actual
+        if actual != expected:
+            return fail_result(
+                "semantic_observation_modes",
+                (
+                    f"semantic_mask_ch={mode!r} produced shape {actual}, "
+                    f"expected {expected}."
+                ),
+            )
+
+    return pass_result(
+        "semantic_observation_modes",
+        f"Semantic stacked observation shapes match config: {observed}",
+    )
+
+
 def check_scene_generator_exception_visibility() -> CheckResult:
     path = REPO_ROOT / "CarlaBEV" / "src" / "managers" / "scene_generator.py"
     text = path.read_text(encoding="utf-8")
@@ -357,6 +395,7 @@ def main() -> int:
             check_reward_speed_penalty_monotonicity,
         ),
         run_check("vector_observation_contract", check_vector_observation_contract),
+        run_check("semantic_observation_modes", check_semantic_observation_modes),
         run_check(
             "scene_generator_exception_visibility",
             check_scene_generator_exception_visibility,

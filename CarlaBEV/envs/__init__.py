@@ -28,7 +28,7 @@ def make_carlabev_env_muzero(seed, idx, capture_video, run_name, size):
             env = CarlaBEV(render_mode="rgb_array", size=size)
 
         env = ResizeObservation(env, (64, 64))
-        env = SemanticMaskWrapper(env)
+        env = SemanticMaskWrapper(env, mode="6-class")
         env = FrameStackObservation(env, stack_size=4)
         env = gym.wrappers.RecordEpisodeStatistics(env)
         env.action_space.seed(seed)
@@ -52,7 +52,10 @@ def wrap_env(cfg, env, capture=False, eval=False):
     env = ResizeObservation(env, env_cfg.obs_size)
 
     if env_cfg.masked:
-        env = SemanticMaskWrapper(env)
+        env = SemanticMaskWrapper(
+            env,
+            mode=_get_cfg_attr(env_cfg, "semantic_mask_ch", "6-class"),
+        )
     else:
         env = GrayscaleObservation(env)
 

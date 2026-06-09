@@ -1,3 +1,13 @@
+from CarlaBEV.config.action_profiles import (
+    ActionProfileSpec,
+    get_action_profile_spec,
+    list_action_profile_ids,
+)
+from CarlaBEV.config.difficulty import (
+    RandomTrafficDifficultySpec,
+    get_difficulty_spec,
+    list_difficulty_ids,
+)
 from CarlaBEV.config.env import (
     ActionMode,
     EnvConfig,
@@ -8,6 +18,7 @@ from CarlaBEV.config.env import (
     SemanticMaskCh,
     TemporalFusionMode,
     get_env_capabilities,
+    resolve_env_profiles,
     validate_env_config,
     validate_run_config,
 )
@@ -23,15 +34,23 @@ from CarlaBEV.config.reset import (
     build_scenario_config_options,
     build_scenario_preset_options,
 )
+from CarlaBEV.config.reward_profiles import (
+    RewardProfileSpec,
+    get_reward_profile_spec,
+    list_reward_profile_ids,
+)
 
 __all__ = [
     "ActionMode",
+    "ActionProfileSpec",
     "AuthoredSceneReset",
     "EnvConfig",
     "ObsMode",
     "RandomNavigationReset",
+    "RandomTrafficDifficultySpec",
     "RenderMode",
     "RewardMode",
+    "RewardProfileSpec",
     "RunConfig",
     "SemanticMaskCh",
     "TemporalFusionMode",
@@ -43,7 +62,14 @@ __all__ = [
     "build_scenario_options_from_config",
     "build_scenario_config_options",
     "build_scenario_preset_options",
+    "get_action_profile_spec",
+    "get_difficulty_spec",
     "get_env_capabilities",
+    "get_reward_profile_spec",
+    "list_action_profile_ids",
+    "list_difficulty_ids",
+    "list_reward_profile_ids",
+    "resolve_env_profiles",
     "validate_env_config",
     "validate_run_config",
 ]

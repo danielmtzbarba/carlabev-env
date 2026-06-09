@@ -1,49 +1,54 @@
 import numpy as np
-from enum import Enum
 from gymnasium import spaces
+
+from CarlaBEV.config.action_profiles import get_action_profile_spec
 
 
 def _action_mode(cfg):
     return getattr(cfg, "action_mode", getattr(cfg, "action_space", "discrete"))
 
 
+def _action_profile_id(cfg):
+    return getattr(cfg, "action_profile_id", None)
+
+
 def _obs_mode(cfg):
     return getattr(cfg, "obs_mode", getattr(cfg, "obs_space", "bev"))
 
-class Actions(Enum):
-    nothing = 0
-    gas = 1
-    brake = 2
-    gas_steer_left = 3
-    gas_steer_right = 4
-    steer_left = 5
-    steer_right = 6
-    brake_steer_left = 7
-    brake_steer_right = 8
+
+def get_action_profile(cfg):
+    profile_id = _action_profile_id(cfg)
+    if profile_id is None:
+        action_mode = _action_mode(cfg)
+        profile_id = "continuous_gsb_v1" if action_mode == "continuous" else "discrete9_v1"
+    return get_action_profile_spec(profile_id)
+
+
+def build_action_space(cfg):
+    profile = get_action_profile(cfg)
+    if profile.action_mode == "discrete":
+        actions = {
+            idx: np.asarray(action, dtype=np.float32)
+            for idx, action in enumerate(profile.discrete_actions)
+        }
+        return spaces.Discrete(len(actions)), actions
+
+    return spaces.Box(
+        np.asarray(profile.low, dtype=np.float32),
+        np.asarray(profile.high, dtype=np.float32),
+        dtype=np.float32,
+    ), None
+
+
+def decode_action(cfg, action):
+    profile = get_action_profile(cfg)
+    if profile.action_mode == "discrete":
+        return np.asarray(profile.discrete_actions[int(action)], dtype=np.float32)
+    return np.asarray(action, dtype=np.float32)
 
 
 def get_action_space(cfg):
-    # Action Space
-    if _action_mode(cfg) == "discrete":
-        action_space = spaces.Discrete(9)
-        actions = {
-            0: np.array([0, 0, 0]),  # nothing
-            1: np.array([1, 0, 0]),  # gas
-            2: np.array([0, 0, 1]),  # brake
-            3: np.array([1, 1, 0]),  # gas + steer left
-            4: np.array([1, -1, 0]),  # gas + steer right
-            5: np.array([0, 1, 0]),  # steer left (coast)
-            6: np.array([0, -1, 0]),  # steer right (coast)
-            7: np.array([0, 1, 1]),  # brake + steer left
-            8: np.array([0, -1, 1]),  # brake + steer right
-        }
-        return action_space, actions
-
-    else:
-        return spaces.Box(
-            np.array([0, -1, 0]).astype(np.float32),
-            np.array([1, +1, 1]).astype(np.float32),
-        ), None  # gas, steer, brake
+    return build_action_space(cfg)
 
 
 def get_obs_space(cfg):

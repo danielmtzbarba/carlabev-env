@@ -3,8 +3,9 @@ import gymnasium as gym
 import numpy as np
 import pygame
 
+from CarlaBEV.config.reward_profiles import get_reward_profile_spec
 from CarlaBEV.envs.world import BaseMap
-from CarlaBEV.envs.spaces import get_obs_space, get_action_space
+from CarlaBEV.envs.spaces import decode_action, get_obs_space, get_action_space
 from CarlaBEV.envs.renderer import Renderer
 
 from CarlaBEV.src.deeprl.reward import RewardFn
@@ -16,6 +17,20 @@ from CarlaBEV.src.control.route_metrics import (
 
 
 from CarlaBEV.src.managers.scene_generator import SceneGenerator
+
+
+def build_reward_fn(cfg):
+    reward_profile_id = getattr(cfg, "reward_profile_id", None)
+    reward_mode = getattr(cfg, "reward_mode", getattr(cfg, "reward_type", "shaping"))
+    if reward_profile_id is None:
+        if reward_mode == "carl":
+            return CaRLRewardFn()
+        return RewardFn()
+
+    spec = get_reward_profile_spec(reward_profile_id)
+    if spec.family == "carl":
+        return CaRLRewardFn(**spec.parameters)
+    return RewardFn(**spec.parameters)
 
 
 class CarlaBEV(gym.Env):
@@ -35,33 +50,23 @@ class CarlaBEV(gym.Env):
 
     def __init__(self, config):
         self.cfg = config
-        # Field Of View PIXEL SIZE
-        self.size = self.cfg.size  # The size of the square grid
+        self.size = self.cfg.size
         self._setup()
 
     def _setup(self):
         self.obs_mode = getattr(self.cfg, "obs_mode", getattr(self.cfg, "obs_space", "bev"))
         self.action_mode = getattr(self.cfg, "action_mode", getattr(self.cfg, "action_space", "discrete"))
         self.reward_mode = getattr(self.cfg, "reward_mode", getattr(self.cfg, "reward_type", "shaping"))
-        # Render mode
         assert self.cfg.render_mode in self.metadata["render_modes"]
         self.render_mode = self.cfg.render_mode
         self.renderer = Renderer(self.cfg.size, fps=self.cfg.fps)
-        # Observation Space
         assert self.obs_mode in {"bev", "bev_rgb", "bev_semantic", "vector"}
         self.observation_space = get_obs_space(self.cfg)
-        # Action space
         assert self.action_mode in self.metadata["action_space"]
         self.action_space, self.action_to_direction = get_action_space(self.cfg)
-        # Experiment Stats
         self.stats = Stats()
-        # Reward Function
-        if self.reward_mode == "carl":
-            self.reward_fn = CaRLRewardFn()
-        else:
-            self.reward_fn = RewardFn()
+        self.reward_fn = build_reward_fn(self.cfg)
 
-        # World
         self.map = BaseMap(self.cfg)
         self.scene_generator = SceneGenerator(self.cfg)
         self.options = None
@@ -86,7 +91,6 @@ class CarlaBEV(gym.Env):
         last_spawn_info = None
 
         for _ in range(max_reset_attempts):
-            # Load scene
             actors, len_route = self.scene_generator.build_scene(options)
             self._scenario_context = self._extract_scenario_context(options)
             self._scenario_context.update(getattr(self.scene_generator, "last_scene_context", {}) or {})
@@ -138,9 +142,7 @@ class CarlaBEV(gym.Env):
         self._scenario_context.update(metrics)
 
     def _preprocess_action(self, action):
-        if self.action_mode == "discrete":
-            action = self.action_to_direction[action]
-        return action
+        return decode_action(self.cfg, action)
 
     def _simulate(self, action):
         action = self._preprocess_action(action)
@@ -170,6 +172,7 @@ class CarlaBEV(gym.Env):
             "scenario_preset_scene",
             "scenario_preset_description",
             "config_file",
+            "difficulty_id",
         )
         for key in keys:
             if key in options and options[key] is not None:

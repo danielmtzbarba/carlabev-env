@@ -78,8 +78,10 @@ class SceneGenerator:
         self.last_scene_context = {}
         scene = options.get("scene", "rdm")
         config_file = options.get("config_file")
+        traffic_enabled = options.get("traffic_enabled", self.traffic_enabled)
         num_vehicles = options.get("num_vehicles", self.cfg.get("max_vehicles", 25))
         dist_range = options.get("route_dist_range", self.cfg.get("route_dist_range", [30, 100]))
+        ego_target_speed = options.get("ego_target_speed")
 
         if isinstance(scene, str) and scene.endswith(".json") and os.path.exists(scene):
             config_file = scene
@@ -112,7 +114,16 @@ class SceneGenerator:
 
         # --- Case 1: Random scene generation ---
         if isinstance(scene, str) and scene == "rdm":
-            return self.generate_random(num_vehicles, dist_range)
+            self.last_scene_context.update({
+                "difficulty_id": options.get("difficulty_id"),
+                "scenario_param_traffic_enabled": bool(traffic_enabled),
+            })
+            return self.generate_random(
+                num_vehicles,
+                dist_range,
+                traffic_enabled=traffic_enabled,
+                ego_target_speed=ego_target_speed,
+            )
 
         # --- Case 2: Predefined scenario ---
         elif isinstance(scene, str) and scene in self.scenarios:
@@ -132,13 +143,24 @@ class SceneGenerator:
     # =========================================================
     # --- Randomized Curriculum Scene ---
     # =========================================================
-    def generate_random(self, num_cars, dist_range, max_retries=20):
+    def generate_random(
+        self,
+        num_cars,
+        dist_range,
+        max_retries=20,
+        traffic_enabled=None,
+        ego_target_speed=None,
+    ):
         """
         Generates a randomized traffic scene with configurable curriculum.
         Returns actor dictionary compatible with Scene.reset().
         """
-        num_cars = num_cars if self.traffic_enabled else 0
-        ego_target_speed = float(self.cfg.get("ego_target_speed", 12.0))
+        if traffic_enabled is None:
+            traffic_enabled = self.traffic_enabled
+        num_cars = num_cars if traffic_enabled else 0
+        if ego_target_speed is None:
+            ego_target_speed = self.cfg.get("ego_target_speed", 12.0)
+        ego_target_speed = float(ego_target_speed)
         self.last_scene_context = {
             "scene": "rdm",
             "scenario_param_num_vehicles": int(num_cars),

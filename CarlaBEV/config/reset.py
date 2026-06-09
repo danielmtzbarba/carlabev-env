@@ -5,6 +5,7 @@ from typing import Any
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
+from CarlaBEV.config.difficulty import get_difficulty_spec
 from CarlaBEV.src.scenes.scenarios.specs import (
     build_runtime_scenario_options,
     build_scenario_options_from_config as _build_scenario_options_from_config,
@@ -14,6 +15,7 @@ from CarlaBEV.src.scenes.scenarios.specs import (
 class RandomNavigationReset(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
+    difficulty_id: str | None = None
     num_vehicles: int = 25
     route_dist_range: tuple[int, int] = (30, 130)
 
@@ -67,6 +69,18 @@ def build_random_navigation_options(
         "num_vehicles": int(request.num_vehicles),
         "route_dist_range": list(request.route_dist_range),
     }
+    if request.difficulty_id is not None:
+        spec = get_difficulty_spec(request.difficulty_id)
+        options.update(
+            {
+                "difficulty_id": spec.difficulty_id,
+                "traffic_enabled": spec.traffic_enabled,
+                "num_vehicles": int(spec.num_vehicles),
+                "route_dist_range": list(spec.route_dist_range),
+            }
+        )
+        if spec.ego_target_speed is not None:
+            options["ego_target_speed"] = float(spec.ego_target_speed)
     return _attach_reset_mask(options, reset_mask)
 
 

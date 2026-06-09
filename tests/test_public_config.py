@@ -15,7 +15,11 @@ from CarlaBEV.config import (
     build_scenario_config_options,
     build_scenario_options_from_config,
     build_scenario_preset_options,
+    get_action_profile_spec,
+    get_difficulty_spec,
     get_env_capabilities,
+    get_reward_profile_spec,
+    resolve_env_profiles,
     validate_env_config,
     validate_run_config,
 )
@@ -38,7 +42,9 @@ class PublicConfigContractTests(unittest.TestCase):
 
         self.assertEqual(cfg.obs_mode, "bev_rgb")
         self.assertEqual(cfg.action_mode, "continuous")
+        self.assertEqual(cfg.action_profile_id, "continuous_gsb_v1")
         self.assertEqual(cfg.reward_mode, "shaping")
+        self.assertEqual(cfg.reward_profile_id, "shaping_base_v1")
         self.assertEqual(cfg.obs_space, "bev")
         self.assertFalse(cfg.masked)
 
@@ -63,11 +69,29 @@ class PublicConfigContractTests(unittest.TestCase):
 
         self.assertIn("Town01", capabilities["maps"])
         self.assertIn("discrete", capabilities["action_modes"])
+        self.assertIn("discrete9_v1", capabilities["action_profile_ids"])
+        self.assertIn("rt_no_traffic_v1", capabilities["difficulty_ids"])
         self.assertIn("bev_semantic", capabilities["obs_modes"])
         self.assertIn("carl", capabilities["reward_modes"])
+        self.assertIn("carl_base_v1", capabilities["reward_profile_ids"])
         self.assertFalse(capabilities["supports_vector_make_env"])
         self.assertIn("jaywalk", capabilities["scenario_ids"])
         self.assertIn("jaywalk_debug", capabilities["scenario_preset_ids"])
+
+    def test_profile_resolution_snapshot(self):
+        resolved = resolve_env_profiles(
+            EnvConfig(
+                map_name="Town01",
+                render_mode="rgb_array",
+                action_profile_id="discrete13_v1",
+                action_mode="discrete",
+                reward_profile_id="carl_safety_v1",
+                reward_mode="carl",
+            )
+        )
+
+        self.assertEqual(resolved["action"]["action_profile_id"], "discrete13_v1")
+        self.assertEqual(resolved["reward"]["reward_profile_id"], "carl_safety_v1")
 
 
 class ResetBuilderTests(unittest.TestCase):
@@ -81,6 +105,16 @@ class ResetBuilderTests(unittest.TestCase):
         self.assertEqual(options["num_vehicles"], 7)
         self.assertEqual(options["route_dist_range"], [40, 80])
         self.assertTrue(np.array_equal(options["reset_mask"], np.array([True, False, True])))
+
+    def test_random_navigation_difficulty_preset_expands_runtime_options(self):
+        options = build_random_navigation_options(
+            RandomNavigationReset(difficulty_id="rt_no_traffic_v1")
+        )
+
+        self.assertEqual(options["difficulty_id"], "rt_no_traffic_v1")
+        self.assertEqual(options["num_vehicles"], 0)
+        self.assertFalse(options["traffic_enabled"])
+        self.assertEqual(options["route_dist_range"], [30, 80])
 
     def test_authored_scene_options_include_variation_seed(self):
         options = build_authored_scene_options(
@@ -142,6 +176,13 @@ class ResetBuilderTests(unittest.TestCase):
         self.assertTrue(np.array_equal(options["reset_mask"], np.array([True])))
 
 
+class ProfileRegistryTests(unittest.TestCase):
+    def test_get_profile_specs(self):
+        self.assertEqual(get_difficulty_spec("rt_medium_v1").num_vehicles, 16)
+        self.assertEqual(get_action_profile_spec("discrete9_v1").action_mode, "discrete")
+        self.assertEqual(get_reward_profile_spec("carl_base_v1").family, "carl")
+
+
 class MakeEnvCompatibilityTests(unittest.TestCase):
     def test_make_env_accepts_public_run_config(self):
         envs = make_env(
@@ -153,6 +194,26 @@ class MakeEnvCompatibilityTests(unittest.TestCase):
         )
         try:
             self.assertEqual(envs.single_action_space.n, 9)
+        finally:
+            envs.close()
+
+    def test_make_env_accepts_id_based_profile_config(self):
+        envs = make_env(
+            RunConfig(
+                env=EnvConfig(
+                    render_mode="rgb_array",
+                    map_name="Town01",
+                    action_mode="continuous",
+                    action_profile_id="continuous_gsb_v1",
+                    reward_mode="carl",
+                    reward_profile_id="carl_base_v1",
+                ),
+                num_envs=1,
+                capture_video=False,
+            )
+        )
+        try:
+            self.assertEqual(envs.single_action_space.shape, (3,))
         finally:
             envs.close()
 

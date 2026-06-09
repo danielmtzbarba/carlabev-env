@@ -70,11 +70,34 @@ class CaRLRewardFn:
     This version adds *rich debug info* under info["reward"]["debug"].
     """
 
-    def __init__(self, dt=0.1, debug=False, debug_every=50):
+    def __init__(
+        self,
+        dt=0.1,
+        debug=False,
+        debug_every=50,
+        lane_center_exponent=1.0,
+        lane_center_floor=0.2,
+        off_lane_penalty=0.0,
+        speed_penalty_scale=6.0,
+        speed_penalty_floor=0.1,
+        ttc_threshold=4.0,
+        ttc_penalty_floor=0.1,
+        reward_scale=1.0,
+        comfort_penalty_floor=0.2,
+    ):
         self.dt = dt
         self.debug = debug
         self.debug_every = debug_every
         self._step_count = 0
+        self.lane_center_exponent = lane_center_exponent
+        self.lane_center_floor = lane_center_floor
+        self.off_lane_penalty = off_lane_penalty
+        self.speed_penalty_scale = speed_penalty_scale
+        self.speed_penalty_floor = speed_penalty_floor
+        self.ttc_threshold = ttc_threshold
+        self.ttc_penalty_floor = ttc_penalty_floor
+        self.reward_scale = reward_scale
+        self.comfort_penalty_floor = comfort_penalty_floor
 
         # Buffers for kinematic derivatives
         self.prev_speed = None
@@ -228,13 +251,13 @@ class CaRLRewardFn:
         if dist_m <= 0.0:
             p_route = 1.0
         else:
-            p_route = max(0.2, 1.0 - dist_m / lane_half_width_m)
+            p_route = max(self.lane_center_floor, 1.0 - (dist_m / lane_half_width_m) ** self.lane_center_exponent)
         p_factors["lane_center"] = float(p_route)
 
         # 3.2 off-lane
         far_from_route = dist_m > (1.5 * lane_half_width_m)
         off_lane = self._is_off_lane(tile_class) or far_from_route
-        p_factors["off_lane"] = 0.0 if off_lane else 1.0
+        p_factors["off_lane"] = self.off_lane_penalty if off_lane else 1.0
 
         # 3.3 speeding
         speed_limit = info["scene"]["speed_limit"]
@@ -245,7 +268,7 @@ class CaRLRewardFn:
             p_speed = 1.0
         else:
             # Monotone overspeed penalty with a floor to keep reward gradients alive.
-            p_speed = max(0.1, float(np.exp(-overspeed_mps / 6.0)))
+            p_speed = max(self.speed_penalty_floor, float(np.exp(-overspeed_mps / self.speed_penalty_scale)))
 
         p_factors["speed"] = p_speed
 
@@ -253,8 +276,9 @@ class CaRLRewardFn:
         hero_state = info["hero"]["state"]
         actors_state = info["collision"]["actors_state"]
         p_ttc, ttc = carl_ttc_penalty(
-            hero_state, actors_state, threshold=4.0, meters_per_pixel=meters_per_pixel
+            hero_state, actors_state, threshold=self.ttc_threshold, meters_per_pixel=meters_per_pixel
         )
+        p_ttc = max(self.ttc_penalty_floor, float(p_ttc))
         p_factors["ttc"] = float(p_ttc)
 
         # 3.5 Comfort

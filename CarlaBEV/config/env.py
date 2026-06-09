@@ -6,6 +6,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
+from CarlaBEV.config.action_profiles import (
+    get_action_profile_spec,
+    list_action_profile_ids,
+)
+from CarlaBEV.config.difficulty import list_difficulty_ids
+from CarlaBEV.config.reward_profiles import (
+    get_reward_profile_spec,
+    list_reward_profile_ids,
+)
 from CarlaBEV.envs.utils import asset_path
 from CarlaBEV.src.scenes.scenarios.specs import (
     list_scenario_ids,
@@ -19,6 +28,16 @@ TemporalFusionMode = Literal["stack", "vehicle_temporal", "vehicle_weighted"]
 ActionMode = Literal["discrete", "continuous"]
 RewardMode = Literal["shaping", "carl"]
 RenderMode = Literal["human", "rgb_array"]
+
+
+LEGACY_ACTION_PROFILE_IDS: dict[str, str] = {
+    "discrete": "discrete9_v1",
+    "continuous": "continuous_gsb_v1",
+}
+LEGACY_REWARD_PROFILE_IDS: dict[str, str] = {
+    "carl": "carl_base_v1",
+    "shaping": "shaping_base_v1",
+}
 
 
 class EnvConfig(BaseModel):
@@ -43,10 +62,12 @@ class EnvConfig(BaseModel):
     frame_stack: int = 4
 
     action_mode: ActionMode = "discrete"
+    action_profile_id: str | None = None
     render_mode: RenderMode = "human"
     max_actions: int = 5000
     scenes_path: str = "assets/scenes"
     reward_mode: RewardMode = "carl"
+    reward_profile_id: str | None = None
 
     traffic_enabled: bool = True
     max_vehicles: int = 50
@@ -78,6 +99,16 @@ class EnvConfig(BaseModel):
                 "carl" if normalized["reward_type"] == "carl" else "shaping"
             )
 
+        action_profile_id = normalized.get("action_profile_id")
+        if action_profile_id is None:
+            action_mode = normalized.get("action_mode", "discrete")
+            normalized["action_profile_id"] = LEGACY_ACTION_PROFILE_IDS.get(action_mode, "discrete9_v1")
+
+        reward_profile_id = normalized.get("reward_profile_id")
+        if reward_profile_id is None:
+            reward_mode = normalized.get("reward_mode", "carl")
+            normalized["reward_profile_id"] = LEGACY_REWARD_PROFILE_IDS.get(reward_mode, "carl_base_v1")
+
         return normalized
 
     @model_validator(mode="after")
@@ -100,6 +131,19 @@ class EnvConfig(BaseModel):
             raise ValueError("ego_anchor_x_frac must be within [0.0, 1.0]")
         if not 0.0 <= self.ego_anchor_y_frac <= 1.0:
             raise ValueError("ego_anchor_y_frac must be within [0.0, 1.0]")
+
+        action_spec = get_action_profile_spec(self.action_profile_id)
+        reward_spec = get_reward_profile_spec(self.reward_profile_id)
+        if action_spec.action_mode != self.action_mode:
+            raise ValueError(
+                f"action_profile_id={self.action_profile_id!r} resolves to action_mode={action_spec.action_mode!r}, "
+                f"but EnvConfig.action_mode={self.action_mode!r}"
+            )
+        if reward_spec.family != self.reward_mode:
+            raise ValueError(
+                f"reward_profile_id={self.reward_profile_id!r} resolves to reward_mode={reward_spec.family!r}, "
+                f"but EnvConfig.reward_mode={self.reward_mode!r}"
+            )
 
         map_dir = Path(asset_path) / self.map_name
         sem_path = map_dir / f"{self.map_name}-{self.size}-sem.png"
@@ -201,6 +245,8 @@ def _to_env_mapping(value: Any):
         "traffic_enabled",
         "max_vehicles",
         "route_direction_metrics_enabled",
+        "action_profile_id",
+        "reward_profile_id",
     }}
     if "obs_mode" in raw:
         env["obs_mode"] = raw["obs_mode"]
@@ -258,28 +304,44 @@ def validate_run_config(cfg: RunConfig | dict[str, Any]) -> RunConfig:
     if run_cfg.env.obs_mode == "vector":
         raise ValueError(
             "obs_mode='vector' is not supported through make_env()/wrap_env() yet. "
-            "Construct CarlaBEV(env_cfg) directly for roadmap-only vector usage."
+            "Use CarlaBEV() directly if you need vector observations."
         )
     return run_cfg
 
 
-def get_env_capabilities() -> dict[str, object]:
-    maps = []
-    for path in Path(asset_path).iterdir():
-        if not path.is_dir():
-            continue
-        has_semantic = any(path.glob(f"{path.name}-*-sem.png"))
-        has_rgb = any(path.glob(f"{path.name}-*-rgb.png"))
-        if has_semantic and has_rgb:
-            maps.append(path.name)
+def resolve_env_profiles(env_cfg: EnvConfig | dict[str, Any]) -> dict[str, Any]:
+    cfg = validate_env_config(env_cfg)
+    action_spec = get_action_profile_spec(cfg.action_profile_id)
+    reward_spec = get_reward_profile_spec(cfg.reward_profile_id)
     return {
-        "maps": sorted(maps),
-        "action_modes": ["discrete", "continuous"],
+        "action": action_spec.model_dump(mode="python"),
+        "reward": reward_spec.model_dump(mode="python"),
+    }
+
+
+def get_env_capabilities() -> dict[str, Any]:
+    maps_root = Path(asset_path)
+    maps = sorted(
+        path.name
+        for path in maps_root.iterdir()
+        if path.is_dir() and (path / f"{path.name}-1024-sem.png").exists()
+    )
+    semantic_mask_channels = ["binary", "2-class", "4-class", "5-class", "6-class", "7-class"]
+    temporal_fusion_modes = ["stack", "vehicle_temporal", "vehicle_weighted"]
+    return {
+        "maps": maps,
         "obs_modes": ["bev_rgb", "bev_semantic", "vector"],
-        "semantic_mask_ch": ["binary", "2-class", "4-class", "5-class", "6-class", "7-class"],
-        "temporal_fusion_mode": ["stack", "vehicle_temporal", "vehicle_weighted"],
+        "semantic_mask_channels": semantic_mask_channels,
+        "semantic_mask_ch": semantic_mask_channels,
+        "temporal_fusion_modes": temporal_fusion_modes,
+        "temporal_fusion_mode": temporal_fusion_modes,
+        "action_modes": ["discrete", "continuous"],
+        "action_profile_ids": list_action_profile_ids(),
         "reward_modes": ["shaping", "carl"],
+        "reward_profile_ids": list_reward_profile_ids(),
+        "difficulty_ids": list_difficulty_ids(),
+        "render_modes": ["human", "rgb_array"],
+        "supports_vector_make_env": False,
         "scenario_ids": list_scenario_ids(),
         "scenario_preset_ids": list_scenario_preset_ids(),
-        "supports_vector_make_env": False,
     }

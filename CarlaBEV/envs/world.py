@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import numpy as np
 import pygame
 
@@ -5,7 +7,20 @@ from .utils import load_map
 from .fov import FovRenderSpec, FovRenderer
 from .transforms import SurfaceFrame
 from CarlaBEV.src.scenes.scene import Scene
-from CarlaBEV.semantics import BLOCKING_CLASSES, semantic_class_from_rgb
+from CarlaBEV.semantics import (
+    BLOCKING_CLASSES,
+    SemanticClass,
+    semantic_class_from_rgb,
+    semantic_color_tuple,
+)
+
+
+@dataclass(frozen=True)
+class RenderMapLayers:
+    padding: int
+    query_shape: tuple[int, int]
+    render_shape: tuple[int, int]
+    render_frame: SurfaceFrame
 
 
 class BaseMap(Scene):
@@ -30,10 +45,12 @@ class BaseMap(Scene):
             )
         )
 
-        # --- Load map and create surfaces
-        self._map_arr, self._map_img, _ = load_map(cfg.map_name, cfg.size)
-        self._Y, self._X, _ = self._map_arr.shape
-        self._scene = pygame.Surface((self._X, self._Y))
+        # --- Load map and create query/render surfaces
+        self._query_map_arr, base_map_img, _ = load_map(cfg.map_name, cfg.size)
+        self._query_Y, self._query_X, _ = self._query_map_arr.shape
+        self._render_layers = self._build_render_layers(base_map_img)
+        self._map_img = self._build_padded_render_map(base_map_img)
+        self._scene = pygame.Surface(self._render_layers.render_shape)
         self.surface_frame = SurfaceFrame()
 
         # --- Rendering surfaces
@@ -43,10 +60,31 @@ class BaseMap(Scene):
         # --- Initialize base Scene
         action_space = getattr(cfg, "action_mode", getattr(cfg, "action_space", "discrete"))
         super().__init__(size=cfg.size, screen=self._map_img, action_space=action_space)
+        self.render_frame = self._render_layers.render_frame
 
         # --- Internal state
         self._theta = 0.0
         self._scene.blit(self._map_img, (0, 0))
+
+    def _build_render_layers(self, base_map_img: pygame.Surface) -> RenderMapLayers:
+        padding = int(self.fov_renderer.crop_size)
+        render_w = self._query_X + 2 * padding
+        render_h = self._query_Y + 2 * padding
+        return RenderMapLayers(
+            padding=padding,
+            query_shape=(self._query_X, self._query_Y),
+            render_shape=(render_w, render_h),
+            render_frame=SurfaceFrame(origin=(padding, padding)),
+        )
+
+    def _build_padded_render_map(self, base_map_img: pygame.Surface) -> pygame.Surface:
+        render_map = pygame.Surface(self._render_layers.render_shape)
+        render_map.fill(semantic_color_tuple(SemanticClass.NON_DRIVABLE))
+        render_map.blit(
+            base_map_img,
+            (self._render_layers.padding, self._render_layers.padding),
+        )
+        return render_map
 
     # =====================================================
     # --- Scene Control ---
@@ -57,7 +95,7 @@ class BaseMap(Scene):
         self._theta = 0.0
         self._scene.blit(self._map_img, (0, 0))
         if getattr(self, "hero", None) is not None and getattr(self, "camera", None) is not None:
-            self.hero.sync_rect(self.surface_frame)
+            self.hero.sync_rect(self.render_frame)
             self.camera.scroll()
             self.draw_fov()
 
@@ -70,7 +108,7 @@ class BaseMap(Scene):
             self.camera.offset.x + self.fov_renderer.crop_size / 2.0,
             self.camera.offset.y + self.fov_renderer.crop_size / 2.0,
         )
-        return self.fov_renderer.compute_crop_rect(crop_center, (self._X, self._Y))
+        return self.fov_renderer.compute_crop_rect(crop_center, self._render_layers.render_shape)
 
     def extract_crop(self, crop_rect):
         """Extract the world-aligned crop patch from the scene surface."""
@@ -119,9 +157,9 @@ class BaseMap(Scene):
         self.hero.draw(self.canvas, self.map_surface)
 
     def semantic_tile_at(self, position):
-        x = int(np.clip(round(float(position.x)), 0, self._X - 1))
-        y = int(np.clip(round(float(position.y)), 0, self._Y - 1))
-        return np.array(self._map_arr[y, x], dtype=np.uint8)
+        x = int(np.clip(round(float(position.x)), 0, self._query_X - 1))
+        y = int(np.clip(round(float(position.y)), 0, self._query_Y - 1))
+        return np.array(self._query_map_arr[y, x], dtype=np.uint8)
 
     def semantic_class_at(self, position):
         return semantic_class_from_rgb(self.semantic_tile_at(position))

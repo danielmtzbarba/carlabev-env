@@ -61,6 +61,28 @@ def _capture_spawn_state(*, seed: int, anchor_y_frac: float) -> dict[str, object
         env.close()
 
 
+def _capture_render_alignment(*, seed: int, anchor_y_frac: float) -> dict[str, object]:
+    env = _make_env(anchor_y_frac=anchor_y_frac)
+    options = build_random_navigation_options(
+        RandomNavigationReset(difficulty_id="rt_medium_v1")
+    )
+    try:
+        env.reset(seed=seed, options=options)
+        crop_rect = env.map.compute_crop_rect()
+        hero_surface = env.map.render_frame.world_to_surface(env.map.hero.position)
+        return {
+            "crop_size": int(env.map.fov_renderer.crop_size),
+            "hero_in_crop": (
+                float(hero_surface.x - crop_rect.x),
+                float(hero_surface.y - crop_rect.y),
+            ),
+            "render_shape": tuple(int(v) for v in env.map._render_layers.render_shape),
+            "crop_rect": (int(crop_rect.x), int(crop_rect.y), int(crop_rect.w), int(crop_rect.h)),
+        }
+    finally:
+        env.close()
+
+
 class SeededSceneConsistencyTests(unittest.TestCase):
     def test_same_seed_same_anchor_repeats_identical_spawn_state(self):
         first = _capture_spawn_state(seed=11, anchor_y_frac=0.5)
@@ -89,6 +111,18 @@ class SeededSceneConsistencyTests(unittest.TestCase):
         self.assertEqual(center["vehicles"], lookahead["vehicles"])
         self.assertEqual(center["spawn_validation"]["reason"], "ok")
         self.assertEqual(lookahead["spawn_validation"]["reason"], "ok")
+
+    def test_padded_render_keeps_ego_centered_in_crop_for_all_anchors(self):
+        center = _capture_render_alignment(seed=7, anchor_y_frac=0.5)
+        lookahead = _capture_render_alignment(seed=7, anchor_y_frac=0.75)
+
+        for snapshot in (center, lookahead):
+            expected = snapshot["crop_size"] / 2.0
+            hx, hy = snapshot["hero_in_crop"]
+            self.assertTrue(0 < snapshot["crop_rect"][0] < snapshot["render_shape"][0] - snapshot["crop_size"])
+            self.assertTrue(0 < snapshot["crop_rect"][1] < snapshot["render_shape"][1] - snapshot["crop_size"])
+            self.assertTrue(math.isclose(hx, expected, abs_tol=1.5))
+            self.assertTrue(math.isclose(hy, expected, abs_tol=1.5))
 
 
 if __name__ == "__main__":

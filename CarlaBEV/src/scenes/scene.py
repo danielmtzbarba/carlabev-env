@@ -29,6 +29,10 @@ class Scene:
         self._t = 0.0
         self._dt = 0.1
         self.hero = None
+        self.render_frame = self.surface_frame
+
+    def _render_frame(self):
+        return getattr(self, "render_frame", self.surface_frame)
 
     # =====================================================
     # --- Scene lifecycle
@@ -70,11 +74,11 @@ class Scene:
             self.actor_manager.reset_all()
 
             # Camera
-            self.hero.sync_rect(self.surface_frame)
+            self.hero.sync_rect(self._render_frame())
             self.camera = Camera(
                 self.hero,
                 resolution=(self.size, self.size),
-                frame=self.surface_frame,
+                frame=self._render_frame(),
                 crop_resolution=getattr(self, "crop_resolution", (self.size, self.size)),
             )
             follow = Follow(self.camera, self.hero)
@@ -87,7 +91,7 @@ class Scene:
         self.hero_step(action)
         self._scene.blit(self._map_img, (0, 0))
         self.actor_manager.step_all(self._t, self._dt)
-        self.actor_manager.draw_all(self.map_surface, self.surface_frame)
+        self.actor_manager.draw_all(self.map_surface, self._render_frame())
 
         self._dist2goal_t_1 = self._dist2goal
         self._dist2goal = self.dist2goal()
@@ -95,7 +99,7 @@ class Scene:
     def hero_step(self, action):
         """Advance hero agent one step and update heading."""
         self.hero.step(action)
-        self.hero.sync_rect(self.surface_frame)
+        self.hero.sync_rect(self._render_frame())
         self._theta = self.hero.yaw
         self.camera.scroll()
 
@@ -108,13 +112,13 @@ class Scene:
         coll_id = None
         actors_state = []
         info = self.scene_info
-        self.hero.sync_rect(self.surface_frame)
+        self.hero.sync_rect(self._render_frame())
         for id_type, actor_list in self.actor_manager.actors.items():
             if id_type in ["agent", "traffic_light"]:
                 continue
             for actor in actor_list:
                 if hasattr(actor, "sync_rect"):
-                    actor.sync_rect(self.surface_frame)
+                    actor.sync_rect(self._render_frame())
                 actor_id, collision, distance = actor.isCollided(self.hero, self._const)
                 if id_type in ["vehicle", "pedestrian"]:
                     if abs(distance) < min_dist:
@@ -138,7 +142,7 @@ class Scene:
         if self.hero is None:
             return {"valid": False, "reason": "missing_hero"}
 
-        self.hero.sync_rect(self.surface_frame)
+        self.hero.sync_rect(self._render_frame())
         hero_tile = self.agent_tile
 
         if hasattr(self, "is_obstacle_tile") and self.is_obstacle_tile(hero_tile):
@@ -153,7 +157,7 @@ class Scene:
                 continue
             for actor in actor_list:
                 if hasattr(actor, "sync_rect"):
-                    actor.sync_rect(self.surface_frame)
+                    actor.sync_rect(self._render_frame())
                 if self.hero.rect.colliderect(actor.rect):
                     return {
                         "valid": False,

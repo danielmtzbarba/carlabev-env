@@ -193,6 +193,10 @@ Important environment options include:
 - `max_vehicles`
 - `route_direction_metrics_enabled`: attach one-time smoothed-route fractions
   (`straight_fraction`, `left_turn_fraction`, `right_turn_fraction`) to reset info
+- `capture_video`: enable wrapper-based RGB video recording
+- `video_output_dir`: explicit video artifact directory for the current run
+- `video_episode_indices`: optional explicit episode ids to record
+- `video_name_prefix`: output filename prefix for recorded videos
 
 Legacy names such as `obs_space`, `masked`, `action_space`, and `reward_type` are accepted for compatibility, but new integrations should use the canonical `*_mode` fields.
 
@@ -284,3 +288,20 @@ It is a weaker fit for:
 - Collision footprints are coarse relative to real vehicle geometry.
 - Some scenario anchors remain map-specific even though the geometry pipeline now exposes explicit metric conversions.
 - The simulator is optimized for research iteration speed, not photorealism or detailed physics.
+
+## Video Capture Contract
+
+`CarlaBEV` now supports explicit downstream-directed video capture through the public run config. The intended use is for study orchestration layers such as `carlabev-lab` to decide:
+
+- where videos should be written
+- which episode indices should be recorded
+- how training probe videos differ from evaluation videos
+
+The environment wrapper path accepts:
+
+- `capture_video`
+- `video_output_dir`
+- `video_episode_indices`
+- `video_name_prefix`
+
+When `video_episode_indices` is omitted, the legacy `capture_every` cadence is still supported as a fallback.

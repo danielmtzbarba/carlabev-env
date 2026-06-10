@@ -25,12 +25,24 @@ def _get_cfg_attr(cfg, key, default):
 def wrap_env(cfg, env, capture=False, eval=False):
     env_cfg = _get_env_cfg(cfg)
     if capture:
-        base_dir = f"videos/{_get_cfg_attr(cfg, 'exp_name', 'carlabev-run')}"
-        save_dir = f"{base_dir}/eval" if eval else base_dir
-        every = 50 if eval else _get_cfg_attr(cfg, "capture_every", 50)
+        base_dir = _get_cfg_attr(cfg, "video_output_dir", None)
+        if base_dir is None:
+            base_dir = f"videos/{_get_cfg_attr(cfg, 'exp_name', 'carlabev-run')}"
+            base_dir = f"{base_dir}/eval" if eval else base_dir
+        episode_indices = _get_cfg_attr(cfg, "video_episode_indices", None)
+        if episode_indices:
+            selected = {int(value) for value in episode_indices}
+            episode_trigger = lambda episode_id: episode_id in selected
+        else:
+            every = 50 if eval else _get_cfg_attr(cfg, "capture_every", 50)
+            episode_trigger = lambda episode_id: episode_id % every == 0
 
         env = gym.wrappers.RecordVideo(
-            env, save_dir, episode_trigger=lambda x: x % every == 0
+            env,
+            base_dir,
+            episode_trigger=episode_trigger,
+            name_prefix=_get_cfg_attr(cfg, "video_name_prefix", "rl-video"),
+            disable_logger=True,
         )
 
     env = ResizeObservation(env, env_cfg.obs_size)

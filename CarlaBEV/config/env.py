@@ -194,6 +194,9 @@ class RunConfig(BaseModel):
     seed: int = 1
     capture_video: bool = False
     capture_every: int = 50
+    video_output_dir: str | None = None
+    video_episode_indices: list[int] | None = None
+    video_name_prefix: str = "rl-video"
     cuda: bool = True
     torch_deterministic: bool = True
 
@@ -284,6 +287,9 @@ def _to_run_mapping(value: Any):
         "seed",
         "capture_video",
         "capture_every",
+        "video_output_dir",
+        "video_episode_indices",
+        "video_name_prefix",
         "cuda",
         "torch_deterministic",
     }

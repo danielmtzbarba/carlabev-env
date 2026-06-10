@@ -144,6 +144,10 @@ Suggested `EnvConfig` fields:
 - `action_mode: Literal["discrete", "continuous"]`
 - `reward_mode: Literal["shaping", "carl"]`
 - `render_mode: Literal["human", "rgb_array"]`
+- `capture_video: bool`
+- `video_output_dir: str | None`
+- `video_episode_indices: list[int] | None`
+- `video_name_prefix: str`
 - `fps: int`
 - `max_actions: int`
 - `difficulty_id: str | None`
@@ -449,3 +453,13 @@ Downstream evaluators may now rely on a stable per-step comfort schema under `in
 - `applied_delta`
 
 The simulator also emits episode summaries with pre-aggregated comfort metrics through `Stats.get_episode_info()`. This is the intended downstream contract for leaderboard computation in `carlabev-lab`.
+
+### Video Capture Fields
+
+Downstream orchestrators may now drive video capture declaratively through the public run config. The wrapper layer supports explicit output directories and explicit episode selection so that study code can separate:
+
+- training probe videos
+- intermediate evaluation videos
+- final evaluation videos
+
+without depending on a global `videos/<exp_name>/` convention.

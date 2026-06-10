@@ -57,6 +57,7 @@ Suggested exports:
 - `validate_env_config()`
 - `normalize_env_config()`
 - `get_env_capabilities()`
+- `resolve_env_profiles()`
 
 Example:
 
@@ -145,6 +146,9 @@ Suggested `EnvConfig` fields:
 - `render_mode: Literal["human", "rgb_array"]`
 - `fps: int`
 - `max_actions: int`
+- `difficulty_id: str | None`
+- `action_profile_id: str | None`
+- `reward_profile_id: str | None`
 - `traffic_enabled: bool`
 - `max_vehicles: int`
 - `route_direction_metrics_enabled: bool`
@@ -428,3 +432,20 @@ The main change is conceptual:
 - external users should no longer need to know internal option-key conventions
 
 This proposal is designed to be implemented incrementally on top of the current runtime without a disruptive rewrite.
+
+## Comfort Metric Contract
+
+Downstream evaluators may now rely on a stable per-step comfort schema under `info["hero"]`:
+
+- `accel_long`
+- `accel_lat`
+- `jerk_long`
+- `jerk_lat`
+- `yaw_rate`
+- `yaw_acc`
+- `cmd_gas`
+- `cmd_steer`
+- `cmd_brake`
+- `applied_delta`
+
+The simulator also emits episode summaries with pre-aggregated comfort metrics through `Stats.get_episode_info()`. This is the intended downstream contract for leaderboard computation in `carlabev-lab`.

@@ -2,6 +2,7 @@ import numpy as np
 
 from CarlaBEV.src.control.utils import lateral_error
 from CarlaBEV.src.deeprl.reward_signals import carl_ttc_penalty
+from CarlaBEV.src.deeprl.comfort import DEFAULT_COMFORT_BOUNDS, count_comfort_violations
 from CarlaBEV.semantics import (
     BLOCKING_CLASSES,
     OFFROAD_CLASSES,
@@ -114,14 +115,7 @@ class CaRLRewardFn:
         self.terminal_penalty = -1.0
 
         # Comfort thresholds from CaRL (CARLA table)
-        self.comfort_bounds = {
-            "accel_long": 2.0,  # o 1.5 si quieres que sea sensible
-            "accel_lat": 2.0,
-            "yaw_rate": 20.0,  # deg/s
-            "jerk_long": 3.0,
-            "jerk_lat": 3.0,
-            "yaw_acc": 120.0,
-        }
+        self.comfort_bounds = dict(DEFAULT_COMFORT_BOUNDS)
 
     # =====================================================
     def reset(self, rx, ry):
@@ -363,27 +357,26 @@ class CaRLRewardFn:
     # kinematic metrics (for comfort)
     # -----------------------------------------------------
     def _update_kinematics(self, info):
+        if all(key in info["hero"] for key in ("accel_long", "accel_lat", "jerk_long", "jerk_lat", "yaw_rate", "yaw_acc")):
+            return info
+
         x, y, yaw, speed = info["hero"]["state"]
         speed_mps = self._speed_to_mps(speed)
         dt = self.dt
 
-        # yaw rate
         if self.prev_yaw is None:
             yaw_rate = 0.0
         else:
             yaw_rate = (yaw - self.prev_yaw) / dt
         yaw_rate_deg = np.degrees(yaw_rate)
 
-        # longitudinal accel
         if self.prev_speed is None:
             accel_long = 0.0
         else:
             accel_long = (speed_mps - self.prev_speed) / dt
 
-        # lateral accel
         accel_lat = speed_mps * yaw_rate
 
-        # jerks
         if self.prev_accel_long is None:
             jerk_long = 0.0
         else:
@@ -394,14 +387,12 @@ class CaRLRewardFn:
         else:
             jerk_lat = (accel_lat - self.prev_accel_lat) / dt
 
-        # yaw acceleration
         if self.prev_yaw_rate is None:
             yaw_acc_deg = 0.0
         else:
             yaw_acc = (yaw_rate - self.prev_yaw_rate) / dt
             yaw_acc_deg = np.degrees(yaw_acc)
 
-        # store
         info["hero"]["accel_long"] = accel_long
         info["hero"]["accel_lat"] = accel_lat
         info["hero"]["jerk_long"] = jerk_long
@@ -409,7 +400,6 @@ class CaRLRewardFn:
         info["hero"]["yaw_rate"] = yaw_rate_deg
         info["hero"]["yaw_acc"] = yaw_acc_deg
 
-        # update prev
         self.prev_speed = speed_mps
         self.prev_yaw = yaw
         self.prev_accel_long = accel_long
@@ -423,37 +413,15 @@ class CaRLRewardFn:
     # -----------------------------------------------------
     def _count_comfort_violations(self, info, return_metrics=False):
         metrics = info["hero"]
-        bounds = self.comfort_bounds
-
-        accel_long = float(metrics.get("accel_long", 0.0))
-        accel_lat = float(metrics.get("accel_lat", 0.0))
-        yaw_rate = float(metrics.get("yaw_rate", 0.0))
-        jerk_long = float(metrics.get("jerk_long", 0.0))
-        jerk_lat = float(metrics.get("jerk_lat", 0.0))
-        yaw_acc = float(metrics.get("yaw_acc", 0.0))
-
-        violations = 0
-        if abs(accel_long) > bounds["accel_long"]:
-            violations += 1
-        if abs(accel_lat) > bounds["accel_lat"]:
-            violations += 1
-        if abs(yaw_rate) > bounds["yaw_rate"]:
-            violations += 1
-        if abs(jerk_long) > bounds["jerk_long"]:
-            violations += 1
-        if abs(jerk_lat) > bounds["jerk_lat"]:
-            violations += 1
-        if abs(yaw_acc) > bounds["yaw_acc"]:
-            violations += 1
-
         metrics_out = {
-            "accel_long": accel_long,
-            "accel_lat": accel_lat,
-            "yaw_rate": yaw_rate,
-            "jerk_long": jerk_long,
-            "jerk_lat": jerk_lat,
-            "yaw_acc": yaw_acc,
+            "accel_long": float(metrics.get("accel_long", 0.0)),
+            "accel_lat": float(metrics.get("accel_lat", 0.0)),
+            "yaw_rate": float(metrics.get("yaw_rate", 0.0)),
+            "jerk_long": float(metrics.get("jerk_long", 0.0)),
+            "jerk_lat": float(metrics.get("jerk_lat", 0.0)),
+            "yaw_acc": float(metrics.get("yaw_acc", 0.0)),
         }
+        violations, _ = count_comfort_violations(metrics_out, self.comfort_bounds)
 
         if return_metrics:
             return violations, metrics_out

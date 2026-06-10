@@ -81,6 +81,26 @@ Before the current fix, a full steer action produced only a very small heading c
 
 The current action mapping increases practical controllability without changing the underlying bicycle model.
 
+
+## Comfort-Related Exported Signals
+
+The ego control path now exports both command-space and kinematic signals so downstream evaluators can compute comfort metrics without re-deriving them from observations:
+
+- command-space
+  - `cmd_gas`
+  - `cmd_steer`
+  - `cmd_brake`
+  - `applied_delta`
+- kinematic comfort signals
+  - `accel_long`
+  - `accel_lat`
+  - `jerk_long`
+  - `jerk_lat`
+  - `yaw_rate`
+  - `yaw_acc`
+
+These are attached to `info["hero"]` on every step and then summarized into episode-level comfort metrics by `CarlaBEV/src/deeprl/stats.py`.
+
 ## Notes
 
 - Steering and longitudinal dynamics are heuristic rather than vehicle-calibrated.

@@ -46,9 +46,12 @@ The project currently supports:
 Recent simulator hardening work also introduced:
 
 - explicit geometry conversion utilities across raw asset, runtime, and metric frames
+- deterministic seeded scene generation for fair study reruns
+- padded render surfaces so `center` and `lookahead_75` share the same world spawn
 - reset-time spawn validation for valid ego initialization
 - stronger steering authority for meaningful turns and avoidance
 - executable simulator validity checks
+- per-step comfort signal export for downstream evaluation
 
 ## Key Features
 
@@ -169,6 +172,9 @@ Important environment options include:
 
 - `map_name`
 - `obs_mode`: `bev_rgb`, `bev_semantic`, or `vector`
+- `difficulty_id`: random-scene difficulty preset such as `rt_no_traffic_v1`, `rt_easy_v1`, `rt_medium_v1`, `rt_hard_v1`
+- `action_profile_id`: action profile preset such as `discrete9_v1`, `discrete13_v1`, `continuous_gsb_v1`
+- `reward_profile_id`: reward profile preset such as `carl_base_v1`, `carl_safety_v1`, `shaping_base_v1`
 - `semantic_mask_ch`: semantic channel layout used when
   `obs_mode="bev_semantic"`
   - `binary`: drivable
@@ -197,6 +203,35 @@ Reward and collision/off-road logic do not read `semantic_mask_ch` directly.
 They use semantic tile classes sampled from the authoritative map under the ego,
 so changing the semantic observation layout changes the NN input contract, not
 the reward contract.
+
+## Comfort Signals
+
+Each environment step now exports a stable comfort snapshot through `info["hero"]`.
+Downstream evaluators can aggregate:
+
+- `accel_long`
+- `accel_lat`
+- `jerk_long`
+- `jerk_lat`
+- `yaw_rate`
+- `yaw_acc`
+- `cmd_gas`
+- `cmd_steer`
+- `cmd_brake`
+- `applied_delta`
+
+Episode summaries additionally expose comfort-oriented aggregates such as:
+
+- `mean_abs_accel_long`
+- `mean_abs_accel_lat`
+- `mean_abs_jerk_long`
+- `mean_abs_jerk_lat`
+- `mean_abs_yaw_rate`
+- `mean_abs_yaw_acc`
+- `comfort_violation_rate`
+- `harsh_brake_rate`
+
+These are intended for study evaluation and leaderboard reporting in `carlabev-lab`, not as a claim of physically calibrated passenger comfort.
 
 ## Example Reset
 

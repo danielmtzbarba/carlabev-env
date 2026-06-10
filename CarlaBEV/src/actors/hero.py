@@ -4,6 +4,7 @@ import numpy as np
 
 from CarlaBEV.src.control.stanley_controller import Controller
 from CarlaBEV.semantics import SemanticClass, semantic_color_tuple
+from CarlaBEV.src.deeprl.comfort import compute_comfort_kinematics
 
 
 class Hero(pygame.sprite.Sprite):
@@ -62,6 +63,20 @@ class BaseAgent(Controller, Hero):
 
         xs, ys = route[0], route[1]
         self.acc = 0.0
+        self.meters_per_pixel = 40.0 / 128.0
+        self._prev_comfort_accel_long = None
+        self._prev_comfort_accel_lat = None
+        self._prev_comfort_yaw_rate = None
+        self.last_control = {"cmd_gas": 0.0, "cmd_steer": 0.0, "cmd_brake": 0.0, "applied_delta": 0.0}
+        self.last_comfort = {
+            "speed_mps": 0.0,
+            "accel_long": 0.0,
+            "accel_lat": 0.0,
+            "jerk_long": 0.0,
+            "jerk_lat": 0.0,
+            "yaw_rate": 0.0,
+            "yaw_acc": 0.0,
+        }
         self._setup()
 
         self.set_route(xs, ys, initial_speed)
@@ -99,6 +114,27 @@ class BaseAgent(Controller, Hero):
 
         # natural drag proportional to speed
         self.v *= 0.985
+
+        self.last_control = {
+            "cmd_gas": float(gas),
+            "cmd_steer": float(steer),
+            "cmd_brake": float(brake),
+            "applied_delta": float(delta),
+        }
+        self.last_comfort = compute_comfort_kinematics(
+            speed_px_s=self.v,
+            prev_speed_px_s=self.v_1,
+            yaw_rad=self.yaw,
+            prev_yaw_rad=self.yaw_1,
+            dt=self.dt,
+            meters_per_pixel=self.meters_per_pixel,
+            prev_accel_long=self._prev_comfort_accel_long,
+            prev_accel_lat=self._prev_comfort_accel_lat,
+            prev_yaw_rate_deg=self._prev_comfort_yaw_rate,
+        )
+        self._prev_comfort_accel_long = self.last_comfort["accel_long"]
+        self._prev_comfort_accel_lat = self.last_comfort["accel_lat"]
+        self._prev_comfort_yaw_rate = self.last_comfort["yaw_rate"]
 
     def accelerate(self, amount):
         """Return positive forward acceleration"""

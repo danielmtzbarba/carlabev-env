@@ -160,10 +160,15 @@ class Controller(State):
     
     @property
     def controller_info(self):
-        return {
+        info = {
             "state": self.state,
             "last_state": self.last_state,
             "dist2wp": self.dist2wp,
             "set_point": self.set_point,
-            "next_wps": self.next_wps(5)
+            "next_wps": self.next_wps(5),
         }
+        if hasattr(self, "last_control"):
+            info.update(self.last_control)
+        if hasattr(self, "last_comfort"):
+            info.update(self.last_comfort)
+        return info

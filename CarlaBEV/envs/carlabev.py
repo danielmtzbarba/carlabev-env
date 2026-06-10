@@ -1,4 +1,4 @@
-
+import random
 import gymnasium as gym
 import numpy as np
 import pygame
@@ -80,9 +80,17 @@ class CarlaBEV(gym.Env):
             info["scenario"] = dict(self._scenario_context)
         return info
 
+    def _seed_scene_randomness(self, seed: int | None) -> int:
+        scene_seed = int(self.cfg.seed if seed is None else seed)
+        random.seed(scene_seed)
+        np.random.seed(scene_seed)
+        return scene_seed
+
     def reset(self, seed=0, options=None):
         options = {} if options is None else dict(options)
         super().reset(seed=seed)
+        scene_seed = self._seed_scene_randomness(seed)
+        options.setdefault("scene_seed", scene_seed)
         self.current_info = {}
         self._current_step = 0
         self.stats.reset()

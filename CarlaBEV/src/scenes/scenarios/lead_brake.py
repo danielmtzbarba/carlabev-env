@@ -24,15 +24,18 @@ class LeadBrakeScenario(Scenario):
         """
         if "config_file" in kwargs and kwargs.get("config_file"):
             return super().sample(level=level, **kwargs)
+        np_rng = kwargs.get("np_rng")
+        if np_rng is None:
+            np_rng = np.random.default_rng()
         # --- Customization Parameters (Fallback to Random) ---
-        ego_start_y = kwargs.get("anchor_y", np.random.randint(900, 1000))
-        lead_gap_m = kwargs.get("lead_gap", np.random.uniform(4.5, 12.5))
-        ego_speed = kwargs.get("ego_speed", np.random.uniform(8.0, 16.0))
+        ego_start_y = kwargs.get("anchor_y", int(np_rng.integers(900, 1000)))
+        lead_gap_m = kwargs.get("lead_gap", float(np_rng.uniform(4.5, 12.5)))
+        ego_speed = kwargs.get("ego_speed", float(np_rng.uniform(8.0, 16.0)))
         lead_speed = kwargs.get(
-            "lead_speed", ego_speed + np.random.uniform(-2.0, 2.0)
+            "lead_speed", ego_speed + float(np_rng.uniform(-2.0, 2.0))
         )
-        brake_delay = kwargs.get("brake_delay", np.random.uniform(1.5, 4.0))
-        brake_strength = kwargs.get("brake_strength", np.random.uniform(2.0, 6.0))
+        brake_delay = kwargs.get("brake_delay", float(np_rng.uniform(1.5, 4.0)))
+        brake_strength = kwargs.get("brake_strength", float(np_rng.uniform(2.0, 6.0)))
 
         # --- Base routes (lane centerlines) ---
         x_center = kwargs.get("anchor_x", 850)
@@ -60,6 +63,7 @@ class LeadBrakeScenario(Scenario):
             routeY=lead_ry,
             behavior=lead_behavior,
             target_speed=lead_speed,
+            np_rng=np_rng,
         )
 
         # Collect all vehicles
@@ -74,7 +78,7 @@ class LeadBrakeScenario(Scenario):
             left_ry = [ego_start_y - i * 20 for i in range(7)]
             left_rx.reverse()
             left_ry.reverse()
-            left_speed = kwargs.get("left_speed", np.random.uniform(10.0, 18.0))
+            left_speed = kwargs.get("left_speed", float(np_rng.uniform(10.0, 18.0)))
 
             left_vehicle = Vehicle(
                 map_size=self.map_size,
@@ -82,6 +86,7 @@ class LeadBrakeScenario(Scenario):
                 routeY=left_ry,
                 target_speed=left_speed,
                 behavior=None,  # constant-speed behavior
+                np_rng=np_rng,
             )
             vehicles.append(left_vehicle)
 
@@ -89,17 +94,17 @@ class LeadBrakeScenario(Scenario):
         # --- Level 3: Add Rear Vehicle (Follower)
         # =====================================================
         if level >= 3:
-            rear_gap_m = kwargs.get("rear_gap", np.random.uniform(3.0, 6.0))
+            rear_gap_m = kwargs.get("rear_gap", float(np_rng.uniform(3.0, 6.0)))
             rear_rx = [x_center] * 6
             rear_ry_start = ego_ry[0] + distance_meters_to_surface(rear_gap_m)
             rear_ry = [rear_ry_start - i * rear_step for i in range(6)]
             rear_speed = kwargs.get(
-                "rear_speed", max(ego_speed - np.random.uniform(1.0, 3.0), 4.0)
+                "rear_speed", max(ego_speed - float(np_rng.uniform(1.0, 3.0)), 4.0)
             )
 
             # --- Rear braking behavior ---
             brake_delay = kwargs.get(
-                "rear_brake_delay", np.random.uniform(2.0, 5.0)
+                "rear_brake_delay", float(np_rng.uniform(2.0, 5.0))
             )
             rear_behavior = LeadBrakeBehavior(
                 start_brake_t=brake_delay, dec_rate=brake_strength
@@ -111,6 +116,7 @@ class LeadBrakeScenario(Scenario):
                 routeY=rear_ry,
                 target_speed=rear_speed,
                 behavior=rear_behavior,  # simple follower for now
+                np_rng=np_rng,
             )
             vehicles.append(rear_vehicle)
 

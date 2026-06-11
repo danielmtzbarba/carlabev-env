@@ -116,6 +116,23 @@ class ResetBuilderTests(unittest.TestCase):
         self.assertFalse(options["traffic_enabled"])
         self.assertEqual(options["route_dist_range"], [30, 80])
 
+    def test_random_navigation_options_include_explicit_subseeds(self):
+        options = build_random_navigation_options(
+            RandomNavigationReset(
+                num_vehicles=7,
+                route_dist_range=(40, 80),
+                scene_seed=11,
+                route_seed=22,
+                traffic_seed=33,
+                scenario_seed=44,
+            )
+        )
+
+        self.assertEqual(options["scene_seed"], 11)
+        self.assertEqual(options["route_seed"], 22)
+        self.assertEqual(options["traffic_seed"], 33)
+        self.assertEqual(options["scenario_seed"], 44)
+
     def test_authored_scene_options_include_variation_seed(self):
         options = build_authored_scene_options(
             AuthoredSceneReset(

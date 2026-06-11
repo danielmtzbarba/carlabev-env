@@ -12,6 +12,7 @@ class Vehicle(Actor):
         routeY=None,
         behavior=None,
         target_speed=12.0,
+        np_rng=None,
     ):
         self._map_size = map_size
         self._color = semantic_color_tuple(SemanticClass.VEHICLE)
@@ -23,6 +24,7 @@ class Vehicle(Actor):
             actor_size=int(32 / self._scale),
             routeX=routeX,
             routeY=routeY,
-            behavior=behavior
+            behavior=behavior,
+            np_rng=np_rng,
         )
         self.set_cruise_speed_mps(target_speed)

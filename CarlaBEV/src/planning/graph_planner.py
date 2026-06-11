@@ -1,5 +1,4 @@
 import math
-import random
 import numpy as np
 import networkx as nx
 
@@ -24,15 +23,21 @@ class GraphPlanner(MapGraph):
             lane_type='center',
             min_distance=500,
             max_distance=2000,
-            merge_threshold=10
+            merge_threshold=10,
+            rng=None,
             ):
         """
         Randomly selects two nodes in the same lane within a distance threshold,
         computes the shortest path, merges close nodes, and visualizes it.
         """
         # Filter nodes by lane
-        lane_nodes = self._nodes[lane_type] 
-        random.shuffle(lane_nodes)
+        lane_nodes = list(self._nodes[lane_type])
+        if rng is None:
+            import random
+
+            random.shuffle(lane_nodes)
+        else:
+            rng.shuffle(lane_nodes)
 
         # Try pairs until we find a valid one
         for source in lane_nodes:
@@ -60,10 +65,16 @@ class GraphPlanner(MapGraph):
             ry.append(pos[0])
         return (rx, ry)
     
-    def get_random_nodes(self, min_distance, max_distance):
+    def get_random_nodes(self, min_distance, max_distance, *, rng=None):
         while True:
-            start = random.choice(self._wp_nodes)
-            end = random.choice(self._wp_nodes)
+            if rng is None:
+                import random
+
+                start = random.choice(self._wp_nodes)
+                end = random.choice(self._wp_nodes)
+            else:
+                start = rng.choice(self._wp_nodes)
+                end = rng.choice(self._wp_nodes)
             if start == end:
                 continue
 

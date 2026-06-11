@@ -2,8 +2,6 @@ import numpy as np
 import networkx as nx
 import pickle
 
-from random import choice
-
 from CarlaBEV.envs.geometry import raw_to_meters, raw_to_surface
 
 
@@ -44,8 +42,12 @@ class MapGraph(object):
             if sem_cls:
                 self._nodes[sem_cls].append(nodeid)
 
-    def get_random_node(self, node_cls):
-        return choice(self._nodes[node_cls])
+    def get_random_node(self, node_cls, *, rng=None):
+        if rng is None:
+            import random
+
+            return random.choice(self._nodes[node_cls])
+        return rng.choice(self._nodes[node_cls])
 
     def get_node_pos(self, node_id):
         return np.array(self._G.nodes[node_id]["pos"], dtype=np.int32)

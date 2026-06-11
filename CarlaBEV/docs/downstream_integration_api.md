@@ -21,7 +21,7 @@ The public facade shrinks that surface into a small, documented, validated contr
 Observed from `carlabev-lab` usage:
 
 1. The downstream repo maintains its own `EnvConfig` dataclass instead of importing one from CarlaBEV.
-2. Scenario reset options are assembled as untyped dictionaries with magic keys like `scene`, `config_file`, `variation_enabled`, and `variation_seed`.
+2. Scenario reset options are assembled as untyped dictionaries with magic keys like `scene`, `config_file`, `variation_enabled`, `variation_seed`, `scene_seed`, `route_seed`, and `traffic_seed`.
 3. Some settings are environment-construction settings, while others are reset-distribution settings, but both are currently mixed together in runtime config.
 4. External callers need to know internal conventions for scenario presets, authored scene JSONs, and reset payloads.
 5. Public string modes are not formalized enough for downstream validation.
@@ -106,6 +106,19 @@ options = build_reset_options(reset, reset_mask=[True] * 8)
 obs, info = env.reset(options=options)
 ```
 
+For random-navigation resets, the builder also supports explicit reset
+sub-seeds through `RandomNavigationReset`:
+
+- `scene_seed`
+- `route_seed`
+- `traffic_seed`
+- `scenario_seed`
+
+These are intended for downstream orchestrators that want repeatability at the
+run level but diversity across episodes. `CarlaBEV.reset()` treats the resolved
+episode seed as local reset state and does not mutate Python or NumPy global
+random generators.
+
 ### `CarlaBEV.scenarios`
 
 Stable discovery and metadata API for scenario families, presets, and authored scenes.
@@ -162,6 +175,7 @@ Notably absent:
 - `scene`
 - `config_file`
 - `variation_seed`
+- reset seed schedules
 - curriculum schedule fields
 
 Those belong to reset protocol or trainer orchestration.
@@ -223,8 +237,13 @@ That lets current internals evolve without leaking inconsistencies downstream.
 ```python
 @dataclass
 class RandomNavigationReset:
+    difficulty_id: str | None = None
     num_vehicles: int = 25
     route_dist_range: tuple[int, int] = (30, 130)
+    scene_seed: int | None = None
+    route_seed: int | None = None
+    traffic_seed: int | None = None
+    scenario_seed: int | None = None
 ```
 
 Maps to:
@@ -234,6 +253,10 @@ Maps to:
     "scene": "rdm",
     "num_vehicles": ...,
     "route_dist_range": [...],
+    "scene_seed": ...,
+    "route_seed": ...,
+    "traffic_seed": ...,
+    "scenario_seed": ...,
 }
 ```
 
@@ -408,6 +431,16 @@ obs, info = envs.reset(
     options=build_reset_options(reset_request, reset_mask=[True])
 )
 ```
+
+For deterministic diverse training, the recommended downstream pattern is:
+
+1. choose a master run seed
+2. derive a per-episode `scene_seed`
+3. optionally derive `route_seed` and `traffic_seed`
+4. call `CarlaBEV.reset()` with those values for that episode only
+
+The environment consumes the seed schedule; it does not define the schedule for
+the caller.
 
 ## Semantic Runtime Boundary
 

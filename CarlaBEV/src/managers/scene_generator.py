@@ -1,7 +1,6 @@
 import json
 import os
 import warnings
-from random import choice
 from CarlaBEV.src.scenes.utils import get_random_node, find_route, find_route_in_range
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.planning.graph_planner import GraphPlanner
@@ -74,7 +73,7 @@ class SceneGenerator:
         }
         self.last_scene_context = {}
 
-    def build_scene(self, options):
+    def build_scene(self, options, *, rng_bundle=None):
         self.last_scene_context = {}
         scene = options.get("scene", "rdm")
         config_file = options.get("config_file")
@@ -98,6 +97,8 @@ class SceneGenerator:
                     )
                 authored_options = dict(options)
                 authored_options["config_file"] = config_file
+                if rng_bundle is not None:
+                    authored_options.setdefault("np_rng", rng_bundle.scenario_np_rng)
                 actors, len_route = self.scenarios[scenario_id].sample(**authored_options)
                 self.last_scene_context = dict(getattr(self.scenarios[scenario_id], "last_loaded_context", {}) or {})
                 self.last_scene_context.setdefault("scene", scenario_id)
@@ -108,27 +109,43 @@ class SceneGenerator:
             scenario_id = config["scenario_id"]
             if scenario_id not in self.scenarios:
                 raise KeyError(f"Unknown scenario '{scenario_id}' in config '{config_file}'")
-            return self.scenarios[scenario_id].sample(
-                **build_scenario_options_from_config(config, overrides=options)
-            )
+            scenario_options = build_scenario_options_from_config(config, overrides=options)
+            if rng_bundle is not None:
+                scenario_options.setdefault("np_rng", rng_bundle.scenario_np_rng)
+            return self.scenarios[scenario_id].sample(**scenario_options)
 
         # --- Case 1: Random scene generation ---
         if isinstance(scene, str) and scene == "rdm":
             self.last_scene_context.update({
                 "difficulty_id": options.get("difficulty_id"),
                 "scenario_param_traffic_enabled": bool(traffic_enabled),
+                "scene_seed": options.get("scene_seed"),
+                "route_seed": options.get("route_seed"),
+                "traffic_seed": options.get("traffic_seed"),
             })
             return self.generate_random(
                 num_vehicles,
                 dist_range,
                 traffic_enabled=traffic_enabled,
                 ego_target_speed=ego_target_speed,
+                route_rng=None if rng_bundle is None else rng_bundle.route_rng,
+                traffic_rng=None if rng_bundle is None else rng_bundle.traffic_rng,
+                traffic_np_rng=None if rng_bundle is None else rng_bundle.traffic_np_rng,
             )
 
         # --- Case 2: Predefined scenario ---
         elif isinstance(scene, str) and scene in self.scenarios:
             scenario_options = dict(options)
-            scenario_options.setdefault("level", choice([1, 2, 3, 4]))
+            if rng_bundle is not None:
+                scenario_options.setdefault("np_rng", rng_bundle.scenario_np_rng)
+                scenario_options.setdefault(
+                    "level",
+                    rng_bundle.scenario_rng.choice([1, 2, 3, 4]),
+                )
+            else:
+                import random
+
+                scenario_options.setdefault("level", random.choice([1, 2, 3, 4]))
             return self.scenarios[scene].sample(**scenario_options)
             
         # --- Default Fallback: Empty Scene ---
@@ -150,6 +167,9 @@ class SceneGenerator:
         max_retries=20,
         traffic_enabled=None,
         ego_target_speed=None,
+        route_rng=None,
+        traffic_rng=None,
+        traffic_np_rng=None,
     ):
         """
         Generates a randomized traffic scene with configurable curriculum.
@@ -177,8 +197,14 @@ class SceneGenerator:
 
         # 1️⃣ Agent route
         for attempt in range(max_retries):
-            _, path, len_route = find_route_in_range(self.planners.all, "agent", 'R',
-                                          dist_range[0], dist_range[1])
+            _, path, len_route = find_route_in_range(
+                self.planners.all,
+                "agent",
+                "R",
+                dist_range[0],
+                dist_range[1],
+                rng=route_rng,
+            )
             if path is not None and len(path[0]) > 1:
                 actors["agent"] = (path[0], path[1], 0.0, ego_target_speed)
                 break
@@ -189,8 +215,19 @@ class SceneGenerator:
 
         # 2️⃣ Background vehicles
         for _ in range(num_cars):
-            lane = choice(["L", "R"])
-            veh, _ = get_actor("vehicle", lane, self.planners.all)
+            if traffic_rng is None:
+                import random
+
+                lane = random.choice(["L", "R"])
+            else:
+                lane = traffic_rng.choice(["L", "R"])
+            veh, _ = get_actor(
+                "vehicle",
+                lane,
+                self.planners.all,
+                rng=traffic_rng,
+                np_rng=traffic_np_rng,
+            )
             if veh is None:
                 continue
             actors["vehicle"].append(veh)
@@ -199,11 +236,11 @@ class SceneGenerator:
         return actors, len_route
 
 
-def get_actor(actor_type, lane, planners):
+def get_actor(actor_type, lane, planners, *, rng=None, np_rng=None):
     try:
-        n1 = get_random_node(planners, actor_type, lane)
-        n2 = get_random_node(planners, actor_type, lane)
-        veh = Vehicle(start_node=n1, end_node=n2, map_size=128)
+        n1 = get_random_node(planners, actor_type, lane, rng=rng)
+        n2 = get_random_node(planners, actor_type, lane, rng=rng)
+        veh = Vehicle(start_node=n1, end_node=n2, map_size=128, np_rng=np_rng)
         veh, path = find_route(planners, veh, lane=lane)
         if len(path[0]) > 5:
             return veh, path

@@ -18,6 +18,10 @@ class RandomNavigationReset(BaseModel):
     difficulty_id: str | None = None
     num_vehicles: int = 25
     route_dist_range: tuple[int, int] = (30, 130)
+    scene_seed: int | None = None
+    route_seed: int | None = None
+    traffic_seed: int | None = None
+    scenario_seed: int | None = None
 
 
 class ScenarioPresetReset(BaseModel):
@@ -69,6 +73,14 @@ def build_random_navigation_options(
         "num_vehicles": int(request.num_vehicles),
         "route_dist_range": list(request.route_dist_range),
     }
+    if request.scene_seed is not None:
+        options["scene_seed"] = int(request.scene_seed)
+    if request.route_seed is not None:
+        options["route_seed"] = int(request.route_seed)
+    if request.traffic_seed is not None:
+        options["traffic_seed"] = int(request.traffic_seed)
+    if request.scenario_seed is not None:
+        options["scenario_seed"] = int(request.scenario_seed)
     if request.difficulty_id is not None:
         spec = get_difficulty_spec(request.difficulty_id)
         options.update(

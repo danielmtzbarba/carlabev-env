@@ -20,10 +20,22 @@ def _make_env(*, anchor_y_frac: float) -> CarlaBEV:
     return CarlaBEV(cfg)
 
 
-def _capture_spawn_state(*, seed: int, anchor_y_frac: float) -> dict[str, object]:
+def _capture_spawn_state(
+    *,
+    seed: int,
+    anchor_y_frac: float,
+    route_seed: int | None = None,
+    traffic_seed: int | None = None,
+    scene_seed: int | None = None,
+) -> dict[str, object]:
     env = _make_env(anchor_y_frac=anchor_y_frac)
     options = build_random_navigation_options(
-        RandomNavigationReset(difficulty_id="rt_medium_v1")
+        RandomNavigationReset(
+            difficulty_id="rt_medium_v1",
+            scene_seed=scene_seed,
+            route_seed=route_seed,
+            traffic_seed=traffic_seed,
+        )
     )
     try:
         _, info = env.reset(seed=seed, options=options)
@@ -56,6 +68,9 @@ def _capture_spawn_state(*, seed: int, anchor_y_frac: float) -> dict[str, object
             "vehicles": tuple(vehicles[:16]),
             "num_vehicles": int(env.num_vehicles),
             "route_length": round(float(env.len_ego_route), 6),
+            "scene_seed": info.get("scenario", {}).get("scenario_param_scene_seed"),
+            "route_seed": info.get("scenario", {}).get("scenario_param_route_seed"),
+            "traffic_seed": info.get("scenario", {}).get("scenario_param_traffic_seed"),
         }
     finally:
         env.close()
@@ -123,6 +138,52 @@ class SeededSceneConsistencyTests(unittest.TestCase):
             self.assertTrue(0 < snapshot["crop_rect"][1] < snapshot["render_shape"][1] - snapshot["crop_size"])
             self.assertTrue(math.isclose(hx, expected, abs_tol=1.5))
             self.assertTrue(math.isclose(hy, expected, abs_tol=1.5))
+
+    def test_same_seed_sequence_replays_identical_scene_sequence(self):
+        first = [
+            _capture_spawn_state(seed=seed, anchor_y_frac=0.5)
+            for seed in (101, 102, 103)
+        ]
+        second = [
+            _capture_spawn_state(seed=seed, anchor_y_frac=0.5)
+            for seed in (101, 102, 103)
+        ]
+
+        self.assertEqual(first, second)
+
+    def test_route_seed_changes_route_without_changing_traffic(self):
+        first = _capture_spawn_state(
+            seed=11,
+            anchor_y_frac=0.5,
+            route_seed=1001,
+            traffic_seed=2001,
+        )
+        second = _capture_spawn_state(
+            seed=11,
+            anchor_y_frac=0.5,
+            route_seed=1002,
+            traffic_seed=2001,
+        )
+
+        self.assertNotEqual(first["route"], second["route"])
+        self.assertEqual(first["vehicles"], second["vehicles"])
+
+    def test_traffic_seed_changes_traffic_without_changing_route(self):
+        first = _capture_spawn_state(
+            seed=11,
+            anchor_y_frac=0.5,
+            route_seed=3001,
+            traffic_seed=4001,
+        )
+        second = _capture_spawn_state(
+            seed=11,
+            anchor_y_frac=0.5,
+            route_seed=3001,
+            traffic_seed=4002,
+        )
+
+        self.assertEqual(first["route"], second["route"])
+        self.assertNotEqual(first["vehicles"], second["vehicles"])
 
 
 if __name__ == "__main__":

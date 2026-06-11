@@ -67,10 +67,10 @@ def select_node(event, planner, lane, actor):
     return closest_node
 
 
-def get_random_node(planner, actor_type, lane):
+def get_random_node(planner, actor_type, lane, *, rng=None):
     planner_id = "pedestrian" if actor_type == "Pedestrian" else f"vehicle-{lane}"
     planner = planner[planner_id]
-    rdm_node_id = planner.get_random_node(lane)
+    rdm_node_id = planner.get_random_node(lane, rng=rng)
     pos = planner.get_node_pos_surface(rdm_node_id)
     return Node(rdm_node_id, pos, lane)
 
@@ -119,6 +119,7 @@ def find_route_in_range(
     min_dist_meters=30.0,
     max_dist_meters=50.0,
     max_attempts=100,
+    rng=None,
 ):
     """
     Create a route for `actor` within a valid distance range.
@@ -144,8 +145,8 @@ def find_route_in_range(
 
     for attempt in range(max_attempts):
         # Sample random nodes as start/end of route
-        start_node = get_random_node(planner, actor_type, lane)
-        end_node = get_random_node(planner, actor_type, lane)
+        start_node = get_random_node(planner, actor_type, lane, rng=rng)
+        end_node = get_random_node(planner, actor_type, lane, rng=rng)
 
         # Skip if identical nodes
         if start_node.id == end_node.id:

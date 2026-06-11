@@ -33,7 +33,7 @@ class ActorManager:
     # ======================================================
     # --- Creation ---
     # ======================================================
-    def spawn_hero(self, route, initial_speed_mps, target_speed_mps):
+    def spawn_hero(self, route, initial_speed_mps, target_speed_mps, np_rng=None):
         """Spawn the main agent (hero vehicle)."""
         initial_speed = speed_mps_to_surface(initial_speed_mps)
         target_speed = speed_mps_to_surface(target_speed_mps)
@@ -45,6 +45,7 @@ class ActorManager:
                 color=(0, 0, 0),
                 target_speed=target_speed,
                 car_size=32,
+                np_rng=np_rng,
             )
         else:
             hero = DiscreteAgent(
@@ -54,6 +55,7 @@ class ActorManager:
                 color=(0, 0, 0),
                 target_speed=target_speed,
                 car_size=32,
+                np_rng=np_rng,
             )
         hero.initial_speed_mps = float(initial_speed_mps)
         hero.target_speed_mps = float(target_speed_mps)

@@ -89,9 +89,9 @@ class BaseMap(Scene):
     # =====================================================
     # --- Scene Control ---
     # =====================================================
-    def reset(self, actors=None):
+    def reset(self, actors=None, hero_np_rng=None):
         """Reset scene and reload actors."""
-        self.reset_scene(actors)
+        self.reset_scene(actors, hero_np_rng=hero_np_rng)
         self._theta = 0.0
         self._scene.blit(self._map_img, (0, 0))
         if getattr(self, "hero", None) is not None and getattr(self, "camera", None) is not None:

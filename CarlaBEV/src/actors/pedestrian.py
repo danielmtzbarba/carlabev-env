@@ -12,6 +12,7 @@ class Pedestrian(Actor):
         routeY=None,
         behavior=None,
         target_speed=1.5,
+        np_rng=None,
     ):
         self._color = semantic_color_tuple(SemanticClass.PEDESTRIAN)
         self._map_size = map_size
@@ -23,6 +24,7 @@ class Pedestrian(Actor):
             actor_size=int(16 / self._scale),
             routeX=routeX,
             routeY=routeY,
-            behavior=behavior
+            behavior=behavior,
+            np_rng=np_rng,
         )
         self.set_cruise_speed_mps(target_speed)

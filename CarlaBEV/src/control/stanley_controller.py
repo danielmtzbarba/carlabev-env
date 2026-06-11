@@ -11,7 +11,6 @@ Ref:
 """
 
 import numpy as np
-from numpy.random import randint
 
 from CarlaBEV.src.control.utils import angle_mod, smooth_and_compute
 from CarlaBEV.src.control.state import State
@@ -32,12 +31,15 @@ class Controller(State):
     def set_target_speed(self, target_speed):
         self._target_speed = target_speed
 
-    def set_route(self, ax, ay, v0=0.0, jitter_start=True):
+    def set_route(self, ax, ay, v0=0.0, jitter_start=True, np_rng=None):
         """Stanley steering control on a cubic spline."""
         cx, cy, cyaw, ck, s = smooth_and_compute(ax, ay, window=11, poly=3)
 
         if jitter_start:
-            self.x, self.y = cx[0] + randint(-1, 1), cy[0] + randint(-1, 1)
+            if np_rng is None:
+                np_rng = np.random.default_rng()
+            self.x = cx[0] + int(np_rng.integers(-1, 2))
+            self.y = cy[0] + int(np_rng.integers(-1, 2))
         else:
             self.x, self.y = cx[0], cy[0]
         self.cx, self.cy = cx, cy

@@ -49,7 +49,8 @@ class Actor(pygame.sprite.Sprite):
         actor_size=1,
         routeX=None,
         routeY=None,
-        behavior=None
+        behavior=None,
+        np_rng=None,
     ):
         pygame.sprite.Sprite.__init__(self)
         self.id = id
@@ -74,6 +75,7 @@ class Actor(pygame.sprite.Sprite):
         self.target_speed_mps = 0.0
         self.cruise_speed = 0.0
         self.cruise_speed_mps = 0.0
+        self.np_rng = np_rng
 
     def set_route_wp(self, node_id, x, y):
         self.rx.append(x)
@@ -92,7 +94,12 @@ class Actor(pygame.sprite.Sprite):
         self.target_speed = self.cruise_speed
         self.target_speed_mps = self.cruise_speed_mps
         self._controller = Controller(self.target_speed)
-        self._controller.set_route(self.rx, self.ry, v0=self.cruise_speed)
+        self._controller.set_route(
+            self.rx,
+            self.ry,
+            v0=self.cruise_speed,
+            np_rng=self.np_rng,
+        )
         self.behavior_state = "idle"
 
         if self.behavior:

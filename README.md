@@ -267,6 +267,53 @@ obs, info = envs.reset(
 )
 ```
 
+## Reset Seeding Model
+
+`CarlaBEV.reset()` still accepts the standard Gymnasium `seed=...` argument,
+but episode randomness is now handled through local RNG bundles instead of
+reseeded global Python or NumPy state.
+
+This gives downstream code two stable behaviors:
+
+- Replaying the same reset seed schedule reproduces the same scene sequence.
+- Varying the reset seed across episodes gives deterministic diversity without
+  cross-episode RNG leakage.
+
+For random-navigation resets, the public reset builder supports optional
+sub-seeds:
+
+- `scene_seed`
+- `route_seed`
+- `traffic_seed`
+- `scenario_seed`
+
+If only `scene_seed` is provided, the environment derives the other sub-seeds
+internally. If `route_seed` or `traffic_seed` are provided explicitly, those
+components become independently controllable.
+
+```python
+from CarlaBEV.config import RandomNavigationReset, build_random_navigation_options
+
+options = build_random_navigation_options(
+    RandomNavigationReset(
+        difficulty_id="rt_medium_v1",
+        scene_seed=1000,
+        route_seed=2000,
+        traffic_seed=3000,
+    ),
+    reset_mask=[True],
+)
+
+obs, info = envs.reset(options=options)
+```
+
+Practical interpretation:
+
+- fixed scene schedule: reuse the same `scene_seed` every reset
+- deterministic diverse schedule: provide a different per-episode `scene_seed`
+- route-only perturbation: hold `traffic_seed` fixed and vary `route_seed`
+- traffic-only perturbation: hold `route_seed` fixed and vary `traffic_seed`
+
 ## Research Scope
 
 CarlaBEV is a strong fit for:

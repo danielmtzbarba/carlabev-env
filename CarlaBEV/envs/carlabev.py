@@ -1,4 +1,3 @@
-import random
 import gymnasium as gym
 import numpy as np
 import pygame
@@ -17,6 +16,7 @@ from CarlaBEV.src.control.route_metrics import (
 
 
 from CarlaBEV.src.managers.scene_generator import SceneGenerator
+from CarlaBEV.src.randomness import build_rng_bundle
 
 
 def build_reward_fn(cfg):
@@ -80,17 +80,27 @@ class CarlaBEV(gym.Env):
             info["scenario"] = dict(self._scenario_context)
         return info
 
-    def _seed_scene_randomness(self, seed: int | None) -> int:
-        scene_seed = int(self.cfg.seed if seed is None else seed)
-        random.seed(scene_seed)
-        np.random.seed(scene_seed)
-        return scene_seed
+    def _resolve_rng_bundle(self, seed: int | None, options: dict) -> tuple[int, object]:
+        scene_seed = int(options.get("scene_seed", self.cfg.seed if seed is None else seed))
+        route_seed = options.get("route_seed")
+        traffic_seed = options.get("traffic_seed")
+        scenario_seed = options.get("scenario_seed")
+        bundle = build_rng_bundle(
+            scene_seed=scene_seed,
+            route_seed=route_seed,
+            traffic_seed=traffic_seed,
+            scenario_seed=scenario_seed,
+        )
+        return scene_seed, bundle
 
     def reset(self, seed=0, options=None):
         options = {} if options is None else dict(options)
-        super().reset(seed=seed)
-        scene_seed = self._seed_scene_randomness(seed)
+        scene_seed, rng_bundle = self._resolve_rng_bundle(seed, options)
+        super().reset(seed=scene_seed)
         options.setdefault("scene_seed", scene_seed)
+        options.setdefault("route_seed", rng_bundle.route_seed)
+        options.setdefault("traffic_seed", rng_bundle.traffic_seed)
+        options.setdefault("scenario_seed", rng_bundle.scenario_seed)
         self.current_info = {}
         self._current_step = 0
         self.stats.reset()
@@ -99,12 +109,15 @@ class CarlaBEV(gym.Env):
         last_spawn_info = None
 
         for _ in range(max_reset_attempts):
-            actors, len_route = self.scene_generator.build_scene(options)
+            actors, len_route = self.scene_generator.build_scene(
+                options,
+                rng_bundle=rng_bundle,
+            )
             self._scenario_context = self._extract_scenario_context(options)
             self._scenario_context.update(getattr(self.scene_generator, "last_scene_context", {}) or {})
             self.len_ego_route = len_route
             self.num_vehicles = len(actors["vehicle"])
-            self.map.reset(actors)
+            self.map.reset(actors, hero_np_rng=rng_bundle.route_np_rng)
             if actors and actors.get("agent") is not None:
                 self._maybe_attach_route_direction_metrics()
                 last_spawn_info = self.map.spawn_validation_info()

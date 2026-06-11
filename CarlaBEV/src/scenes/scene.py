@@ -37,12 +37,12 @@ class Scene:
     # =====================================================
     # --- Scene lifecycle
     # =====================================================
-    def reset_scene(self, actors=None):
+    def reset_scene(self, actors=None, hero_np_rng=None):
         """Reset the scene with optional actor data."""
         self._idx = 0
         self._t = 0.0
         if actors:
-            self.load_scene(actors)
+            self.load_scene(actors, hero_np_rng=hero_np_rng)
         else:
             self.actor_manager.reset_all()
 
@@ -58,7 +58,7 @@ class Scene:
             self._dist2goal = 0.0
             self._dist2wp_1 = 0.0
 
-    def load_scene(self, actors):
+    def load_scene(self, actors, hero_np_rng=None):
         self.actor_manager.load(actors)
         if self.actor_manager.actors.get("agent"):
             cx, cy, initial_speed_mps, target_speed_mps = self.agent_route
@@ -67,6 +67,7 @@ class Scene:
                 route=(cx, cy),
                 initial_speed_mps=initial_speed_mps,
                 target_speed_mps=target_speed_mps,
+                np_rng=hero_np_rng,
             )
             self._actors = set_targets(
                 self.actor_manager.actors, self.hero.cx, self.hero.cy

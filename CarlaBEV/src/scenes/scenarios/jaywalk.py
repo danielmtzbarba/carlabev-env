@@ -33,17 +33,20 @@ class JaywalkScenario(Scenario):
         """
         if "config_file" in kwargs and kwargs["config_file"]:
             return super().sample(level=level, **kwargs)
+        np_rng = kwargs.get("np_rng")
+        if np_rng is None:
+            np_rng = np.random.default_rng()
         # --- Customization Parameters (Fallback to Random) ---
-        ego_start_y = kwargs.get("anchor_y", np.random.randint(900, 1000))
-        ego_speed = kwargs.get("ego_speed", np.random.uniform(8.0, 14.0))
+        ego_start_y = kwargs.get("anchor_y", int(np_rng.integers(900, 1000)))
+        ego_speed = kwargs.get("ego_speed", float(np_rng.uniform(8.0, 14.0)))
         ped_x_base = kwargs.get("anchor_x", 850)  # center lane crossing
         lane_width = distance_meters_to_surface(1.6)
-        cross_offset_m = kwargs.get("cross_offset", np.random.uniform(-3.0, 3.0))
-        cross_delay = kwargs.get("cross_delay", np.random.uniform(1.0, 2.5))
-        pedestrian_speed = kwargs.get("pedestrian_speed", np.random.uniform(1.2, 2.2))
+        cross_offset_m = kwargs.get("cross_offset", float(np_rng.uniform(-3.0, 3.0)))
+        cross_delay = kwargs.get("cross_delay", float(np_rng.uniform(1.0, 2.5)))
+        pedestrian_speed = kwargs.get("pedestrian_speed", float(np_rng.uniform(1.2, 2.2)))
         ego_step = distance_meters_to_surface(6.25)
         rear_step = distance_meters_to_surface(3.12)
-        yield_duration = kwargs.get("yield_duration", np.random.uniform(0.8, 1.6))
+        yield_duration = kwargs.get("yield_duration", float(np_rng.uniform(0.8, 1.6)))
 
         # === Ego vehicle path ===
         ego_rx = [ped_x_base] * 6
@@ -54,7 +57,7 @@ class JaywalkScenario(Scenario):
         cross_offset = distance_meters_to_surface(cross_offset_m)
         ped_start_x = ped_x_base + lane_width + cross_offset
         ped_end_x = ped_x_base - lane_width + cross_offset
-        ped_y = ego_ry[2] + distance_meters_to_surface(np.random.uniform(-1.0, 1.6))
+        ped_y = ego_ry[2] + distance_meters_to_surface(float(np_rng.uniform(-1.0, 1.6)))
 
         ped_rx = np.linspace(ped_start_x, ped_end_x, 8)
         ped_ry = np.ones_like(ped_rx) * ped_y
@@ -76,6 +79,7 @@ class JaywalkScenario(Scenario):
             routeY=ped_ry,
             behavior=behavior,
             target_speed=pedestrian_speed,
+            np_rng=np_rng,
         )
 
         # --- Collect actors ---
@@ -86,12 +90,12 @@ class JaywalkScenario(Scenario):
         # --- Level 4: Add rear vehicle to increase challenge
         # ==========================================================
         if level >= 4:
-            rear_gap_m = kwargs.get("rear_gap", np.random.uniform(3.0, 6.0))
+            rear_gap_m = kwargs.get("rear_gap", float(np_rng.uniform(3.0, 6.0)))
             rear_rx = [ped_x_base] * 6
             rear_ry_start = ego_ry[0] + distance_meters_to_surface(rear_gap_m)
             rear_ry = [rear_ry_start - i * rear_step for i in range(6)]
             rear_speed = kwargs.get(
-                "rear_speed", max(ego_speed - np.random.uniform(1.0, 3.0), 4.0)
+                "rear_speed", max(ego_speed - float(np_rng.uniform(1.0, 3.0)), 4.0)
             )
 
             rear_vehicle = Vehicle(
@@ -100,6 +104,7 @@ class JaywalkScenario(Scenario):
                 routeY=rear_ry,
                 target_speed=rear_speed,
                 behavior=None,
+                np_rng=np_rng,
             )
             vehicles.append(rear_vehicle)
 

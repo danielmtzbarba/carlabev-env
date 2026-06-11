@@ -57,6 +57,7 @@ class BaseAgent(Controller, Hero):
         initial_speed=0.0,
         color=None,
         car_size=32,
+        np_rng=None,
     ):
         Controller.__init__(self, target_speed=target_speed)
         Hero.__init__(self, window_size, color, car_size)
@@ -79,7 +80,7 @@ class BaseAgent(Controller, Hero):
         }
         self._setup()
 
-        self.set_route(xs, ys, initial_speed)
+        self.set_route(xs, ys, initial_speed, np_rng=np_rng)
         
         # Initial control step to set target_idx
         _, self.target_idx = self.stanley_control()

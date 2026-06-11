@@ -73,6 +73,22 @@ class SceneGenerator:
         }
         self.last_scene_context = {}
 
+    @staticmethod
+    def _sample_route_profile(route_rng, route_profile_mix):
+        if not route_profile_mix:
+            return None
+        labels = list(route_profile_mix.keys())
+        weights = [float(route_profile_mix[label]) for label in labels]
+        if any(weight < 0.0 for weight in weights):
+            raise ValueError(f"route_profile_mix must use non-negative weights: {route_profile_mix}")
+        if sum(weights) <= 0.0:
+            raise ValueError(f"route_profile_mix must contain at least one positive weight: {route_profile_mix}")
+        if route_rng is None:
+            import random
+
+            return random.choices(labels, weights=weights, k=1)[0]
+        return route_rng.choices(labels, weights=weights, k=1)[0]
+
     def build_scene(self, options, *, rng_bundle=None):
         self.last_scene_context = {}
         scene = options.get("scene", "rdm")
@@ -81,6 +97,12 @@ class SceneGenerator:
         num_vehicles = options.get("num_vehicles", self.cfg.get("max_vehicles", 25))
         dist_range = options.get("route_dist_range", self.cfg.get("route_dist_range", [30, 100]))
         ego_target_speed = options.get("ego_target_speed")
+        route_profile = options.get("route_profile")
+        route_profile_mix = options.get("route_profile_mix")
+        min_turns = options.get("min_turns")
+        max_turns = options.get("max_turns")
+        intersection_required = options.get("intersection_required")
+        max_route_attempts = options.get("max_route_attempts")
 
         if isinstance(scene, str) and scene.endswith(".json") and os.path.exists(scene):
             config_file = scene
@@ -128,6 +150,12 @@ class SceneGenerator:
                 dist_range,
                 traffic_enabled=traffic_enabled,
                 ego_target_speed=ego_target_speed,
+                route_profile=route_profile,
+                route_profile_mix=route_profile_mix,
+                min_turns=min_turns,
+                max_turns=max_turns,
+                intersection_required=intersection_required,
+                max_retries=20 if max_route_attempts is None else int(max_route_attempts),
                 route_rng=None if rng_bundle is None else rng_bundle.route_rng,
                 traffic_rng=None if rng_bundle is None else rng_bundle.traffic_rng,
                 traffic_np_rng=None if rng_bundle is None else rng_bundle.traffic_np_rng,
@@ -167,6 +195,11 @@ class SceneGenerator:
         max_retries=20,
         traffic_enabled=None,
         ego_target_speed=None,
+        route_profile=None,
+        route_profile_mix=None,
+        min_turns=None,
+        max_turns=None,
+        intersection_required=None,
         route_rng=None,
         traffic_rng=None,
         traffic_np_rng=None,
@@ -186,6 +219,20 @@ class SceneGenerator:
             "scenario_param_num_vehicles": int(num_cars),
             "scenario_param_route_dist_range": list(dist_range),
         }
+        selected_route_profile = route_profile
+        if route_profile_mix:
+            selected_route_profile = self._sample_route_profile(route_rng, route_profile_mix)
+            self.last_scene_context["scenario_param_route_profile_mix"] = dict(route_profile_mix)
+        if selected_route_profile is not None:
+            self.last_scene_context["scenario_param_requested_route_profile"] = selected_route_profile
+        if min_turns is not None:
+            self.last_scene_context["scenario_param_min_turns"] = int(min_turns)
+        if max_turns is not None:
+            self.last_scene_context["scenario_param_max_turns"] = int(max_turns)
+        if intersection_required is not None:
+            self.last_scene_context["scenario_param_intersection_required"] = bool(intersection_required)
+        if max_retries is not None:
+            self.last_scene_context["scenario_param_max_route_attempts"] = int(max_retries)
 
         actors = {
             "agent": None,
@@ -196,21 +243,39 @@ class SceneGenerator:
         }
 
         # 1️⃣ Agent route
+        selected_route_metrics = None
         for attempt in range(max_retries):
-            _, path, len_route = find_route_in_range(
+            _, path, len_route, route_metrics = find_route_in_range(
                 self.planners.all,
                 "agent",
                 "R",
                 dist_range[0],
                 dist_range[1],
                 rng=route_rng,
+                route_profile=selected_route_profile,
+                min_turns=min_turns,
+                max_turns=max_turns,
+                intersection_required=intersection_required,
             )
             if path is not None and len(path[0]) > 1:
                 actors["agent"] = (path[0], path[1], 0.0, ego_target_speed)
+                selected_route_metrics = route_metrics
                 break
         if actors["agent"] is None:
             raise RuntimeError(
                 f"Failed to generate a valid ego route in range {dist_range} after {max_retries} attempts."
+            )
+        if selected_route_metrics is not None:
+            self.last_scene_context.update(
+                {
+                    "route_profile": selected_route_metrics["route_profile"],
+                    "route_turn_count": int(selected_route_metrics["turn_count"]),
+                    "route_intersection_like": bool(selected_route_metrics["intersection_like"]),
+                    "route_length_m": float(len_route),
+                    "route_left_turn_fraction": float(selected_route_metrics["left_turn_fraction"]),
+                    "route_right_turn_fraction": float(selected_route_metrics["right_turn_fraction"]),
+                    "route_straight_fraction": float(selected_route_metrics["straight_fraction"]),
+                }
             )
 
         # 2️⃣ Background vehicles

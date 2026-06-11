@@ -18,6 +18,12 @@ class RandomNavigationReset(BaseModel):
     difficulty_id: str | None = None
     num_vehicles: int = 25
     route_dist_range: tuple[int, int] = (30, 130)
+    route_profile: str | None = None
+    route_profile_mix: dict[str, float] | None = None
+    min_turns: int | None = None
+    max_turns: int | None = None
+    intersection_required: bool | None = None
+    max_route_attempts: int | None = None
     scene_seed: int | None = None
     route_seed: int | None = None
     traffic_seed: int | None = None
@@ -73,6 +79,18 @@ def build_random_navigation_options(
         "num_vehicles": int(request.num_vehicles),
         "route_dist_range": list(request.route_dist_range),
     }
+    if request.route_profile is not None:
+        options["route_profile"] = request.route_profile
+    if request.route_profile_mix is not None:
+        options["route_profile_mix"] = dict(request.route_profile_mix)
+    if request.min_turns is not None:
+        options["min_turns"] = int(request.min_turns)
+    if request.max_turns is not None:
+        options["max_turns"] = int(request.max_turns)
+    if request.intersection_required is not None:
+        options["intersection_required"] = bool(request.intersection_required)
+    if request.max_route_attempts is not None:
+        options["max_route_attempts"] = int(request.max_route_attempts)
     if request.scene_seed is not None:
         options["scene_seed"] = int(request.scene_seed)
     if request.route_seed is not None:

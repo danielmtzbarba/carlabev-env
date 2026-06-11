@@ -5,6 +5,10 @@ from CarlaBEV.envs.geometry import (
     route_length_meters,
     surface_to_raw,
 )
+from CarlaBEV.src.control.route_profile import (
+    compute_route_profile_metrics,
+    matches_route_profile,
+)
 from CarlaBEV.src.gui.settings import Settings as cfg
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.scenes.target import Target
@@ -120,6 +124,10 @@ def find_route_in_range(
     max_dist_meters=50.0,
     max_attempts=100,
     rng=None,
+    route_profile=None,
+    min_turns=None,
+    max_turns=None,
+    intersection_required=None,
 ):
     """
     Create a route for `actor` within a valid distance range.
@@ -172,13 +180,22 @@ def find_route_in_range(
 
         # Check if route is within the range
         if min_dist_meters <= total_dist_meters <= max_dist_meters:
+            route_metrics = compute_route_profile_metrics(rx, ry)
+            if not matches_route_profile(
+                route_metrics,
+                route_profile=route_profile,
+                min_turns=min_turns,
+                max_turns=max_turns,
+                intersection_required=intersection_required,
+            ):
+                continue
             # Assign route to actor
             actor = Vehicle(start_node=start_node, end_node=end_node, map_size=128)
-            return actor, (rx, ry), total_dist_meters
+            return actor, (rx, ry), total_dist_meters, route_metrics
 
     # Fallback: no route within range
     #    print(f"[WARN] No valid route found within {min_dist_meters}-{max_dist_meters}m after {max_attempts} attempts.")
-    return None, None, None
+    return None, None, None, None
 
 
 def compute_total_dist_px(path, scale=1):

@@ -26,6 +26,9 @@ class PlannerManager:
         # --- Load all graph planners ---
         self.graphs = {
             "pedestrian": GraphPlanner(os.path.join(base_path, f"{planner_prefix}.pkl")),
+            "vehicle-full": GraphPlanner(
+                os.path.join(base_path, f"{planner_prefix}-vehicles-100.pkl")
+            ),
             "vehicle": GraphPlanner(
                 os.path.join(base_path, f"{planner_prefix}-vehicles-2lanes-100.pkl")
             ),
@@ -103,6 +106,7 @@ class SceneGenerator:
         max_turns = options.get("max_turns")
         intersection_required = options.get("intersection_required")
         max_route_attempts = options.get("max_route_attempts")
+        ego_route_graph = options.get("ego_route_graph", "full_vehicle")
 
         if isinstance(scene, str) and scene.endswith(".json") and os.path.exists(scene):
             config_file = scene
@@ -156,6 +160,7 @@ class SceneGenerator:
                 max_turns=max_turns,
                 intersection_required=intersection_required,
                 max_retries=20 if max_route_attempts is None else int(max_route_attempts),
+                ego_route_graph=ego_route_graph,
                 route_rng=None if rng_bundle is None else rng_bundle.route_rng,
                 traffic_rng=None if rng_bundle is None else rng_bundle.traffic_rng,
                 traffic_np_rng=None if rng_bundle is None else rng_bundle.traffic_np_rng,
@@ -203,6 +208,7 @@ class SceneGenerator:
         route_rng=None,
         traffic_rng=None,
         traffic_np_rng=None,
+        ego_route_graph="full_vehicle",
     ):
         """
         Generates a randomized traffic scene with configurable curriculum.
@@ -218,6 +224,7 @@ class SceneGenerator:
             "scene": "rdm",
             "scenario_param_num_vehicles": int(num_cars),
             "scenario_param_route_dist_range": list(dist_range),
+            "scenario_param_ego_route_graph": str(ego_route_graph),
         }
         selected_route_profile = route_profile
         if route_profile_mix:
@@ -244,11 +251,28 @@ class SceneGenerator:
 
         # 1️⃣ Agent route
         selected_route_metrics = None
+        if ego_route_graph == "full_vehicle":
+            ego_planner_key = "vehicle-full"
+            ego_node_cls = "vehicle"
+            ego_lane = "vehicle"
+        elif ego_route_graph == "right_lane":
+            ego_planner_key = "vehicle-R"
+            ego_node_cls = "R"
+            ego_lane = "R"
+        elif ego_route_graph == "left_lane":
+            ego_planner_key = "vehicle-L"
+            ego_node_cls = "L"
+            ego_lane = "L"
+        else:
+            raise ValueError(
+                f"Unsupported ego_route_graph={ego_route_graph!r}. "
+                "Expected one of: full_vehicle, right_lane, left_lane."
+            )
         for attempt in range(max_retries):
             _, path, len_route, route_metrics = find_route_in_range(
                 self.planners.all,
                 "agent",
-                "R",
+                ego_lane,
                 dist_range[0],
                 dist_range[1],
                 rng=route_rng,
@@ -256,6 +280,8 @@ class SceneGenerator:
                 min_turns=min_turns,
                 max_turns=max_turns,
                 intersection_required=intersection_required,
+                planner_key=ego_planner_key,
+                node_cls=ego_node_cls,
             )
             if path is not None and len(path[0]) > 1:
                 actors["agent"] = (path[0], path[1], 0.0, ego_target_speed)

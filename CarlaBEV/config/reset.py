@@ -18,6 +18,7 @@ class RandomNavigationReset(BaseModel):
     difficulty_id: str | None = None
     num_vehicles: int = 25
     route_dist_range: tuple[int, int] = (30, 130)
+    ego_route_graph: str = "full_vehicle"
     route_profile: str | None = None
     route_profile_mix: dict[str, float] | None = None
     min_turns: int | None = None
@@ -78,6 +79,7 @@ def build_random_navigation_options(
         "scene": "rdm",
         "num_vehicles": int(request.num_vehicles),
         "route_dist_range": list(request.route_dist_range),
+        "ego_route_graph": request.ego_route_graph,
     }
     if request.route_profile is not None:
         options["route_profile"] = request.route_profile

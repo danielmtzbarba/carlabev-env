@@ -19,6 +19,7 @@ def test_build_random_navigation_options_includes_route_profile_controls():
 
     options = build_random_navigation_options(request)
 
+    assert options["ego_route_graph"] == "full_vehicle"
     assert options["route_profile"] == "single_left"
     assert options["route_profile_mix"] == {
         "mostly_straight": 0.5,

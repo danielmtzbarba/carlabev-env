@@ -79,6 +79,12 @@ def get_random_node(planner, actor_type, lane, *, rng=None):
     return Node(rdm_node_id, pos, lane)
 
 
+def get_random_node_from_planner(planner, node_cls, *, rng=None):
+    rdm_node_id = planner.get_random_node(node_cls, rng=rng)
+    pos = planner.get_node_pos_surface(rdm_node_id)
+    return Node(rdm_node_id, pos, node_cls)
+
+
 def find_route(planner, actor, lane):
     planner_id = "pedestrian" if actor.id == "pedestrian" else f"vehicle-{lane}"
     planner = planner[planner_id]
@@ -128,6 +134,8 @@ def find_route_in_range(
     min_turns=None,
     max_turns=None,
     intersection_required=None,
+    planner_key=None,
+    node_cls=None,
 ):
     """
     Create a route for `actor` within a valid distance range.
@@ -145,16 +153,21 @@ def find_route_in_range(
         actor: with updated route assigned via actor.set_route_wp(...)
         (rx, ry): list of float BEV coords of the route
     """
-    planner_id = "pedestrian" if actor_type == "pedestrian" else f"vehicle-{lane}"
+    planner_id = planner_key or ("pedestrian" if actor_type == "pedestrian" else f"vehicle-{lane}")
     lane_planner = planner[planner_id]
+    sampled_node_cls = node_cls or lane
 
     start_node = None
     end_node = None
 
     for attempt in range(max_attempts):
         # Sample random nodes as start/end of route
-        start_node = get_random_node(planner, actor_type, lane, rng=rng)
-        end_node = get_random_node(planner, actor_type, lane, rng=rng)
+        if planner_key is None and node_cls is None:
+            start_node = get_random_node(planner, actor_type, lane, rng=rng)
+            end_node = get_random_node(planner, actor_type, lane, rng=rng)
+        else:
+            start_node = get_random_node_from_planner(lane_planner, sampled_node_cls, rng=rng)
+            end_node = get_random_node_from_planner(lane_planner, sampled_node_cls, rng=rng)
 
         # Skip if identical nodes
         if start_node.id == end_node.id:

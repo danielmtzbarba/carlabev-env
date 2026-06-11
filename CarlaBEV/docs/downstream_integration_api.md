@@ -240,6 +240,13 @@ class RandomNavigationReset:
     difficulty_id: str | None = None
     num_vehicles: int = 25
     route_dist_range: tuple[int, int] = (30, 130)
+    ego_route_graph: str = "full_vehicle"
+    route_profile: str | None = None
+    route_profile_mix: dict[str, float] | None = None
+    min_turns: int | None = None
+    max_turns: int | None = None
+    intersection_required: bool | None = None
+    max_route_attempts: int | None = None
     scene_seed: int | None = None
     route_seed: int | None = None
     traffic_seed: int | None = None
@@ -253,12 +260,29 @@ Maps to:
     "scene": "rdm",
     "num_vehicles": ...,
     "route_dist_range": [...],
+    "ego_route_graph": ...,
+    "route_profile": ...,
+    "route_profile_mix": ...,
+    "min_turns": ...,
+    "max_turns": ...,
+    "intersection_required": ...,
+    "max_route_attempts": ...,
     "scene_seed": ...,
     "route_seed": ...,
     "traffic_seed": ...,
     "scenario_seed": ...,
 }
 ```
+
+Planner note:
+
+- `ego_route_graph="full_vehicle"` is the current default because it preserves
+  connected intersection traversal and restores turning-route diversity
+- the legacy `right_lane` and `left_lane` lane graphs currently over-collapse
+  to straight corridors because their intersection nodes are disconnected
+- `full_vehicle` is still an undirected graph, so downstream users should treat
+  it as a diversity-preserving fallback rather than a guaranteed lane-legal
+  traffic-direction planner
 
 ### `ScenarioPresetReset`
 

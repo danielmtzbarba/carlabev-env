@@ -193,6 +193,11 @@ Important environment options include:
 - `max_vehicles`
 - `route_direction_metrics_enabled`: attach one-time smoothed-route fractions
   (`straight_fraction`, `left_turn_fraction`, `right_turn_fraction`) to reset info
+- `RandomNavigationReset.ego_route_graph`: choose the planner asset used for ego
+  route sampling. `full_vehicle` is now the default because it preserves
+  intersection connectivity and route diversity. `right_lane` and `left_lane`
+  remain available for diagnostics, but their current graph assets collapse
+  heavily toward straight routes.
 - `capture_video`: enable wrapper-based RGB video recording
 - `video_output_dir`: explicit video artifact directory for the current run
 - `video_episode_indices`: optional explicit episode ids to record
@@ -207,6 +212,14 @@ Reward and collision/off-road logic do not read `semantic_mask_ch` directly.
 They use semantic tile classes sampled from the authoritative map under the ego,
 so changing the semantic observation layout changes the NN input contract, not
 the reward contract.
+
+Current planner caveat:
+
+- `full_vehicle` uses the connected vehicle graph and restores turning routes
+- that graph is currently undirected, so it should be treated as a connectivity
+  fallback and comparison tool rather than a final lane-legal planner
+- the long-term fix is a connected directed lane graph with valid
+  intersection-turn transitions
 
 ## Comfort Signals
 

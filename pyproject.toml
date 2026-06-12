@@ -2,19 +2,37 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build]
+artifacts = [
+  "CarlaBEV/assets/**/*.json",
+  "CarlaBEV/assets/**/*.png",
+  "CarlaBEV/assets/**/*.pkl",
+  "CarlaBEV/docs/**/*.md",
+  "CarlaBEV/internal/**/*.md",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["CarlaBEV"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/CarlaBEV",
+  "/README.md",
+  "/tests",
+  "/pyproject.toml",
+]
 
 [project]
 name = "CarlaBEV"
 version = "0.1.0"
-requires-python = ">=3.12" 
+description = "Bird's-eye-view Gymnasium simulator for autonomous-driving RL research"
+readme = "README.md"
+requires-python = ">=3.12"
 dependencies = [
   "gymnasium",
   "pygame>=2.1.3",
   "numpy",
   "pandas",
-  "pre-commit",
   "tyro",
   "pillow",
   "scipy",
@@ -24,6 +42,11 @@ dependencies = [
   "matplotlib",
   "pydantic>=2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/danielmtzbarba/carlabev-env"
+Repository = "https://github.com/danielmtzbarba/carlabev-env"
+Issues = "https://github.com/danielmtzbarba/carlabev-env/issues"
 
 [dependency-groups]
 dev = [

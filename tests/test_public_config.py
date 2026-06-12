@@ -1,4 +1,5 @@
 import unittest
+from importlib.resources import files
 
 import numpy as np
 from pydantic import ValidationError
@@ -24,10 +25,18 @@ from CarlaBEV.config import (
     validate_run_config,
 )
 from CarlaBEV.envs import make_env
+from CarlaBEV import __version__
 from CarlaBEV.tools.debug.cfg import ArgsCarlaBEV, EnvConfig as LegacyEnvConfig, LoggerConfig
 
 
 class PublicConfigContractTests(unittest.TestCase):
+    def test_package_exposes_version_and_runtime_assets(self):
+        package_root = files("CarlaBEV")
+
+        self.assertEqual(__version__, "0.1.0")
+        self.assertTrue((package_root / "assets" / "Town01" / "Town01-128-rgb.png").is_file())
+        self.assertTrue((package_root / "assets" / "scenes" / "jaywalk-01.01.json").is_file())
+
     def test_validate_env_config_normalizes_legacy_fields(self):
         cfg = validate_env_config(
             {

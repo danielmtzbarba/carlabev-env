@@ -18,7 +18,6 @@ from CarlaBEV.wrappers.rgb_to_semantic import (
     fuse_vehicle_temporal_channels,
     fuse_weighted_vehicle_history,
     rgb_to_semantic_mask,
-    semantic_mask_channels,
     stacked_semantic_channel_labels,
     vehicle_temporal_channel_labels,
     weighted_vehicle_history_channel_labels,

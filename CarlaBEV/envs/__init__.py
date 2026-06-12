@@ -22,6 +22,21 @@ def _get_cfg_attr(cfg, key, default):
     return getattr(cfg, key, default)
 
 
+def _build_episode_trigger(*, episode_indices, every):
+    if episode_indices:
+        selected = {int(value) for value in episode_indices}
+
+        def episode_trigger(episode_id):
+            return episode_id in selected
+
+        return episode_trigger
+
+    def episode_trigger(episode_id):
+        return episode_id % every == 0
+
+    return episode_trigger
+
+
 def wrap_env(cfg, env, capture=False, eval=False):
     env_cfg = _get_env_cfg(cfg)
     if capture:
@@ -30,12 +45,11 @@ def wrap_env(cfg, env, capture=False, eval=False):
             base_dir = f"videos/{_get_cfg_attr(cfg, 'exp_name', 'carlabev-run')}"
             base_dir = f"{base_dir}/eval" if eval else base_dir
         episode_indices = _get_cfg_attr(cfg, "video_episode_indices", None)
-        if episode_indices:
-            selected = {int(value) for value in episode_indices}
-            episode_trigger = lambda episode_id: episode_id in selected
-        else:
-            every = 50 if eval else _get_cfg_attr(cfg, "capture_every", 50)
-            episode_trigger = lambda episode_id: episode_id % every == 0
+        every = 50 if eval else _get_cfg_attr(cfg, "capture_every", 50)
+        episode_trigger = _build_episode_trigger(
+            episode_indices=episode_indices,
+            every=every,
+        )
 
         env = gym.wrappers.RecordVideo(
             env,

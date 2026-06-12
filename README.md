@@ -111,6 +111,19 @@ cd carlabev-env
 uv sync
 ```
 
+If you want to consume a tagged release from another project instead of a local
+editable checkout, install from GitHub by tag:
+
+```bash
+uv add "CarlaBEV @ git+https://github.com/danielmtzbarba/carlabev-env.git@v0.1.0"
+```
+
+Once PyPI publishing is enabled, downstream projects will also be able to use:
+
+```bash
+uv add CarlaBEV
+```
+
 ## Running The Simulator
 
 ### Debug Viewer
@@ -154,6 +167,26 @@ Hook behavior:
 - `pre-push`: `ruff --fix` and `ruff-format`
 - `pre-push`: `uv run pytest`
 - `pre-push`: `uv run python CarlaBEV/tools/validate_simulator_semantics.py`
+
+## Release Workflow
+
+This repository is set up to publish package releases from Git tags.
+
+Typical release flow:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The GitHub Actions workflows will:
+
+- run tests and build validation on pushes and pull requests
+- build an sdist and wheel on version tags
+- publish the package to PyPI when the publish workflow is authorized
+
+Before the first publish, configure PyPI trusted publishing for this repository
+or add a `PYPI_API_TOKEN` secret if you prefer token-based publishing.
 
 ## Configuration
 

@@ -1,8 +1,6 @@
 import math
 import unittest
 
-import numpy as np
-
 from CarlaBEV.config import EnvConfig, RandomNavigationReset, build_random_navigation_options
 from CarlaBEV.envs.carlabev import CarlaBEV
 

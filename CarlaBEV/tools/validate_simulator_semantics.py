@@ -26,6 +26,11 @@ from CarlaBEV.src.actors.hero import ContinuousAgent
 from CarlaBEV.src.managers.actor_manager import ActorManager
 from CarlaBEV.src.control.stanley_controller import Controller
 from CarlaBEV.src.deeprl.carl_reward_fn import CaRLRewardFn
+from CarlaBEV.src.planning.town01_canonical_graph import (
+    build_town01_canonical_vehicle_graph,
+    summarize_canonical_graph,
+    validate_town01_canonical_vehicle_graph,
+)
 from CarlaBEV.wrappers.rgb_to_semantic import semantic_mask_channels
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -477,6 +482,29 @@ def check_scenario_spawn_validity() -> CheckResult:
     )
 
 
+def check_town01_canonical_graph() -> CheckResult:
+    graph = build_town01_canonical_vehicle_graph()
+    problems = validate_town01_canonical_vehicle_graph(graph)
+    summary = summarize_canonical_graph(graph)
+
+    if problems:
+        return fail_result(
+            "town01_canonical_graph",
+            f"Canonical graph validation failed: {problems}",
+        )
+
+    return pass_result(
+        "town01_canonical_graph",
+        (
+            "Canonical Town01 graph is structurally valid. "
+            f"nodes={summary.node_count}, edges={summary.edge_count}, "
+            f"weak_components={summary.weak_component_count}, "
+            f"junctions={summary.junction_count}, "
+            f"junction_connectors={summary.junction_connector_count}"
+        ),
+    )
+
+
 def main() -> int:
     checks = [
         run_check("bicycle_yaw_update", check_bicycle_yaw_update),
@@ -497,6 +525,7 @@ def main() -> int:
         run_check("fov_anchor_stability", check_fov_anchor_stability),
         run_check("geometry_roundtrip", check_geometry_roundtrip),
         run_check("scenario_spawn_validity", check_scenario_spawn_validity),
+        run_check("town01_canonical_graph", check_town01_canonical_graph),
     ]
 
     width = max(len(result.name) for result in checks)

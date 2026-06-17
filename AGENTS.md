@@ -70,13 +70,22 @@ If you are debugging a behavior or reward issue, stay on that path first before 
 ### Tooling / editor / support
 
 - `CarlaBEV/tools/debug_env.py`
-  Best manual smoke test.
+  Best manual smoke test. It now resets through the random scene generator, so
+  it is a good end-to-end check for ego routing plus random traffic.
 
 - `CarlaBEV/tools/debug_authored_scenes.py`
   Debug loop for authored JSON scene files.
 
 - `CarlaBEV/tools/validate_simulator_semantics.py`
   Most useful verification script in the repo.
+
+- `CarlaBEV/tools/visualize_town01_canonical_graph.py`
+  Best graph-inspection entrypoint when route connectivity or lane flow is in
+  question.
+
+- `CarlaBEV/tools/analyze_ego_route_distribution.py`
+  Summarizes straight/left/right route composition over many random ego
+  episodes.
 
 - `CarlaBEV/tools/scene_designer.py`
   Large PyGame scene-authoring GUI. Useful, but not part of the minimal runtime path.
@@ -109,6 +118,8 @@ The validation script passed cleanly during analysis.
 - Start in `CarlaBEV/src/managers/scene_generator.py`
 - Then inspect `CarlaBEV/src/scenes/scenarios/`
 - Then inspect `CarlaBEV/src/scenes/scenarios/specs.py`
+- Then read `CarlaBEV/docs/route_generation_and_planning.md` if the change
+  touches ego routing, route constraints, or canonical graph usage
 
 ### If changing actor motion
 
@@ -128,6 +139,7 @@ The validation script passed cleanly during analysis.
 - `CarlaBEV/envs/utils.py`
 - `CarlaBEV/docs/coordinate_conventions.md`
 - `CarlaBEV/docs/geometry_and_metric_frame.md`
+- `CarlaBEV/docs/route_generation_and_planning.md`
 
 ## Important Contracts
 
@@ -151,6 +163,7 @@ If your change touches one of those areas, state the assumption explicitly in yo
 ## Working Rules For Agents
 
 - Prefer reading `CarlaBEV/docs/` before modifying geometry, control, or scenario semantics.
+- If the work touches Town01 planning or route diversity, read `CarlaBEV/docs/route_generation_and_planning.md` and `CarlaBEV/docs/debugging_and_diagnostics.md` first.
 - Preserve the distinction between scenario-level meters/seconds and runtime surface units.
 - When changing reset/scene logic, rerun `validate_simulator_semantics.py`.
 - When changing authored-scene or GUI behavior, also test with `debug_authored_scenes.py` or `scene_designer.py`.

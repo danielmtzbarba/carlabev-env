@@ -22,22 +22,19 @@ class PlannerManager:
         self.town_name = town_name
         base_path = os.path.join(asset_path, town_name)
         planner_prefix = town_name.lower()
+        canonical_vehicle_path = os.path.join(base_path, f"{planner_prefix}-canonical-vehicle.pkl")
+        canonical_vehicle_planner = GraphPlanner(canonical_vehicle_path)
 
         # --- Load all graph planners ---
         self.graphs = {
             "pedestrian": GraphPlanner(os.path.join(base_path, f"{planner_prefix}.pkl")),
-            "vehicle-full": GraphPlanner(
-                os.path.join(base_path, f"{planner_prefix}-vehicles-100.pkl")
-            ),
-            "vehicle": GraphPlanner(
-                os.path.join(base_path, f"{planner_prefix}-vehicles-2lanes-100.pkl")
-            ),
-            "vehicle-R": GraphPlanner(
-                os.path.join(base_path, f"{planner_prefix}-vehicles-right-100.pkl")
-            ),
-            "vehicle-L": GraphPlanner(
-                os.path.join(base_path, f"{planner_prefix}-vehicles-left-100.pkl")
-            ),
+            "vehicle-full": canonical_vehicle_planner,
+            "vehicle": canonical_vehicle_planner,
+            "vehicle-R": canonical_vehicle_planner,
+            "vehicle-L": canonical_vehicle_planner,
+            "vehicle-canonical": canonical_vehicle_planner,
+            "vehicle-flow-a": canonical_vehicle_planner,
+            "vehicle-flow-b": canonical_vehicle_planner,
         }
 
     def get(self, key: str):
@@ -251,23 +248,7 @@ class SceneGenerator:
 
         # 1️⃣ Agent route
         selected_route_metrics = None
-        if ego_route_graph == "full_vehicle":
-            ego_planner_key = "vehicle-full"
-            ego_node_cls = "vehicle"
-            ego_lane = "vehicle"
-        elif ego_route_graph == "right_lane":
-            ego_planner_key = "vehicle-R"
-            ego_node_cls = "R"
-            ego_lane = "R"
-        elif ego_route_graph == "left_lane":
-            ego_planner_key = "vehicle-L"
-            ego_node_cls = "L"
-            ego_lane = "L"
-        else:
-            raise ValueError(
-                f"Unsupported ego_route_graph={ego_route_graph!r}. "
-                "Expected one of: full_vehicle, right_lane, left_lane."
-            )
+        ego_planner_key, ego_node_cls, ego_lane = self._resolve_ego_route_graph(ego_route_graph)
         for attempt in range(max_retries):
             _, path, len_route, route_metrics = find_route_in_range(
                 self.planners.all,
@@ -282,6 +263,7 @@ class SceneGenerator:
                 intersection_required=intersection_required,
                 planner_key=ego_planner_key,
                 node_cls=ego_node_cls,
+                turn_metric_mode="semantic",
             )
             if path is not None and len(path[0]) > 1:
                 actors["agent"] = (path[0], path[1], 0.0, ego_target_speed)
@@ -325,6 +307,27 @@ class SceneGenerator:
 
         # (Optional future) pedestrians, traffic lights, etc.
         return actors, len_route
+
+    @staticmethod
+    def _resolve_ego_route_graph(ego_route_graph):
+        aliases = {
+            "full_vehicle": ("vehicle-canonical", "vehicle", "vehicle"),
+            "canonical": ("vehicle-canonical", "vehicle", "vehicle"),
+            "vehicle-canonical": ("vehicle-canonical", "vehicle", "vehicle"),
+            "right_lane": ("vehicle-flow-b", "R", "R"),
+            "flow_b": ("vehicle-flow-b", "R", "R"),
+            "vehicle-flow-b": ("vehicle-flow-b", "R", "R"),
+            "left_lane": ("vehicle-flow-a", "L", "L"),
+            "flow_a": ("vehicle-flow-a", "L", "L"),
+            "vehicle-flow-a": ("vehicle-flow-a", "L", "L"),
+        }
+        try:
+            return aliases[str(ego_route_graph)]
+        except KeyError as exc:
+            raise ValueError(
+                f"Unsupported ego_route_graph={ego_route_graph!r}. "
+                "Expected one of: full_vehicle, canonical, right_lane, left_lane, flow_a, flow_b."
+            ) from exc
 
 
 def get_actor(actor_type, lane, planners, *, rng=None, np_rng=None):

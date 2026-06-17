@@ -276,13 +276,13 @@ Maps to:
 
 Planner note:
 
-- `ego_route_graph="full_vehicle"` is the current default because it preserves
-  connected intersection traversal and restores turning-route diversity
-- the legacy `right_lane` and `left_lane` lane graphs currently over-collapse
-  to straight corridors because their intersection nodes are disconnected
-- `full_vehicle` is still an undirected graph, so downstream users should treat
-  it as a diversity-preserving fallback rather than a guaranteed lane-legal
-  traffic-direction planner
+- `ego_route_graph="full_vehicle"` remains the compatibility default
+- `full_vehicle` now resolves to the canonical Town01 directed vehicle graph
+- `canonical` is the clearer preferred alias for new integrations
+- `left_lane` and `right_lane` remain supported as filtered views over the same
+  canonical graph
+- ego route constraints such as `min_turns` are evaluated against traversed
+  semantic junction connectors when the canonical graph is used
 
 ### `ScenarioPresetReset`
 

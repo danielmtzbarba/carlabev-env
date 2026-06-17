@@ -10,6 +10,27 @@ class MapGraph(object):
         self._load_graph(graph)
         self.get_lane_nodes()
 
+    @staticmethod
+    def _node_pos(data):
+        if "pos_raw" in data:
+            return np.array(data["pos_raw"], dtype=np.float32)
+        return np.array(data["pos"], dtype=np.float32)
+
+    @staticmethod
+    def _node_lane(data):
+        lane = data.get("legacy_lane")
+        if lane in {"L", "R"}:
+            return lane
+        lane = data.get("lane")
+        if lane in {"L", "R"}:
+            return lane
+        flow_group = data.get("flow_group")
+        if flow_group == "forward_a":
+            return "L"
+        if flow_group == "forward_b":
+            return "R"
+        return None
+
     def _load_graph(self, graph_path):
         # Load
         if isinstance(graph_path, nx.Graph):
@@ -27,20 +48,22 @@ class MapGraph(object):
             "R": [],
         }
 
-        try:
-            self._nodes["R"] = [n for n in self._G.nodes if "R" in n]
-        except Exception:
-            pass
-
-        try:
-            self._nodes["L"] = [n for n in self._G.nodes if "L" in n]
-        except Exception:
-            pass
-
         for nodeid, data in self._G.nodes(data=True):
             sem_cls = data.get("semantic")
+            node_kind = data.get("node_kind")
+            lane = self._node_lane(data)
+
             if sem_cls:
-                self._nodes[sem_cls].append(nodeid)
+                self._nodes.setdefault(sem_cls, []).append(nodeid)
+
+            if node_kind == "lane":
+                self._nodes["vehicle"].append(nodeid)
+                if lane in {"L", "R"}:
+                    self._nodes[lane].append(nodeid)
+            elif sem_cls == "sidewalk":
+                self._nodes["sidewalk"].append(nodeid)
+            elif node_kind and str(node_kind).startswith("junction"):
+                self._nodes["intersection"].append(nodeid)
 
     def get_random_node(self, node_cls, *, rng=None):
         if rng is None:
@@ -50,7 +73,7 @@ class MapGraph(object):
         return rng.choice(self._nodes[node_cls])
 
     def get_node_pos(self, node_id):
-        return np.array(self._G.nodes[node_id]["pos"], dtype=np.int32)
+        return self._node_pos(self._G.nodes[node_id])
 
     def get_node_pos_surface(self, node_id):
         return raw_to_surface(self.get_node_pos(node_id))
@@ -68,17 +91,17 @@ class MapGraph(object):
         pos_array = np.array(position)
 
         for node, data in self._G.nodes(data=True):
-            if "pos" not in data:
+            if "pos" not in data and "pos_raw" not in data:
                 continue
-            if lane_type is None:
-                node_pos = np.array(data["pos"])
-                dist = np.linalg.norm(pos_array - node_pos)
-            else:
-                if lane_type and data.get("lane") != lane_type:
+            if lane_type is not None:
+                canonical_lane = self._node_lane(data)
+                if lane_type in {"L", "R"} and canonical_lane != lane_type:
+                    continue
+                if lane_type == "vehicle" and data.get("node_kind") != "lane":
                     continue
 
-                node_pos = np.array(data["pos"])
-                dist = np.linalg.norm(pos_array - node_pos)
+            node_pos = self._node_pos(data)
+            dist = np.linalg.norm(pos_array - node_pos)
 
             if dist < min_dist:
                 min_dist = dist

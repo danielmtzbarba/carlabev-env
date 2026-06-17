@@ -72,7 +72,10 @@ Project documentation lives in `CarlaBEV/docs/`:
 - [Control And Actions](CarlaBEV/docs/control_and_actions.md)
 - [Coordinate Conventions](CarlaBEV/docs/coordinate_conventions.md)
 - [Scenario Specifications](CarlaBEV/docs/scenario_specifications.md)
+- [Route Generation And Planning](CarlaBEV/docs/route_generation_and_planning.md)
+- [Debugging And Diagnostics](CarlaBEV/docs/debugging_and_diagnostics.md)
 - [Public Integration API](CarlaBEV/docs/downstream_integration_api.md)
+- [Town01 Canonical Graph Plan](CarlaBEV/docs/town01_canonical_graph_plan.md)
 
 These docs describe the simulator as it exists in the repository today.
 
@@ -134,7 +137,12 @@ The fastest way to inspect the simulator manually is:
 uv run CarlaBEV/tools/debug_env.py
 ```
 
-This launches a `pygame` window and steps the environment with keyboard control.
+This launches a `pygame` window, drives the ego vehicle with keyboard control,
+and now resets through the random traffic generator.
+
+For the full set of debugging and route-diagnostics tools, see:
+
+- [Debugging And Diagnostics](CarlaBEV/docs/debugging_and_diagnostics.md)
 
 ### Validity Checks
 
@@ -201,7 +209,7 @@ from CarlaBEV.config import (
 )
 ```
 
-Important environment options include:
+Common environment options include:
 
 - `map_name`
 - `obs_mode`: `bev_rgb`, `bev_semantic`, or `vector`
@@ -226,33 +234,20 @@ Important environment options include:
 - `max_vehicles`
 - `route_direction_metrics_enabled`: attach one-time smoothed-route fractions
   (`straight_fraction`, `left_turn_fraction`, `right_turn_fraction`) to reset info
-- `RandomNavigationReset.ego_route_graph`: choose the planner asset used for ego
-  route sampling. `full_vehicle` is now the default because it preserves
-  intersection connectivity and route diversity. `right_lane` and `left_lane`
-  remain available for diagnostics, but their current graph assets collapse
-  heavily toward straight routes.
 - `capture_video`: enable wrapper-based RGB video recording
 - `video_output_dir`: explicit video artifact directory for the current run
 - `video_episode_indices`: optional explicit episode ids to record
 - `video_name_prefix`: output filename prefix for recorded videos
 
-Legacy names such as `obs_space`, `masked`, `action_space`, and `reward_type` are accepted for compatibility, but new integrations should use the canonical `*_mode` fields.
+Legacy names such as `obs_space`, `masked`, `action_space`, and `reward_type`
+are accepted for compatibility, but new integrations should use the canonical
+`*_mode` fields.
 
-Semantic observations are produced by wrapper-time decoding of the rendered BEV
-using the shared definitions in `CarlaBEV/semantics.py`.
+Route-generation controls, canonical planner aliases, and ego turn constraints
+are documented in:
 
-Reward and collision/off-road logic do not read `semantic_mask_ch` directly.
-They use semantic tile classes sampled from the authoritative map under the ego,
-so changing the semantic observation layout changes the NN input contract, not
-the reward contract.
-
-Current planner caveat:
-
-- `full_vehicle` uses the connected vehicle graph and restores turning routes
-- that graph is currently undirected, so it should be treated as a connectivity
-  fallback and comparison tool rather than a final lane-legal planner
-- the long-term fix is a connected directed lane graph with valid
-  intersection-turn transitions
+- [Route Generation And Planning](CarlaBEV/docs/route_generation_and_planning.md)
+- [Public Integration API](CarlaBEV/docs/downstream_integration_api.md)
 
 ## Comfort Signals
 

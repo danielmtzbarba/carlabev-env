@@ -1,8 +1,8 @@
 import pygame
 import numpy as np
 import tyro
-import os
 
+from CarlaBEV.config import RandomNavigationReset, build_random_navigation_options
 from CarlaBEV.envs import make_env
 from CarlaBEV.tools.debug.controls import (
     init_key_tracking,
@@ -13,18 +13,11 @@ from CarlaBEV.tools.debug.controls import (
 from CarlaBEV.src.deeprl.logger import create_loggers
 from CarlaBEV.tools.debug.cfg import (
     ArgsCarlaBEV,
-    build_debug_authored_options,
-    build_debug_preset_options,
     to_public_run_config,
 )
 
 
 cfg = tyro.cli(ArgsCarlaBEV)
-DEBUG_PRESET_ID = "jaywalk_debug"
-DEBUG_CONFIG_FILE = os.environ.get("CARLABEV_DEBUG_CONFIG")
-
-
-# Assuming cfg.exp_name and cfg.logging.enabled are defined
 sim_logger = create_loggers(cfg)
 
 
@@ -34,19 +27,21 @@ def get_base_env(env):
     return env
 
 
-def build_debug_reset_options(reset_mask, overrides=None):
-    if DEBUG_CONFIG_FILE:
-        options = build_debug_authored_options(
-            DEBUG_CONFIG_FILE,
-            reset_mask=reset_mask,
-            variation_enabled=False,
-        )
-        if overrides:
-            options.update(overrides)
-        return options
-    return build_debug_preset_options(
-        DEBUG_PRESET_ID, reset_mask=reset_mask, overrides=overrides
+def build_debug_reset_options(reset_mask, *, reset_index=0, overrides=None):
+    seed_base = int(cfg.seed) + int(reset_index) * 1000
+    request = RandomNavigationReset(
+        num_vehicles=cfg.env.max_vehicles,
+        route_dist_range=(30, 130),
+        ego_route_graph="canonical",
+        scene_seed=seed_base,
+        route_seed=seed_base + 1,
+        traffic_seed=seed_base + 2,
+        scenario_seed=seed_base + 3,
     )
+    options = build_random_navigation_options(request, reset_mask=reset_mask)
+    if overrides:
+        options.update(overrides)
+    return options
 
 
 def main(size: int = 128):
@@ -63,8 +58,12 @@ def main(size: int = 128):
         },
     )
     print("Observation space:", envs.observation_space)
-    options = build_debug_reset_options(np.array([True], dtype=bool))
+    reset_index = 0
+    options = build_debug_reset_options(np.array([True], dtype=bool), reset_index=reset_index)
     observation, info = envs.reset(options=options)
+    print("[debug-env] reset-options", {k: v for k, v in options.items() if k != "reset_mask"})
+    if info.get("scenario"):
+        print("[debug-env] scenario", info["scenario"])
     spawn_info = info.get("spawn_validation", {})
     if spawn_info and not spawn_info.get("valid", False):
         raise RuntimeError(f"Invalid ego spawn at reset: {spawn_info}")
@@ -126,10 +125,14 @@ def main(size: int = 128):
         for i, ended in enumerate(terminated):
             if ended:
                 sim_logger.log_episode(info["episode_info"], i)
+                reset_index += 1
                 options = build_debug_reset_options(
-                    np.logical_or(terminated, trunks)
+                    np.logical_or(terminated, trunks),
+                    reset_index=reset_index,
                 )
                 observation, info = envs.reset(options=options)
+                if info.get("scenario"):
+                    print("[debug-env] scenario", info["scenario"])
                 spawn_info = info.get("spawn_validation", {})
                 if spawn_info and not spawn_info.get("valid", False):
                     raise RuntimeError(f"Invalid ego spawn during debug reset: {spawn_info}")

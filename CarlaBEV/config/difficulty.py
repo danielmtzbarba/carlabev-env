@@ -117,18 +117,18 @@ TRAFFIC_DENSITY_PRESETS: dict[TrafficDensityId, TrafficDensitySpec] = {
 SPEED_PROFILE_PRESETS: dict[SpeedProfileId, SpeedProfileSpec] = {
     SpeedProfileId.SLOW: SpeedProfileSpec(
         speed_profile=SpeedProfileId.SLOW,
-        ego_target_speed=8.0,
-        vehicle_target_speed=8.0,
+        ego_target_speed=20.0 / 3.6,
+        vehicle_target_speed=20.0 / 3.6,
     ),
     SpeedProfileId.MEDIUM: SpeedProfileSpec(
         speed_profile=SpeedProfileId.MEDIUM,
-        ego_target_speed=10.0,
-        vehicle_target_speed=10.0,
+        ego_target_speed=30.0 / 3.6,
+        vehicle_target_speed=30.0 / 3.6,
     ),
     SpeedProfileId.FAST: SpeedProfileSpec(
         speed_profile=SpeedProfileId.FAST,
-        ego_target_speed=12.0,
-        vehicle_target_speed=12.0,
+        ego_target_speed=40.0 / 3.6,
+        vehicle_target_speed=40.0 / 3.6,
     ),
 }
 

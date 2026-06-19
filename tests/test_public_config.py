@@ -132,8 +132,8 @@ class ResetBuilderTests(unittest.TestCase):
         self.assertFalse(options["traffic_enabled"])
         self.assertEqual(options["route_dist_range"], [30, 80])
         self.assertEqual(options["speed_profile"], "medium")
-        self.assertEqual(options["ego_target_speed"], 10.0)
-        self.assertEqual(options["vehicle_target_speed"], 10.0)
+        self.assertAlmostEqual(options["ego_target_speed"], 30.0 / 3.6)
+        self.assertAlmostEqual(options["vehicle_target_speed"], 30.0 / 3.6)
 
     def test_random_navigation_axis_overrides_take_precedence_over_preset(self):
         options = build_random_navigation_options(
@@ -152,8 +152,8 @@ class ResetBuilderTests(unittest.TestCase):
         self.assertEqual(options["route_dist_range"], [30, 80])
         self.assertEqual(options["num_vehicles"], 0)
         self.assertFalse(options["traffic_enabled"])
-        self.assertEqual(options["ego_target_speed"], 8.0)
-        self.assertEqual(options["vehicle_target_speed"], 8.0)
+        self.assertAlmostEqual(options["ego_target_speed"], 20.0 / 3.6)
+        self.assertAlmostEqual(options["vehicle_target_speed"], 20.0 / 3.6)
 
     def test_random_navigation_difficulty_preset_resolves_runtime_values(self):
         options = build_random_navigation_options(
@@ -166,8 +166,8 @@ class ResetBuilderTests(unittest.TestCase):
         self.assertEqual(options["speed_profile"], "medium")
         self.assertEqual(options["num_vehicles"], 16)
         self.assertEqual(options["route_dist_range"], [40, 100])
-        self.assertEqual(options["ego_target_speed"], 10.0)
-        self.assertEqual(options["vehicle_target_speed"], 10.0)
+        self.assertAlmostEqual(options["ego_target_speed"], 30.0 / 3.6)
+        self.assertAlmostEqual(options["vehicle_target_speed"], 30.0 / 3.6)
 
     def test_random_navigation_options_include_explicit_subseeds(self):
         options = build_random_navigation_options(
@@ -253,7 +253,7 @@ class ProfileRegistryTests(unittest.TestCase):
         self.assertEqual(get_action_profile_spec("discrete9_v1").action_mode, "discrete")
         self.assertEqual(get_route_extent_spec("large").route_dist_range, (50, 130))
         self.assertEqual(get_traffic_density_spec("dense").num_vehicles, 25)
-        self.assertEqual(get_speed_profile_spec("slow").ego_target_speed, 8.0)
+        self.assertAlmostEqual(get_speed_profile_spec("slow").ego_target_speed, 20.0 / 3.6)
         self.assertEqual(get_reward_profile_spec("carl_base_v1").family, "carl")
 
 

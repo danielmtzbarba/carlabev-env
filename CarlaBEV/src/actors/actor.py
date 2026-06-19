@@ -75,6 +75,10 @@ class Actor(pygame.sprite.Sprite):
         self.target_speed_mps = 0.0
         self.cruise_speed = 0.0
         self.cruise_speed_mps = 0.0
+        self.initial_speed = None
+        self.initial_speed_mps = None
+        self.startup_ramp_duration_s = 0.0
+        self._startup_elapsed_s = 0.0
         self.np_rng = np_rng
 
     def set_route_wp(self, node_id, x, y):
@@ -89,17 +93,22 @@ class Actor(pygame.sprite.Sprite):
             self._initial_ry = list(self.ry)
         self.rx = list(self._initial_rx)
         self.ry = list(self._initial_ry)
-        # initialize controller at the authored cruise speed so spawned actors
-        # start with the configured scene speed instead of accelerating from 0
+        if self.initial_speed_mps is None:
+            initial_speed_mps = self.cruise_speed_mps
+        else:
+            initial_speed_mps = min(max(0.0, float(self.initial_speed_mps)), self.cruise_speed_mps)
+        self.initial_speed_mps = initial_speed_mps
+        self.initial_speed = speed_mps_to_surface(initial_speed_mps)
         self.target_speed = self.cruise_speed
         self.target_speed_mps = self.cruise_speed_mps
         self._controller = Controller(self.target_speed)
         self._controller.set_route(
             self.rx,
             self.ry,
-            v0=self.cruise_speed,
+            v0=self.initial_speed,
             np_rng=self.np_rng,
         )
+        self._startup_elapsed_s = 0.0
         self.behavior_state = "idle"
 
         if self.behavior:
@@ -113,9 +122,11 @@ class Actor(pygame.sprite.Sprite):
             self.behavior.apply(self, t, dt)
 
         # --- PROPAGATE TARGET SPEED TO CONTROLLER ---
-        self._controller.set_target_speed(self.target_speed)
+        controller_target_mps = self._startup_capped_target_speed_mps()
+        self._controller.set_target_speed(speed_mps_to_surface(controller_target_mps))
 
         finished = self._controller.control_step()
+        self._startup_elapsed_s += float(dt)
         return finished
 
     def set_target_speed_mps(self, speed_mps):
@@ -133,8 +144,27 @@ class Actor(pygame.sprite.Sprite):
         self.cruise_speed = speed_mps_to_surface(self.cruise_speed_mps)
         self.set_target_speed_mps(self.cruise_speed_mps)
 
+    def set_initial_speed_mps(self, speed_mps):
+        speed_mps = max(0.0, float(speed_mps))
+        self.initial_speed_mps = min(speed_mps, self.cruise_speed_mps)
+        self.initial_speed = speed_mps_to_surface(self.initial_speed_mps)
+
+    def set_startup_ramp_duration(self, duration_s):
+        self.startup_ramp_duration_s = max(0.0, float(duration_s))
+
     def set_behavior_state(self, state_name):
         self.behavior_state = str(state_name)
+
+    def _startup_capped_target_speed_mps(self):
+        target_speed_mps = max(0.0, float(self.target_speed_mps))
+        if self.startup_ramp_duration_s <= 0.0 or self.initial_speed_mps is None:
+            return target_speed_mps
+
+        ramp_progress = min(self._startup_elapsed_s / self.startup_ramp_duration_s, 1.0)
+        startup_cap_mps = self.initial_speed_mps + (
+            self.cruise_speed_mps - self.initial_speed_mps
+        ) * ramp_progress
+        return min(target_speed_mps, startup_cap_mps)
 
     def set_route_surface(self, route_x, route_y, initial_speed_surface=None, jitter_start=False):
         self.rx = list(route_x)

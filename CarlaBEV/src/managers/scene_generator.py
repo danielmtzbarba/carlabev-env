@@ -74,6 +74,26 @@ class SceneGenerator:
         self.last_scene_context = {}
 
     @staticmethod
+    def _sample_vehicle_startup(target_speed_mps, rng=None):
+        if rng is None:
+            import random
+
+            rng = random
+
+        startup_bucket = rng.random()
+        if startup_bucket < 0.20:
+            speed_frac = 0.0
+        elif startup_bucket < 0.80:
+            speed_frac = rng.uniform(0.0, 0.25)
+        else:
+            speed_frac = rng.uniform(0.25, 0.50)
+
+        return {
+            "initial_speed_mps": float(target_speed_mps) * float(speed_frac),
+            "ramp_duration_s": 1.0,
+        }
+
+    @staticmethod
     def _sample_route_profile(route_rng, route_profile_mix):
         if not route_profile_mix:
             return None
@@ -233,6 +253,7 @@ class SceneGenerator:
             "scenario_param_ego_route_graph": str(ego_route_graph),
             "scenario_param_ego_target_speed": ego_target_speed,
             "scenario_param_vehicle_target_speed": vehicle_target_speed,
+            "scenario_param_vehicle_startup_policy": "low_speed_ramp_v1",
         }
         selected_route_profile = route_profile
         if route_profile_mix:
@@ -310,6 +331,10 @@ class SceneGenerator:
                 lane,
                 self.planners.all,
                 target_speed_mps=vehicle_target_speed,
+                startup_config=self._sample_vehicle_startup(
+                    vehicle_target_speed,
+                    rng=traffic_rng,
+                ),
                 rng=traffic_rng,
                 np_rng=traffic_np_rng,
             )
@@ -342,7 +367,16 @@ class SceneGenerator:
             ) from exc
 
 
-def get_actor(actor_type, lane, planners, *, target_speed_mps=12.0, rng=None, np_rng=None):
+def get_actor(
+    actor_type,
+    lane,
+    planners,
+    *,
+    target_speed_mps=12.0,
+    startup_config=None,
+    rng=None,
+    np_rng=None,
+):
     try:
         n1 = get_random_node(planners, actor_type, lane, rng=rng)
         n2 = get_random_node(planners, actor_type, lane, rng=rng)
@@ -353,6 +387,9 @@ def get_actor(actor_type, lane, planners, *, target_speed_mps=12.0, rng=None, np
             target_speed=target_speed_mps,
             np_rng=np_rng,
         )
+        if startup_config:
+            veh.set_initial_speed_mps(startup_config.get("initial_speed_mps", 0.0))
+            veh.set_startup_ramp_duration(startup_config.get("ramp_duration_s", 0.0))
         veh, path = find_route(planners, veh, lane=lane)
         if len(path[0]) > 5:
             return veh, path

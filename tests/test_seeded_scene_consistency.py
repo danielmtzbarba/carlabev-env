@@ -40,6 +40,8 @@ def _capture_spawn_state(
         hero = env.map.hero
         route_x, route_y = env.map.route
         vehicles = []
+        vehicle_initial_speeds_mps = []
+        vehicle_cruise_speeds_mps = []
         for actor in env.map.actor_manager.actors.get("vehicle", []):
             ax, ay, ayaw, av = actor.state
             vehicles.append(
@@ -50,6 +52,8 @@ def _capture_spawn_state(
                     round(float(av), 6),
                 )
             )
+            vehicle_initial_speeds_mps.append(round(float(actor.initial_speed_mps), 6))
+            vehicle_cruise_speeds_mps.append(round(float(actor.cruise_speed_mps), 6))
         return {
             "spawn_validation": info.get("spawn_validation"),
             "hero_pose": (
@@ -64,6 +68,8 @@ def _capture_spawn_state(
                 len(route_x),
             ),
             "vehicles": tuple(vehicles[:16]),
+            "vehicle_initial_speeds_mps": tuple(vehicle_initial_speeds_mps[:16]),
+            "vehicle_cruise_speeds_mps": tuple(vehicle_cruise_speeds_mps[:16]),
             "num_vehicles": int(env.num_vehicles),
             "route_length": round(float(env.len_ego_route), 6),
             "scene_seed": info.get("scenario", {}).get("scenario_param_scene_seed"),
@@ -182,6 +188,18 @@ class SeededSceneConsistencyTests(unittest.TestCase):
 
         self.assertEqual(first["route"], second["route"])
         self.assertNotEqual(first["vehicles"], second["vehicles"])
+
+    def test_random_traffic_vehicles_spawn_below_cruise_speed(self):
+        snapshot = _capture_spawn_state(seed=11, anchor_y_frac=0.5)
+
+        self.assertGreater(len(snapshot["vehicle_initial_speeds_mps"]), 0)
+        for initial_speed_mps, cruise_speed_mps in zip(
+            snapshot["vehicle_initial_speeds_mps"],
+            snapshot["vehicle_cruise_speeds_mps"],
+        ):
+            self.assertGreaterEqual(initial_speed_mps, 0.0)
+            self.assertLessEqual(initial_speed_mps, 0.5 * cruise_speed_mps + 1e-6)
+            self.assertLessEqual(initial_speed_mps, cruise_speed_mps)
 
 
 if __name__ == "__main__":

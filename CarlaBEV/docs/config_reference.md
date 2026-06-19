@@ -146,9 +146,9 @@ Current axis expansions:
 | `traffic_density` | `low` | `traffic_enabled=True`, `num_vehicles=8` |
 | `traffic_density` | `medium` | `traffic_enabled=True`, `num_vehicles=16` |
 | `traffic_density` | `dense` | `traffic_enabled=True`, `num_vehicles=25` |
-| `speed_profile` | `slow` | `ego_target_speed=8.0`, `vehicle_target_speed=8.0` |
-| `speed_profile` | `medium` | `ego_target_speed=10.0`, `vehicle_target_speed=10.0` |
-| `speed_profile` | `fast` | `ego_target_speed=12.0`, `vehicle_target_speed=12.0` |
+| `speed_profile` | `slow` | `ego_target_speed=5.56`, `vehicle_target_speed=5.56` (20 km/h) |
+| `speed_profile` | `medium` | `ego_target_speed=8.33`, `vehicle_target_speed=8.33` (30 km/h) |
+| `speed_profile` | `fast` | `ego_target_speed=11.11`, `vehicle_target_speed=11.11` (40 km/h) |
 
 ### Low-Level Overrides
 
@@ -176,6 +176,18 @@ Current axis expansions:
 | `scenario_seed` | `int | None` | Explicit scenario sampler seed for non-random scenarios. |
 
 If omitted, [CarlaBEV.reset()](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/carlabev.py:87) resolves missing seeds from the incoming `seed` argument and the config seed.
+
+### Random Traffic Startup Behavior
+
+Randomly generated background vehicles do not currently spawn at cruise speed anymore. The runtime now samples a low-speed startup state and ramps each vehicle back toward cruise over roughly `1.0 s`.
+
+Current built-in startup policy:
+
+- `20%` of vehicles start at `0`
+- `60%` start uniformly in `[0, 0.25 * cruise]`
+- `20%` start uniformly in `[0.25 * cruise, 0.5 * cruise]`
+
+This policy is applied only to procedurally generated traffic. Authored scenarios and scenario-specific actors keep their explicit startup speeds unless they opt into the same pattern.
 
 ## Scenario Reset Builders
 

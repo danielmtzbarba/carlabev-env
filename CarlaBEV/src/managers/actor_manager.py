@@ -110,13 +110,23 @@ class ActorManager:
 
     def step_all(self, t=0.0, dt=0.05):
         """Step all non-hero actors."""
+        traffic_actors = [
+            actor
+            for key in ("vehicle", "pedestrian")
+            for actor in self.actors.get(key, [])
+            if self._has_valid_route(actor)
+        ]
         for k, v in self.actors.items():
             if k == "agent":
                 continue
             for actor in v:
                 if k in {"vehicle", "pedestrian"} and not self._has_valid_route(actor):
                     continue
-                actor.step(t, dt)
+                if k in {"vehicle", "pedestrian"}:
+                    other_actors = [other for other in traffic_actors if other is not actor]
+                    actor.step(t, dt, other_actors=other_actors)
+                else:
+                    actor.step(t, dt)
 
     def draw_all(self, surface, frame):
         """Draw all actors on given pygame surface."""

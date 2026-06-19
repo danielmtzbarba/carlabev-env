@@ -40,15 +40,18 @@ class Controller(State):
         self.time = 0.0
         self._target_speed = float(target_speed)
         self._target_speed_mps = speed_surface_to_mps(target_speed)
+        self._speed_limit_mps = self._target_speed_mps
         self.max_steer = np.radians(30.0)  # [rad] max steering angle
         self.L = float(L)  # [m] Wheel base of vehicle
         self.speed_kp = self.Kp if speed_kp is None else float(speed_kp)
         self.max_accel_mps2 = None if max_accel_mps2 is None else float(max_accel_mps2)
         self.max_decel_mps2 = None if max_decel_mps2 is None else float(max_decel_mps2)
     
-    def set_target_speed(self, target_speed):
+    def set_target_speed(self, target_speed, *, update_speed_limit=True):
         self._target_speed = float(target_speed)
         self._target_speed_mps = speed_surface_to_mps(target_speed)
+        if update_speed_limit:
+            self._speed_limit_mps = self._target_speed_mps
 
     def set_route(self, ax, ay, v0=0.0, jitter_start=True, np_rng=None):
         """Stanley steering control on a cubic spline."""
@@ -80,6 +83,7 @@ class Controller(State):
         if self.target_idx >= len(self.cx) - 1:
             self._target_speed = 0.0  # stop target
             self._target_speed_mps = 0.0
+            self._speed_limit_mps = 0.0
             if self.v_mps <= 0.01:        # fully stopped
                 return True           # signal finished
         else:
@@ -240,11 +244,15 @@ class Controller(State):
             "dist2wp_m": self.dist2wp_m,
             "set_point": self.set_point,
             "set_point_m": self.set_point_m,
+            "target_speed_mps": self._target_speed_mps,
+            "speed_limit_mps": self._speed_limit_mps,
             "next_wps": self.next_wps(5),
             "next_wps_m": self.next_wps_m(5),
         }
         if hasattr(self, "last_control"):
             info.update(self.last_control)
+        if hasattr(self, "last_traffic_policy"):
+            info.update(self.last_traffic_policy)
         if hasattr(self, "last_comfort"):
             info.update(self.last_comfort)
         return info

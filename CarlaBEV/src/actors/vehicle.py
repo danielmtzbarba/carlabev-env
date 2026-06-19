@@ -3,6 +3,8 @@ from CarlaBEV.semantics import SemanticClass, semantic_color_tuple
 
 
 class Vehicle(Actor):
+    reacts_to_traffic = True
+
     def __init__(
         self,
         map_size,

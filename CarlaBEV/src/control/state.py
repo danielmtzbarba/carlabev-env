@@ -52,7 +52,8 @@ class State:
         self.yaw += self._v_mps / self.L * np.tan(delta) * self.dt
         self._v_mps += acceleration * self.dt
         self.yaw = angle_mod(self.yaw)
-        self._v_mps = np.clip(self._v_mps, -1 * self._target_speed_mps, self._target_speed_mps)
+        speed_limit_mps = getattr(self, "_speed_limit_mps", self._target_speed_mps)
+        self._v_mps = np.clip(self._v_mps, -1 * speed_limit_mps, speed_limit_mps)
 
     @property
     def x(self):

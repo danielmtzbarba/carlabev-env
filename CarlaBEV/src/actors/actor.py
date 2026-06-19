@@ -5,6 +5,7 @@ import numpy as np
 from CarlaBEV.src.gui.settings import Settings as cfg
 from CarlaBEV.src.control.stanley_controller import Controller
 from CarlaBEV.envs.geometry import speed_mps_to_surface, speed_surface_to_mps
+from CarlaBEV.src.actors.traffic_policy import compute_safe_target_speed_mps
 
 
 class Node(object):
@@ -44,6 +45,7 @@ class Actor(pygame.sprite.Sprite):
     traffic_speed_kp = 0.5
     traffic_max_accel_mps2 = 2.5
     traffic_max_decel_mps2 = 3.5
+    reacts_to_traffic = False
 
     def __init__(
         self,
@@ -87,6 +89,14 @@ class Actor(pygame.sprite.Sprite):
         self.startup_ramp_duration_s = 0.0
         self._startup_elapsed_s = 0.0
         self.np_rng = np_rng
+        self.last_traffic_policy = {
+            "traffic_braking_active": False,
+            "lead_gap_m": None,
+            "lead_speed_mps": None,
+            "lead_ttc_s": None,
+            "nominal_target_speed_mps": 0.0,
+            "safe_target_speed_mps": 0.0,
+        }
 
     def set_route_wp(self, node_id, x, y):
         self.rx.append(x)
@@ -128,14 +138,36 @@ class Actor(pygame.sprite.Sprite):
 
         self.rect = pygame.Rect(0, 0, self.size, self.size)
 
-    def step(self, t=0.0, dt=0.05):
+    def step(self, t=0.0, dt=0.05, other_actors=None):
         # --- APPLY BEHAVIOR FIRST ---
         if self.behavior:
             self.behavior.apply(self, t, dt)
 
         # --- PROPAGATE TARGET SPEED TO CONTROLLER ---
-        controller_target_mps = self._startup_capped_target_speed_mps()
-        self._controller.set_target_speed(speed_mps_to_surface(controller_target_mps))
+        nominal_target_speed_mps = max(0.0, float(self.target_speed_mps))
+        safe_target_speed_mps = nominal_target_speed_mps
+        if self.reacts_to_traffic:
+            safe_target_speed_mps, self.last_traffic_policy = compute_safe_target_speed_mps(
+                self,
+                other_actors,
+                nominal_target_speed_mps,
+            )
+        else:
+            self.last_traffic_policy = {
+                "traffic_braking_active": False,
+                "lead_gap_m": None,
+                "lead_speed_mps": None,
+                "lead_ttc_s": None,
+                "nominal_target_speed_mps": nominal_target_speed_mps,
+                "safe_target_speed_mps": nominal_target_speed_mps,
+            }
+
+        controller_target_mps = self._startup_capped_target_speed_mps(safe_target_speed_mps)
+        self.last_traffic_policy["safe_target_speed_mps"] = float(controller_target_mps)
+        self._controller.set_target_speed(
+            speed_mps_to_surface(controller_target_mps),
+            update_speed_limit=False,
+        )
 
         finished = self._controller.control_step()
         self._startup_elapsed_s += float(dt)
@@ -167,8 +199,10 @@ class Actor(pygame.sprite.Sprite):
     def set_behavior_state(self, state_name):
         self.behavior_state = str(state_name)
 
-    def _startup_capped_target_speed_mps(self):
-        target_speed_mps = max(0.0, float(self.target_speed_mps))
+    def _startup_capped_target_speed_mps(self, target_speed_mps=None):
+        if target_speed_mps is None:
+            target_speed_mps = self.target_speed_mps
+        target_speed_mps = max(0.0, float(target_speed_mps))
         if self.startup_ramp_duration_s <= 0.0 or self.initial_speed_mps is None:
             return target_speed_mps
 

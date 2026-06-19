@@ -22,6 +22,7 @@ class ActorManager:
     def clear(self):
         """Reset actor registry to empty."""
         self.route_length = 0.0
+        self.drivable_mask = None
         self.actors = {
             "agent": None,
             "vehicle": [],
@@ -46,6 +47,7 @@ class ActorManager:
                 target_speed=target_speed,
                 car_size=32,
                 np_rng=np_rng,
+                drivable_mask=self.drivable_mask,
             )
         else:
             hero = DiscreteAgent(
@@ -56,6 +58,7 @@ class ActorManager:
                 target_speed=target_speed,
                 car_size=32,
                 np_rng=np_rng,
+                drivable_mask=self.drivable_mask,
             )
         hero.initial_speed_mps = float(initial_speed_mps)
         hero.target_speed_mps = float(target_speed_mps)
@@ -87,12 +90,22 @@ class ActorManager:
 
     def load(self, actors_dict):
         """Load actors from a prebuilt dictionary (used when loading from CSV)."""
+        drivable_mask = self.drivable_mask
         self.clear()
         for key, value in copy.deepcopy(actors_dict).items():
             if key in {"vehicle", "pedestrian"}:
                 self.actors[key] = [actor for actor in value if self._has_valid_route(actor)]
             else:
                 self.actors[key] = value
+        self.set_drivable_mask(drivable_mask)
+
+    def set_drivable_mask(self, drivable_mask):
+        self.drivable_mask = drivable_mask
+        for key in ("vehicle", "pedestrian"):
+            for actor in self.actors.get(key, []):
+                actor.drivable_mask = drivable_mask
+        if self.actors.get("agent") is not None and hasattr(self.actors["agent"], "drivable_mask"):
+            self.actors["agent"].drivable_mask = drivable_mask
 
     # ======================================================
     # --- Simulation ---

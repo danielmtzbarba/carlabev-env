@@ -27,6 +27,8 @@ class Controller(State):
     dt = 0.1  # [s] time difference
     rolling_resistance_mps2 = 0.05
     aero_drag_coeff = 0.002
+    route_offroad_point_tolerance = 1
+    route_offroad_fraction_tolerance = 0.01
 
     def __init__(
         self,
@@ -53,13 +55,23 @@ class Controller(State):
         if update_speed_limit:
             self._speed_limit_mps = self._target_speed_mps
 
-    def set_route(self, ax, ay, v0=0.0, jitter_start=True, np_rng=None):
+    def set_route(self, ax, ay, v0=0.0, jitter_start=True, np_rng=None, drivable_mask=None):
         """Stanley steering control on a cubic spline."""
         ax = np.asarray(ax, dtype=float)
         ay = np.asarray(ay, dtype=float)
         ax_m = ax * SURFACE_METERS_PER_PIXEL
         ay_m = ay * SURFACE_METERS_PER_PIXEL
-        cx_m, cy_m, cyaw, ck, s = smooth_and_compute(ax_m, ay_m, window=11, poly=3)
+        raw_route = self._build_raw_controller_path(ax_m, ay_m)
+        smoothed_route = smooth_and_compute(ax_m, ay_m, window=11, poly=3)
+        offroad_points, offroad_fraction = self._route_offroad_stats(smoothed_route, drivable_mask)
+        if self._should_fallback_to_raw(offroad_points, offroad_fraction):
+            cx_m, cy_m, cyaw, ck, s = raw_route
+            self.route_smoothing_mode = "raw_fallback"
+        else:
+            cx_m, cy_m, cyaw, ck, s = smoothed_route
+            self.route_smoothing_mode = "smoothed"
+        self.route_offroad_points = int(offroad_points)
+        self.route_offroad_fraction = float(offroad_fraction)
 
         if jitter_start:
             if np_rng is None:
@@ -77,6 +89,51 @@ class Controller(State):
         self.cyaw = cyaw
         self.target_idx, _ = self.calc_target_index()
         self.yaw = self.cyaw[self.target_idx]
+
+    @staticmethod
+    def _build_raw_controller_path(ax_m, ay_m):
+        cx_m = np.asarray(ax_m, dtype=float)
+        cy_m = np.asarray(ay_m, dtype=float)
+        dx = np.diff(cx_m)
+        dy = np.diff(cy_m)
+        seg_len = np.hypot(dx, dy)
+        s = np.concatenate(([0.0], np.cumsum(seg_len)))
+        if len(cx_m) == 1:
+            cyaw = np.zeros_like(cx_m)
+            ck = np.zeros_like(cx_m)
+            return cx_m, cy_m, cyaw, ck, s
+
+        heading = np.arctan2(dy, dx)
+        cyaw = np.empty_like(cx_m)
+        cyaw[:-1] = heading
+        cyaw[-1] = heading[-1]
+        cyaw = np.unwrap(cyaw)
+        ck = np.zeros_like(cx_m)
+        return cx_m, cy_m, cyaw, ck, s
+
+    def _route_offroad_stats(self, route, drivable_mask):
+        if drivable_mask is None:
+            return 0, 0.0
+        cx_m, cy_m, *_ = route
+        offroad_points = 0
+        total_points = len(cx_m)
+        height, width = drivable_mask.shape
+        for x_m, y_m in zip(cx_m, cy_m):
+            x = x_m / SURFACE_METERS_PER_PIXEL
+            y = y_m / SURFACE_METERS_PER_PIXEL
+            xi = int(round(float(x)))
+            yi = int(round(float(y)))
+            if not (0 <= xi < width and 0 <= yi < height) or not bool(drivable_mask[yi, xi]):
+                offroad_points += 1
+        if total_points <= 0:
+            return 0, 0.0
+        return offroad_points, offroad_points / total_points
+
+    def _should_fallback_to_raw(self, offroad_points, offroad_fraction):
+        return (
+            offroad_points > self.route_offroad_point_tolerance
+            or offroad_fraction > self.route_offroad_fraction_tolerance
+        )
 
     def control_step(self):
         # Check if we're at or past the last waypoint
@@ -246,6 +303,9 @@ class Controller(State):
             "set_point_m": self.set_point_m,
             "target_speed_mps": self._target_speed_mps,
             "speed_limit_mps": self._speed_limit_mps,
+            "route_smoothing_mode": getattr(self, "route_smoothing_mode", "smoothed"),
+            "route_offroad_points": getattr(self, "route_offroad_points", 0),
+            "route_offroad_fraction": getattr(self, "route_offroad_fraction", 0.0),
             "next_wps": self.next_wps(5),
             "next_wps_m": self.next_wps_m(5),
         }

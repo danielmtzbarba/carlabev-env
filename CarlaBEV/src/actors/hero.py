@@ -62,6 +62,7 @@ class BaseAgent(Controller, Hero):
         color=None,
         car_size=32,
         np_rng=None,
+        drivable_mask=None,
     ):
         Controller.__init__(self, target_speed=target_speed)
         Hero.__init__(self, window_size, color, car_size)
@@ -91,9 +92,10 @@ class BaseAgent(Controller, Hero):
             "yaw_rate": 0.0,
             "yaw_acc": 0.0,
         }
+        self.drivable_mask = drivable_mask
         self._setup()
 
-        self.set_route(xs, ys, initial_speed, np_rng=np_rng)
+        self.set_route(xs, ys, initial_speed, np_rng=np_rng, drivable_mask=self.drivable_mask)
         
         # Initial control step to set target_idx
         _, self.target_idx = self.stanley_control()

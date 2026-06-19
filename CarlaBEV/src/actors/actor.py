@@ -89,6 +89,7 @@ class Actor(pygame.sprite.Sprite):
         self.startup_ramp_duration_s = 0.0
         self._startup_elapsed_s = 0.0
         self.np_rng = np_rng
+        self.drivable_mask = None
         self.last_traffic_policy = {
             "traffic_braking_active": False,
             "lead_gap_m": None,
@@ -129,6 +130,7 @@ class Actor(pygame.sprite.Sprite):
             self.ry,
             v0=self.initial_speed,
             np_rng=self.np_rng,
+            drivable_mask=self.drivable_mask,
         )
         self._startup_elapsed_s = 0.0
         self.behavior_state = "idle"
@@ -222,6 +224,7 @@ class Actor(pygame.sprite.Sprite):
             self.ry,
             v0=float(initial_speed_surface),
             jitter_start=jitter_start,
+            drivable_mask=self.drivable_mask,
         )
 
     def sync_rect(self, frame):

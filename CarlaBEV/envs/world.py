@@ -11,6 +11,7 @@ from CarlaBEV.semantics import (
     BLOCKING_CLASSES,
     SemanticClass,
     semantic_class_from_rgb,
+    semantic_color_array,
     semantic_color_tuple,
 )
 
@@ -47,6 +48,10 @@ class BaseMap(Scene):
 
         # --- Load map and create query/render surfaces
         self._query_map_arr, base_map_img, _ = load_map(cfg.map_name, cfg.size)
+        self._drivable_mask = np.all(
+            self._query_map_arr == semantic_color_array(SemanticClass.DRIVABLE),
+            axis=-1,
+        )
         self._query_Y, self._query_X, _ = self._query_map_arr.shape
         self._render_layers = self._build_render_layers(base_map_img)
         self._map_img = self._build_padded_render_map(base_map_img)

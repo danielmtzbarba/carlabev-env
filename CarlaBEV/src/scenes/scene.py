@@ -60,6 +60,8 @@ class Scene:
             self._dist2wp_1 = 0.0
 
     def load_scene(self, actors, hero_np_rng=None):
+        if hasattr(self.actor_manager, "set_drivable_mask") and hasattr(self, "_drivable_mask"):
+            self.actor_manager.set_drivable_mask(self._drivable_mask)
         self.actor_manager.load(actors)
         if self.actor_manager.actors.get("agent"):
             cx, cy, initial_speed_mps, target_speed_mps = self.agent_route

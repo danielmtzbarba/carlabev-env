@@ -6,12 +6,17 @@ This document describes the current ego-motion model used by CarlaBEV.
 
 The ego vehicle uses a kinematic bicycle update implemented in [state.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/control/state.py) and driven through [hero.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/actors/hero.py).
 
-State:
+Canonical runtime state:
 
-- `x`: world/surface x-position
-- `y`: world/surface y-position
+- `x_m`: world x-position in meters
+- `y_m`: world y-position in meters
 - `yaw`: heading in radians
-- `v`: longitudinal speed
+- `v_mps`: longitudinal speed in meters/second
+
+Compatibility exports:
+
+- `state`: legacy surface-frame `[x_surface, y_surface, yaw, v_surface]`
+- `state_m`: canonical metric `[x_m, y_m, yaw, v_mps]`
 
 Discrete-time update:
 
@@ -84,7 +89,8 @@ This gives the policy enough turning authority for dynamic-object avoidance whil
 
 ## Notes
 
-- Speed is an internally scaled simulator quantity within the current runtime model.
+- Internal ego dynamics now run in SI units.
+- Legacy surface-frame state is still exported for backward compatibility.
 - The model uses simple damping rather than a calibrated drivetrain/brake model.
 - Collision footprint is coarse relative to real vehicle geometry.
 

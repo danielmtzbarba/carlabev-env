@@ -36,7 +36,7 @@ class EpisodeStats:
             self.cause = c
 
         hero = info["hero"]
-        v = hero["state"][3]
+        v = float(hero.get("speed_mps", hero["state_m"][3]))
         self.speeds.append(v)
 
         if "progress" in info["reward"]:

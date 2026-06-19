@@ -223,6 +223,15 @@ That is clearer for downstream users and easier to validate.
 
 If vector mode remains roadmap-only for some construction paths, validation should reject unsupported combinations explicitly.
 
+When used through `CarlaBEV(...)` directly, vector observations use metric units:
+
+- ego state: `[x_m, y_m, yaw, v_mps]`
+- current set point: `[setpoint_x_m, setpoint_y_m, setpoint_yaw]`
+
+The lower-level `info["hero"]["state"]` field is retained only as a legacy
+surface-frame compatibility export. New integrations should prefer
+`info["hero"]["state_m"]`.
+
 ### 3. Make reward mode explicit
 
 Today external code uses values like `"shaping"` and `"carl"`, while the environment internally checks only whether the value equals `"carl"`.

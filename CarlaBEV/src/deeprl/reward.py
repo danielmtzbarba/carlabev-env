@@ -1,5 +1,6 @@
 import numpy as np
 
+from CarlaBEV.envs.geometry import distance_surface_to_meters
 from CarlaBEV.src.control.utils import lateral_error
 from CarlaBEV.src.deeprl.reward_signals import compute_ttc
 from CarlaBEV.semantics import (
@@ -64,8 +65,12 @@ class RewardFn(object):
 
         self.max_speed_for_flow = max_speed_for_flow
         self.lat_clip = lat_clip
+        self.lat_clip_m = distance_surface_to_meters(lat_clip)
         self.yaw_small = yaw_small
         self.lat_small = lat_small
+        self.lat_small_m = distance_surface_to_meters(lat_small)
+        self.route_dev_start_m = distance_surface_to_meters(route_dev_start)
+        self.out_of_bounds_threshold_m = distance_surface_to_meters(60.0)
 
         # internal counters
         self._k = 0
@@ -91,7 +96,7 @@ class RewardFn(object):
             reward, terminated, cause = 0.0, True, "max_actions"
 
         # --- out of bounds (hard fail) ---
-        elif info["hero"]["dist2wp"] > 60:
+        elif info["hero"]["dist2wp_m"] > self.out_of_bounds_threshold_m:
             # slightly harsher and at a bit larger distance
             reward, terminated, cause = -1.0, True, "out_of_bounds"
 
@@ -165,28 +170,28 @@ class RewardFn(object):
 
     def non_terminal(self, info, offroad_mask: bool):
         r = 0.0
-        x, y, yaw, v = info["hero"]["state"]
-        _, _, yaw_1, v_1 = info["hero"]["last_state"]
+        x, y, yaw, v = info["hero"]["state_m"]
+        _, _, yaw_1, v_1 = info["hero"]["last_state_m"]
 
         # waypoints / alignment
-        distance_t = info["scene"]["dist2goal"]
-        distance_t_1 = info["scene"]["dist2goal_t_1"]
-        set_point = info["hero"]["set_point"]
+        distance_t = info["scene"]["dist2goal_m"]
+        distance_t_1 = info["scene"]["dist2goal_t_1_m"]
+        set_point = info["hero"]["set_point_m"]
         desired_yaw = set_point[2]
         yaw_error = np.arctan2(np.sin(desired_yaw - yaw), np.cos(desired_yaw - yaw))
         yaw_alignment = np.cos(yaw_error)  # [-1, 1]
 
         # lateral error (quadratic, clipped)
-        xs, ys, _ = info["hero"]["next_wps"]
+        xs, ys, _ = info["hero"]["next_wps_m"]
         wps = np.array([xs, ys]).T
         dist2route = lateral_error(x, y, wps, signed=True)
-        e = np.clip(abs(dist2route), 0.0, self.lat_clip)
+        e = np.clip(abs(dist2route), 0.0, self.lat_clip_m)
         r -= self.k_lat_quadratic * (e * e)
 
         # route deviation shaping: push back if drifting far from path
-        dist2wp = float(info["hero"]["dist2wp"])
-        if dist2wp > self.route_dev_start:
-            dev = dist2wp - self.route_dev_start
+        dist2wp = float(info["hero"]["dist2wp_m"])
+        if dist2wp > self.route_dev_start_m:
+            dev = dist2wp - self.route_dev_start_m
             r -= self.k_route_dev * dev
 
         # progress only if improving distance AND (optionally) not off-road
@@ -202,12 +207,12 @@ class RewardFn(object):
 
         # alignment micro-bonus when tightly centered & aligned
         align_bonus = 0.0
-        if e < self.lat_small and abs(yaw_error) < self.yaw_small:
+        if e < self.lat_small_m and abs(yaw_error) < self.yaw_small:
             r += self.k_align_bonus
             align_bonus = self.k_align_bonus
 
         # TTC shaping
-        hero_state = info["hero"]["state"]
+        hero_state = info["hero"]["state_m"]
         actors_state = info["collision"]["actors_state"]
         ttc_term = compute_ttc(hero_state, actors_state, ttc_threshold=30)
         r += self.k_ttc * ttc_term
@@ -255,7 +260,7 @@ class RewardFn(object):
             "offroad_steps": self._consecutive_offroad,
             "offroad_mask": offroad_mask,
             "route_dev_penalty": float(
-                -self.k_route_dev * max(0.0, dist2wp - self.route_dev_start)
+                -self.k_route_dev * max(0.0, dist2wp - self.route_dev_start_m)
             ),
         }
 

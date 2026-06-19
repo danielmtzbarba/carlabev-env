@@ -239,8 +239,8 @@ class CarlaBEV(gym.Env):
         )
         if self.obs_mode == "vector":
             if self.map.hero is not None:
-                hero = self.map.hero.state
-                set_point = self.map.hero.set_point
+                hero = self.map.hero.state_m
+                set_point = self.map.hero.set_point_m
                 vector_data = np.concatenate([hero, set_point]).astype(np.float32)
                 self._observation = vector_data
             else:

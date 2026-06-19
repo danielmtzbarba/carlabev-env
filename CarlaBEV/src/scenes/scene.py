@@ -1,6 +1,7 @@
 import numpy as np
 
 from CarlaBEV.envs.camera import Camera, Follow
+from CarlaBEV.envs.geometry import distance_surface_to_meters, surface_to_meters
 from CarlaBEV.envs.transforms import SurfaceFrame
 from CarlaBEV.src.managers.actor_manager import ActorManager
 from CarlaBEV.src.scenes.utils import set_targets
@@ -126,8 +127,19 @@ class Scene:
                         ax, ay, ayaw, av = actor.state
                         avx = av * np.cos(ayaw)
                         avy = av * np.sin(ayaw)
+                        pos_m = surface_to_meters((ax, ay))
+                        vel_m = (
+                            distance_surface_to_meters(avx),
+                            distance_surface_to_meters(avy),
+                        )
                         actors_state.append(
-                            {"pos": (ax, ay), "vel": (avx, avy), "type": id_type}
+                            {
+                                "pos": (ax, ay),
+                                "vel": (avx, avy),
+                                "pos_m": (float(pos_m[0]), float(pos_m[1])),
+                                "vel_m": (float(vel_m[0]), float(vel_m[1])),
+                                "type": id_type,
+                            }
                         )
                 if collision:
                     result = id_type
@@ -210,6 +222,8 @@ class Scene:
             "scene": {
                 "dist2goal": self._dist2goal,
                 "dist2goal_t_1": self._dist2goal_t_1,
+                "dist2goal_m": distance_surface_to_meters(self._dist2goal),
+                "dist2goal_t_1_m": distance_surface_to_meters(self._dist2goal_t_1),
                 "num_vehicles": self.actor_manager.num_vehicles,
                 "route_length": self.actor_manager.route_length,
                 "speed_limit": 35,

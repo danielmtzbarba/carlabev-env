@@ -12,6 +12,12 @@ def proximity_shaping(distances, safe=8.0):
     return -np.exp(-(d / (safe / 2.0))) * 0.5  # ∈ [-0.5, 0)
 
 
+def _extract_actor_metric_state(actor):
+    if "pos_m" in actor and "vel_m" in actor:
+        return actor["pos_m"], actor["vel_m"]
+    return actor["pos"], actor["vel"]
+
+
 def compute_ttc(hero_state, actors_state, ttc_threshold=8.0):
     """
     Compute minimum Time-To-Collision across all actors.
@@ -22,8 +28,7 @@ def compute_ttc(hero_state, actors_state, ttc_threshold=8.0):
     min_ttc = np.inf
 
     for actor in actors_state:
-        (ax, ay) = actor["pos"]
-        (avx, avy) = actor["vel"]
+        (ax, ay), (avx, avy) = _extract_actor_metric_state(actor)
 
         # relative position and velocity
         rx, ry = ax - hx, ay - hy
@@ -43,36 +48,20 @@ def compute_ttc(hero_state, actors_state, ttc_threshold=8.0):
 
 
 # CaRL
-def compute_ttc_raw(hero_state, actors_state, dt=0.1, meters_per_pixel=0.625):
+def compute_ttc_raw(hero_state, actors_state, dt=0.1):
     """
     Raw Time-To-Collision (TTC) in seconds using CaRL logic.
     No shaping. Returns min TTC across all actors.
     """
 
-    hx, hy, hyaw, hv_px = hero_state
-
-    # Convert hero position to meters
-    hx_m = hx * meters_per_pixel
-    hy_m = hy * meters_per_pixel
-
-    # Controller speed behaves like px/s, so convert directly to m/s.
-    hv_m = hv_px * meters_per_pixel
+    hx_m, hy_m, hyaw, hv_m = hero_state
     hvx_m = hv_m * np.cos(hyaw)
     hvy_m = hv_m * np.sin(hyaw)
 
     min_ttc = np.inf
 
     for actor in actors_state:
-        (ax_px, ay_px) = actor["pos"]
-        (avx_px, avy_px) = actor["vel"]
-
-        # Convert actor position to meters
-        ax_m = ax_px * meters_per_pixel
-        ay_m = ay_px * meters_per_pixel
-
-        # Actor velocity components behave like px/s as well.
-        avx_m = avx_px * meters_per_pixel
-        avy_m = avy_px * meters_per_pixel
+        (ax_m, ay_m), (avx_m, avy_m) = _extract_actor_metric_state(actor)
 
         # Relative position and velocity
         rx = ax_m - hx_m
@@ -94,17 +83,13 @@ def compute_ttc_raw(hero_state, actors_state, dt=0.1, meters_per_pixel=0.625):
     return min_ttc
 
 
-def carl_ttc_penalty(
-    hero_state, actors_state, threshold=1.0, dt=0.1, meters_per_pixel=0.625
-):
+def carl_ttc_penalty(hero_state, actors_state, threshold=1.0, dt=0.1):
     """
     CaRL soft TTC penalty:
         p_ttc = 1.0 (safe)
         p_ttc = 0.5 (TTC < threshold)
     """
-    ttc = compute_ttc_raw(
-        hero_state, actors_state, dt=dt, meters_per_pixel=meters_per_pixel
-    )
+    ttc = compute_ttc_raw(hero_state, actors_state, dt=dt)
 
     if ttc < threshold:
         return 0.5, ttc  # TTC violation

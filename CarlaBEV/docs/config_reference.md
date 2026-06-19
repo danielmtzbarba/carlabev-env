@@ -88,7 +88,7 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 
 - Direct `CarlaBEV(...)` observations:
   - `obs_mode="bev_rgb"` or `"bev_semantic"` returns a raw `(size, size, 3)` image.
-  - `obs_mode="vector"` returns a `float32` vector of length `7`.
+  - `obs_mode="vector"` returns a metric `float32` vector of length `7` as `[x_m, y_m, yaw, v_mps, setpoint_x_m, setpoint_y_m, setpoint_yaw]`.
 - Wrapped `make_env(...)` observations:
   - always go through resize
   - RGB observations are converted to grayscale and then frame-stacked

@@ -25,6 +25,8 @@ class Controller(State):
     k = 2.0  # control gain
     Kp = 1.0  # speed proportional gain
     dt = 0.1  # [s] time difference
+    rolling_resistance_mps2 = 0.05
+    aero_drag_coeff = 0.002
 
     def __init__(self, target_speed, L=2.9) -> None:
         super().__init__()
@@ -73,7 +75,7 @@ class Controller(State):
         else:
             ai = self.pid_control()
             di, self.target_idx = self.stanley_control()
-            self.update(ai, di)
+            self.update(ai - self.longitudinal_resistance_accel(), di)
             self.time += self.dt
             return False  # still running
 
@@ -112,6 +114,12 @@ class Controller(State):
         :return: (float)
         """
         return self.Kp * (self._target_speed_mps - self.v_mps)
+
+    def longitudinal_resistance_accel(self):
+        speed_mps = abs(self.v_mps)
+        if speed_mps <= 1e-6:
+            return 0.0
+        return self.rolling_resistance_mps2 + self.aero_drag_coeff * (speed_mps ** 2)
 
     def calc_target_index(self):
         """

@@ -50,6 +50,8 @@ class BaseAgent(Controller, Hero):
     max_action_steer_deg = 18.0
     # Reach minimum steering authority around 12.5 m/s instead of at ~1 m/s.
     steer_speed_scale_mps = 0.10
+    accel_response_alpha = 0.5
+    accel_gain_mps2 = 4.5
 
     def __init__(
         self,
@@ -67,7 +69,7 @@ class BaseAgent(Controller, Hero):
         xs, ys = route[0], route[1]
         self.acc = 0.0
         self.meters_per_pixel = SURFACE_METERS_PER_PIXEL
-        self.max_accel_mps2 = 1.0 * self.scale * self.meters_per_pixel
+        self.max_accel_mps2 = self.accel_gain_mps2
         self.max_brake_mps2 = 0.6 * self.scale * self.meters_per_pixel
         self._prev_comfort_accel_long = None
         self._prev_comfort_accel_lat = None
@@ -106,26 +108,20 @@ class BaseAgent(Controller, Hero):
         delta = self.steering(steer)
         brake_val = self.brake(brake)
 
-        # Total longitudinal acceleration
-        # 0.05 * speed_mps is a simple rolling resistance/friction term.
-        target_acc = acc_val - brake_val - 0.05 * self.speed_mps
+        # Total longitudinal acceleration with the same explicit resistance
+        # model used by controller-driven traffic actors.
+        target_acc = acc_val - brake_val - self.longitudinal_resistance_accel()
 
         # === Smooth acceleration (low-pass filter) ===
-        alpha = 0.2
+        alpha = self.accel_response_alpha
         self.acc = (1 - alpha) * self.acc + alpha * target_acc
 
         # === Update physics (bicycle model) ===
         # Controller (state.py) uses bicycle model:
         # yaw += v / L * tan(delta) * dt
         self.update(self.acc, delta)
-
-        # === Friction & velocity stabilization ===
-        self.v_mps *= 0.9999
         if abs(self.v_mps) < 0.05:
             self.v_mps = 0.0
-
-        # natural drag proportional to speed
-        self.v_mps *= 0.985
 
         self.last_control = {
             "cmd_gas": float(gas),

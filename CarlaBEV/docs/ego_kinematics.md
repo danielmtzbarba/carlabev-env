@@ -45,20 +45,26 @@ The ego action is mapped to:
 
 Then the simulator computes:
 
-`a_target = a_gas - a_brake - 0.05 v`
+`a_target = a_gas - a_brake - a_resist(v)`
+
+with:
+
+`a_resist(v) = c_roll + c_drag v^2`
 
 and smooths it with a first-order filter:
 
 `a_k = (1 - alpha) a_{k-1} + alpha a_target`
 
-with `alpha = 0.2`.
+with `alpha = 0.5`.
 
-After the main update, a small velocity damping is applied:
+Current command limits:
 
-- `v *= 0.9999`
-- `v *= 0.985`
+- full-throttle acceleration: `4.5 m/s^2`
+- full-brake deceleration: `0.6 * scale * meters_per_pixel`
 
-This is a simplified research vehicle model rather than a production vehicle model.
+The same explicit longitudinal resistance model is also used by
+controller-driven background vehicles so ego and traffic do not rely on
+different passive slow-down rules.
 
 ## Intended Behavior
 
@@ -91,7 +97,7 @@ This gives the policy enough turning authority for dynamic-object avoidance whil
 
 - Internal ego dynamics now run in SI units.
 - Legacy surface-frame state is still exported for backward compatibility.
-- The model uses simple damping rather than a calibrated drivetrain/brake model.
+- The model uses explicit rolling resistance and quadratic drag rather than multiplicative damping.
 - Collision footprint is coarse relative to real vehicle geometry.
 
 ## Implementation References

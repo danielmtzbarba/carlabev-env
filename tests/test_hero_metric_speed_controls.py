@@ -48,3 +48,12 @@ def test_brake_scaling_uses_metric_speed():
     assert slow_brake < fast_brake
     assert math.isclose(slow_brake, slow_agent.max_brake_mps2 * 0.4, rel_tol=1e-6)
     assert math.isclose(fast_brake, fast_agent.max_brake_mps2, rel_tol=1e-6)
+
+
+def test_longitudinal_resistance_is_explicit_and_shared():
+    agent = _make_agent(initial_speed_mps=10.0)
+
+    resistance = agent.longitudinal_resistance_accel()
+
+    expected = agent.rolling_resistance_mps2 + agent.aero_drag_coeff * (10.0 ** 2)
+    assert math.isclose(resistance, expected, rel_tol=1e-6)

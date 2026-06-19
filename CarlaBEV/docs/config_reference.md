@@ -181,6 +181,20 @@ If omitted, [CarlaBEV.reset()](/Users/danielmtz/Data/projects/driverless/carlabe
 
 Randomly generated background vehicles do not currently spawn at cruise speed anymore. The runtime now samples a low-speed startup state and ramps each vehicle back toward cruise over roughly `1.0 s`.
 
+Random traffic also no longer uses one identical cruise speed for every vehicle. Instead, each background vehicle samples its own cruise target around the scene-level `vehicle_target_speed`.
+
+Current built-in random traffic speed mix:
+
+- `slow`: `55%`, sampled around `0.80 * vehicle_target_speed`
+- `medium`: `35%`, sampled around `1.00 * vehicle_target_speed`
+- `fast`: `10%`, sampled around `1.15 * vehicle_target_speed`
+- per-vehicle jitter: `+/- 5%`
+
+This keeps ego and traffic configuration separate:
+
+- ego still uses the resolved `ego_target_speed`
+- random traffic uses `vehicle_target_speed` only as the base speed for per-vehicle sampling
+
 Current built-in startup policy:
 
 - `20%` of vehicles start at `0`

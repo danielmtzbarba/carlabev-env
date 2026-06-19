@@ -42,6 +42,7 @@ def _capture_spawn_state(
         vehicles = []
         vehicle_initial_speeds_mps = []
         vehicle_cruise_speeds_mps = []
+        vehicle_speed_classes = []
         for actor in env.map.actor_manager.actors.get("vehicle", []):
             ax, ay, ayaw, av = actor.state
             vehicles.append(
@@ -54,6 +55,7 @@ def _capture_spawn_state(
             )
             vehicle_initial_speeds_mps.append(round(float(actor.initial_speed_mps), 6))
             vehicle_cruise_speeds_mps.append(round(float(actor.cruise_speed_mps), 6))
+            vehicle_speed_classes.append(str(actor.speed_class))
         return {
             "spawn_validation": info.get("spawn_validation"),
             "hero_pose": (
@@ -70,11 +72,14 @@ def _capture_spawn_state(
             "vehicles": tuple(vehicles[:16]),
             "vehicle_initial_speeds_mps": tuple(vehicle_initial_speeds_mps[:16]),
             "vehicle_cruise_speeds_mps": tuple(vehicle_cruise_speeds_mps[:16]),
+            "vehicle_speed_classes": tuple(vehicle_speed_classes[:16]),
             "num_vehicles": int(env.num_vehicles),
             "route_length": round(float(env.len_ego_route), 6),
             "scene_seed": info.get("scenario", {}).get("scenario_param_scene_seed"),
             "route_seed": info.get("scenario", {}).get("scenario_param_route_seed"),
             "traffic_seed": info.get("scenario", {}).get("scenario_param_traffic_seed"),
+            "base_vehicle_target_speed_mps": info.get("scenario", {}).get("scenario_param_vehicle_target_speed"),
+            "vehicle_speed_mix": info.get("scenario", {}).get("scenario_param_vehicle_speed_mix"),
         }
     finally:
         env.close()
@@ -200,6 +205,30 @@ class SeededSceneConsistencyTests(unittest.TestCase):
             self.assertGreaterEqual(initial_speed_mps, 0.0)
             self.assertLessEqual(initial_speed_mps, 0.5 * cruise_speed_mps + 1e-6)
             self.assertLessEqual(initial_speed_mps, cruise_speed_mps)
+
+    def test_random_traffic_vehicle_cruise_speeds_follow_sampled_speed_classes(self):
+        snapshot = _capture_spawn_state(seed=11, anchor_y_frac=0.5)
+
+        self.assertEqual(
+            snapshot["vehicle_speed_mix"],
+            {"slow": 0.55, "medium": 0.35, "fast": 0.1},
+        )
+        base_speed = float(snapshot["base_vehicle_target_speed_mps"])
+        class_bounds = {
+            "slow": (0.80 * 0.95 * base_speed, 0.80 * 1.05 * base_speed),
+            "medium": (1.00 * 0.95 * base_speed, 1.00 * 1.05 * base_speed),
+            "fast": (1.15 * 0.95 * base_speed, 1.15 * 1.05 * base_speed),
+        }
+
+        self.assertGreater(len(snapshot["vehicle_speed_classes"]), 0)
+        for speed_class, cruise_speed_mps in zip(
+            snapshot["vehicle_speed_classes"],
+            snapshot["vehicle_cruise_speeds_mps"],
+        ):
+            self.assertIn(speed_class, class_bounds)
+            lower, upper = class_bounds[speed_class]
+            self.assertGreaterEqual(cruise_speed_mps, lower - 1e-6)
+            self.assertLessEqual(cruise_speed_mps, upper + 1e-6)
 
 
 if __name__ == "__main__":

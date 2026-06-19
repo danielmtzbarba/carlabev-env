@@ -94,6 +94,30 @@ class SceneGenerator:
         }
 
     @staticmethod
+    def _sample_vehicle_speed_profile(base_speed_mps, rng=None):
+        if rng is None:
+            import random
+
+            rng = random
+
+        speed_classes = ("slow", "medium", "fast")
+        weights = (0.55, 0.35, 0.10)
+        speed_multipliers = {
+            "slow": 0.80,
+            "medium": 1.00,
+            "fast": 1.15,
+        }
+        speed_class = rng.choices(speed_classes, weights=weights, k=1)[0]
+        jitter = rng.uniform(0.95, 1.05)
+        cruise_speed_mps = float(base_speed_mps) * speed_multipliers[speed_class] * jitter
+        return {
+            "speed_class": speed_class,
+            "speed_multiplier": speed_multipliers[speed_class],
+            "speed_jitter": float(jitter),
+            "target_speed_mps": float(cruise_speed_mps),
+        }
+
+    @staticmethod
     def _sample_route_profile(route_rng, route_profile_mix):
         if not route_profile_mix:
             return None
@@ -254,6 +278,13 @@ class SceneGenerator:
             "scenario_param_ego_target_speed": ego_target_speed,
             "scenario_param_vehicle_target_speed": vehicle_target_speed,
             "scenario_param_vehicle_startup_policy": "low_speed_ramp_v1",
+            "scenario_param_vehicle_speed_mix": {"slow": 0.55, "medium": 0.35, "fast": 0.10},
+            "scenario_param_vehicle_speed_multipliers": {
+                "slow": 0.80,
+                "medium": 1.00,
+                "fast": 1.15,
+            },
+            "scenario_param_vehicle_speed_jitter_frac": 0.05,
         }
         selected_route_profile = route_profile
         if route_profile_mix:
@@ -319,6 +350,8 @@ class SceneGenerator:
             )
 
         # 2️⃣ Background vehicles
+        sampled_vehicle_speeds = []
+        sampled_vehicle_speed_classes = {"slow": 0, "medium": 0, "fast": 0}
         for _ in range(num_cars):
             if traffic_rng is None:
                 import random
@@ -326,21 +359,36 @@ class SceneGenerator:
                 lane = random.choice(["L", "R"])
             else:
                 lane = traffic_rng.choice(["L", "R"])
+            speed_profile = self._sample_vehicle_speed_profile(
+                vehicle_target_speed,
+                rng=traffic_rng,
+            )
             veh, _ = get_actor(
                 "vehicle",
                 lane,
                 self.planners.all,
-                target_speed_mps=vehicle_target_speed,
+                target_speed_mps=speed_profile["target_speed_mps"],
                 startup_config=self._sample_vehicle_startup(
-                    vehicle_target_speed,
+                    speed_profile["target_speed_mps"],
                     rng=traffic_rng,
                 ),
+                speed_profile=speed_profile,
                 rng=traffic_rng,
                 np_rng=traffic_np_rng,
             )
             if veh is None:
                 continue
             actors["vehicle"].append(veh)
+            sampled_vehicle_speeds.append(float(veh.cruise_speed_mps))
+            sampled_vehicle_speed_classes[veh.speed_class] += 1
+
+        if sampled_vehicle_speeds:
+            self.last_scene_context["generated_vehicle_speed_classes"] = dict(sampled_vehicle_speed_classes)
+            self.last_scene_context["generated_vehicle_speed_min_mps"] = float(min(sampled_vehicle_speeds))
+            self.last_scene_context["generated_vehicle_speed_max_mps"] = float(max(sampled_vehicle_speeds))
+            self.last_scene_context["generated_vehicle_speed_mean_mps"] = float(
+                sum(sampled_vehicle_speeds) / len(sampled_vehicle_speeds)
+            )
 
         # (Optional future) pedestrians, traffic lights, etc.
         return actors, len_route
@@ -374,6 +422,7 @@ def get_actor(
     *,
     target_speed_mps=12.0,
     startup_config=None,
+    speed_profile=None,
     rng=None,
     np_rng=None,
 ):
@@ -387,6 +436,10 @@ def get_actor(
             target_speed=target_speed_mps,
             np_rng=np_rng,
         )
+        if speed_profile:
+            veh.speed_class = str(speed_profile.get("speed_class", "medium"))
+            veh.speed_multiplier = float(speed_profile.get("speed_multiplier", 1.0))
+            veh.speed_jitter = float(speed_profile.get("speed_jitter", 1.0))
         if startup_config:
             veh.set_initial_speed_mps(startup_config.get("initial_speed_mps", 0.0))
             veh.set_startup_ramp_duration(startup_config.get("ramp_duration_s", 0.0))

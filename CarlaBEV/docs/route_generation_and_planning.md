@@ -162,6 +162,32 @@ constraints. That is by design:
 This keeps the ego route contract explicit without over-constraining background
 actors.
 
+Random traffic now also applies two lightweight runtime policies after route
+sampling:
+
+- per-vehicle cruise-speed variation around the scene-level
+  `vehicle_target_speed`
+- low-speed startup followed by a short ramp back toward each vehicle's own
+  sampled cruise speed
+
+Current random traffic speed mix:
+
+- `slow`: `55%` with `0.80x` cruise multiplier
+- `medium`: `35%` with `1.00x` cruise multiplier
+- `fast`: `10%` with `1.15x` cruise multiplier
+- per-vehicle jitter: `+/- 5%`
+
+Current random traffic startup policy:
+
+- `20%` start at `0`
+- `60%` start in `[0, 0.25 * cruise]`
+- `20%` start in `[0.25 * cruise, 0.5 * cruise]`
+- startup ramp duration: about `1.0 s`
+
+These policies apply only to procedurally generated background traffic. Ego
+speed remains controlled by `ego_target_speed`, and authored scenario actors
+keep their explicit speeds unless they opt into the same behavior.
+
 ## Route Distribution Utility
 
 To inspect route composition over many sampled ego episodes, use:

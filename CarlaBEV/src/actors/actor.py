@@ -75,6 +75,9 @@ class Actor(pygame.sprite.Sprite):
         self.target_speed_mps = 0.0
         self.cruise_speed = 0.0
         self.cruise_speed_mps = 0.0
+        self.speed_class = "medium"
+        self.speed_multiplier = 1.0
+        self.speed_jitter = 1.0
         self.initial_speed = None
         self.initial_speed_mps = None
         self.startup_ramp_duration_s = 0.0

@@ -193,7 +193,10 @@ class CarlaBEV(gym.Env):
             "scenario_preset_scene",
             "scenario_preset_description",
             "config_file",
-            "difficulty_id",
+            "difficulty_preset_id",
+            "route_extent",
+            "traffic_density",
+            "speed_profile",
         )
         for key in keys:
             if key in options and options[key] is not None:

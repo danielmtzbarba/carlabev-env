@@ -19,7 +19,10 @@ from CarlaBEV.config import (
     get_action_profile_spec,
     get_difficulty_spec,
     get_env_capabilities,
+    get_speed_profile_spec,
+    get_traffic_density_spec,
     get_reward_profile_spec,
+    get_route_extent_spec,
     resolve_env_profiles,
     validate_env_config,
     validate_run_config,
@@ -79,7 +82,10 @@ class PublicConfigContractTests(unittest.TestCase):
         self.assertIn("Town01", capabilities["maps"])
         self.assertIn("discrete", capabilities["action_modes"])
         self.assertIn("discrete9_v1", capabilities["action_profile_ids"])
-        self.assertIn("rt_no_traffic_v1", capabilities["difficulty_ids"])
+        self.assertIn("no_traffic", capabilities["difficulty_preset_ids"])
+        self.assertIn("short", capabilities["route_extent_ids"])
+        self.assertIn("dense", capabilities["traffic_density_ids"])
+        self.assertIn("fast", capabilities["speed_profile_ids"])
         self.assertIn("bev_semantic", capabilities["obs_modes"])
         self.assertIn("carl", capabilities["reward_modes"])
         self.assertIn("carl_base_v1", capabilities["reward_profile_ids"])
@@ -113,17 +119,55 @@ class ResetBuilderTests(unittest.TestCase):
         self.assertEqual(options["scene"], "rdm")
         self.assertEqual(options["num_vehicles"], 7)
         self.assertEqual(options["route_dist_range"], [40, 80])
+        self.assertTrue(options["traffic_enabled"])
         self.assertTrue(np.array_equal(options["reset_mask"], np.array([True, False, True])))
 
     def test_random_navigation_difficulty_preset_expands_runtime_options(self):
         options = build_random_navigation_options(
-            RandomNavigationReset(difficulty_id="rt_no_traffic_v1")
+            RandomNavigationReset(difficulty_preset_id="no_traffic")
         )
 
-        self.assertEqual(options["difficulty_id"], "rt_no_traffic_v1")
+        self.assertEqual(options["difficulty_preset_id"], "no_traffic")
         self.assertEqual(options["num_vehicles"], 0)
         self.assertFalse(options["traffic_enabled"])
         self.assertEqual(options["route_dist_range"], [30, 80])
+        self.assertEqual(options["speed_profile"], "medium")
+        self.assertEqual(options["ego_target_speed"], 10.0)
+        self.assertEqual(options["vehicle_target_speed"], 10.0)
+
+    def test_random_navigation_axis_overrides_take_precedence_over_preset(self):
+        options = build_random_navigation_options(
+            RandomNavigationReset(
+                difficulty_preset_id="hard",
+                route_extent="short",
+                traffic_density="none",
+                speed_profile="slow",
+            )
+        )
+
+        self.assertEqual(options["difficulty_preset_id"], "hard")
+        self.assertEqual(options["route_extent"], "short")
+        self.assertEqual(options["traffic_density"], "none")
+        self.assertEqual(options["speed_profile"], "slow")
+        self.assertEqual(options["route_dist_range"], [30, 80])
+        self.assertEqual(options["num_vehicles"], 0)
+        self.assertFalse(options["traffic_enabled"])
+        self.assertEqual(options["ego_target_speed"], 8.0)
+        self.assertEqual(options["vehicle_target_speed"], 8.0)
+
+    def test_random_navigation_difficulty_preset_resolves_runtime_values(self):
+        options = build_random_navigation_options(
+            RandomNavigationReset(difficulty_preset_id="medium")
+        )
+
+        self.assertEqual(options["difficulty_preset_id"], "medium")
+        self.assertEqual(options["route_extent"], "medium")
+        self.assertEqual(options["traffic_density"], "medium")
+        self.assertEqual(options["speed_profile"], "medium")
+        self.assertEqual(options["num_vehicles"], 16)
+        self.assertEqual(options["route_dist_range"], [40, 100])
+        self.assertEqual(options["ego_target_speed"], 10.0)
+        self.assertEqual(options["vehicle_target_speed"], 10.0)
 
     def test_random_navigation_options_include_explicit_subseeds(self):
         options = build_random_navigation_options(
@@ -204,8 +248,12 @@ class ResetBuilderTests(unittest.TestCase):
 
 class ProfileRegistryTests(unittest.TestCase):
     def test_get_profile_specs(self):
-        self.assertEqual(get_difficulty_spec("rt_medium_v1").num_vehicles, 16)
+        self.assertEqual(get_difficulty_spec("medium").traffic_density, "medium")
+        self.assertEqual(get_difficulty_spec("medium").route_extent, "medium")
         self.assertEqual(get_action_profile_spec("discrete9_v1").action_mode, "discrete")
+        self.assertEqual(get_route_extent_spec("large").route_dist_range, (50, 130))
+        self.assertEqual(get_traffic_density_spec("dense").num_vehicles, 25)
+        self.assertEqual(get_speed_profile_spec("slow").ego_target_speed, 8.0)
         self.assertEqual(get_reward_profile_spec("carl_base_v1").family, "carl")
 
 

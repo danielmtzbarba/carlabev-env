@@ -29,7 +29,7 @@ def _capture_spawn_state(
     env = _make_env(anchor_y_frac=anchor_y_frac)
     options = build_random_navigation_options(
         RandomNavigationReset(
-            difficulty_id="rt_medium_v1",
+            difficulty_preset_id="medium",
             scene_seed=scene_seed,
             route_seed=route_seed,
             traffic_seed=traffic_seed,
@@ -77,7 +77,7 @@ def _capture_spawn_state(
 def _capture_render_alignment(*, seed: int, anchor_y_frac: float) -> dict[str, object]:
     env = _make_env(anchor_y_frac=anchor_y_frac)
     options = build_random_navigation_options(
-        RandomNavigationReset(difficulty_id="rt_medium_v1")
+        RandomNavigationReset(difficulty_preset_id="medium")
     )
     try:
         env.reset(seed=seed, options=options)

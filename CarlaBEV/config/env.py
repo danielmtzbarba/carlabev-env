@@ -10,7 +10,12 @@ from CarlaBEV.config.action_profiles import (
     get_action_profile_spec,
     list_action_profile_ids,
 )
-from CarlaBEV.config.difficulty import list_difficulty_ids
+from CarlaBEV.config.difficulty import (
+    list_difficulty_preset_ids,
+    list_route_extent_ids,
+    list_speed_profile_ids,
+    list_traffic_density_ids,
+)
 from CarlaBEV.config.reward_profiles import (
     get_reward_profile_spec,
     list_reward_profile_ids,
@@ -345,7 +350,10 @@ def get_env_capabilities() -> dict[str, Any]:
         "action_profile_ids": list_action_profile_ids(),
         "reward_modes": ["shaping", "carl"],
         "reward_profile_ids": list_reward_profile_ids(),
-        "difficulty_ids": list_difficulty_ids(),
+        "difficulty_preset_ids": list_difficulty_preset_ids(),
+        "route_extent_ids": list_route_extent_ids(),
+        "traffic_density_ids": list_traffic_density_ids(),
+        "speed_profile_ids": list_speed_profile_ids(),
         "render_modes": ["human", "rgb_array"],
         "supports_vector_make_env": False,
         "scenario_ids": list_scenario_ids(),

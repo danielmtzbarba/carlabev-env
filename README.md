@@ -72,6 +72,7 @@ Project documentation lives in `CarlaBEV/docs/`:
 - [Control And Actions](CarlaBEV/docs/control_and_actions.md)
 - [Coordinate Conventions](CarlaBEV/docs/coordinate_conventions.md)
 - [Scenario Specifications](CarlaBEV/docs/scenario_specifications.md)
+- [Configuration Reference](CarlaBEV/docs/config_reference.md)
 - [Route Generation And Planning](CarlaBEV/docs/route_generation_and_planning.md)
 - [Debugging And Diagnostics](CarlaBEV/docs/debugging_and_diagnostics.md)
 - [Public Integration API](CarlaBEV/docs/downstream_integration_api.md)
@@ -209,22 +210,12 @@ from CarlaBEV.config import (
 )
 ```
 
-Common environment options include:
+Common `EnvConfig` options include:
 
 - `map_name`
 - `obs_mode`: `bev_rgb`, `bev_semantic`, or `vector`
-- `difficulty_id`: random-scene difficulty preset such as `rt_no_traffic_v1`, `rt_easy_v1`, `rt_medium_v1`, `rt_hard_v1`
 - `action_profile_id`: action profile preset such as `discrete9_v1`, `discrete13_v1`, `continuous_gsb_v1`
 - `reward_profile_id`: reward profile preset such as `carl_base_v1`, `carl_safety_v1`, `shaping_base_v1`
-- `semantic_mask_ch`: semantic channel layout used when
-  `obs_mode="bev_semantic"`
-  - `binary`: drivable
-  - `2-class`: drivable, route
-  - `4-class`: drivable, vehicle, pedestrian, route
-  - `5-class`: drivable, sidewalk, vehicle, pedestrian, route
-  - `6-class`: non_drivable, drivable, sidewalk, vehicle, pedestrian, route
-  - `7-class`: non_drivable, drivable, sidewalk, vehicle, pedestrian, route,
-    traffic_light_red
 - `action_mode`: `discrete` or `continuous`
 - `reward_mode`: `shaping` or `carl`
 - `size`: base BEV size
@@ -234,10 +225,37 @@ Common environment options include:
 - `max_vehicles`
 - `route_direction_metrics_enabled`: attach one-time smoothed-route fractions
   (`straight_fraction`, `left_turn_fraction`, `right_turn_fraction`) to reset info
+- `semantic_mask_ch`: semantic channel layout used when
+  `obs_mode="bev_semantic"`
+  - `binary`: drivable
+  - `2-class`: drivable, route
+  - `4-class`: drivable, vehicle, pedestrian, route
+  - `5-class`: drivable, sidewalk, vehicle, pedestrian, route
+  - `6-class`: non_drivable, drivable, sidewalk, vehicle, pedestrian, route
+  - `7-class`: non_drivable, drivable, sidewalk, vehicle, pedestrian, route,
+    traffic_light_red
+
+Common random-navigation reset options include:
+
+- `difficulty_preset_id`: `no_traffic`, `easy`, `medium`, `hard`
+- `route_extent`: `short`, `medium`, or `large`
+- `traffic_density`: `none`, `low`, `medium`, or `dense`
+- `speed_profile`: `slow`, `medium`, or `fast`
+- direct overrides such as `num_vehicles`, `route_dist_range`, `ego_target_speed`, and `vehicle_target_speed`
+
+Common `RunConfig` options include:
+
+- `num_envs`
 - `capture_video`: enable wrapper-based RGB video recording
+- `capture_every`
 - `video_output_dir`: explicit video artifact directory for the current run
 - `video_episode_indices`: optional explicit episode ids to record
 - `video_name_prefix`: output filename prefix for recorded videos
+
+For the full list of accepted `EnvConfig`, `RunConfig`, and reset-builder fields,
+plus where each parameter is actually consumed in the runtime, see:
+
+- [Configuration Reference](CarlaBEV/docs/config_reference.md)
 
 Legacy names such as `obs_space`, `masked`, `action_space`, and `reward_type`
 are accepted for compatibility, but new integrations should use the canonical
@@ -337,7 +355,7 @@ from CarlaBEV.config import RandomNavigationReset, build_random_navigation_optio
 
 options = build_random_navigation_options(
     RandomNavigationReset(
-        difficulty_id="rt_medium_v1",
+        difficulty_preset_id="medium",
         scene_seed=1000,
         route_seed=2000,
         traffic_seed=3000,

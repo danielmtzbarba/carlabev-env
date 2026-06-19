@@ -97,6 +97,7 @@ class SceneGenerator:
         num_vehicles = options.get("num_vehicles", self.cfg.get("max_vehicles", 25))
         dist_range = options.get("route_dist_range", self.cfg.get("route_dist_range", [30, 100]))
         ego_target_speed = options.get("ego_target_speed")
+        vehicle_target_speed = options.get("vehicle_target_speed")
         route_profile = options.get("route_profile")
         route_profile_mix = options.get("route_profile_mix")
         min_turns = options.get("min_turns")
@@ -140,7 +141,10 @@ class SceneGenerator:
         # --- Case 1: Random scene generation ---
         if isinstance(scene, str) and scene == "rdm":
             self.last_scene_context.update({
-                "difficulty_id": options.get("difficulty_id"),
+                "difficulty_preset_id": options.get("difficulty_preset_id"),
+                "route_extent": options.get("route_extent"),
+                "traffic_density": options.get("traffic_density"),
+                "speed_profile": options.get("speed_profile"),
                 "scenario_param_traffic_enabled": bool(traffic_enabled),
                 "scene_seed": options.get("scene_seed"),
                 "route_seed": options.get("route_seed"),
@@ -151,6 +155,7 @@ class SceneGenerator:
                 dist_range,
                 traffic_enabled=traffic_enabled,
                 ego_target_speed=ego_target_speed,
+                vehicle_target_speed=vehicle_target_speed,
                 route_profile=route_profile,
                 route_profile_mix=route_profile_mix,
                 min_turns=min_turns,
@@ -197,6 +202,7 @@ class SceneGenerator:
         max_retries=20,
         traffic_enabled=None,
         ego_target_speed=None,
+        vehicle_target_speed=None,
         route_profile=None,
         route_profile_mix=None,
         min_turns=None,
@@ -217,11 +223,16 @@ class SceneGenerator:
         if ego_target_speed is None:
             ego_target_speed = self.cfg.get("ego_target_speed", 12.0)
         ego_target_speed = float(ego_target_speed)
+        if vehicle_target_speed is None:
+            vehicle_target_speed = self.cfg.get("vehicle_target_speed", 12.0)
+        vehicle_target_speed = float(vehicle_target_speed)
         self.last_scene_context = {
             "scene": "rdm",
             "scenario_param_num_vehicles": int(num_cars),
             "scenario_param_route_dist_range": list(dist_range),
             "scenario_param_ego_route_graph": str(ego_route_graph),
+            "scenario_param_ego_target_speed": ego_target_speed,
+            "scenario_param_vehicle_target_speed": vehicle_target_speed,
         }
         selected_route_profile = route_profile
         if route_profile_mix:
@@ -298,6 +309,7 @@ class SceneGenerator:
                 "vehicle",
                 lane,
                 self.planners.all,
+                target_speed_mps=vehicle_target_speed,
                 rng=traffic_rng,
                 np_rng=traffic_np_rng,
             )
@@ -330,11 +342,17 @@ class SceneGenerator:
             ) from exc
 
 
-def get_actor(actor_type, lane, planners, *, rng=None, np_rng=None):
+def get_actor(actor_type, lane, planners, *, target_speed_mps=12.0, rng=None, np_rng=None):
     try:
         n1 = get_random_node(planners, actor_type, lane, rng=rng)
         n2 = get_random_node(planners, actor_type, lane, rng=rng)
-        veh = Vehicle(start_node=n1, end_node=n2, map_size=128, np_rng=np_rng)
+        veh = Vehicle(
+            start_node=n1,
+            end_node=n2,
+            map_size=128,
+            target_speed=target_speed_mps,
+            np_rng=np_rng,
+        )
         veh, path = find_route(planners, veh, lane=lane)
         if len(path[0]) > 5:
             return veh, path

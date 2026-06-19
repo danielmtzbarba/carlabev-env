@@ -41,6 +41,10 @@ class Node(object):
         return [self.draw_x, self.draw_y]
 
 class Actor(pygame.sprite.Sprite):
+    traffic_speed_kp = 0.5
+    traffic_max_accel_mps2 = 2.5
+    traffic_max_decel_mps2 = 3.5
+
     def __init__(
         self,
         start_node=None,
@@ -104,7 +108,12 @@ class Actor(pygame.sprite.Sprite):
         self.initial_speed = speed_mps_to_surface(initial_speed_mps)
         self.target_speed = self.cruise_speed
         self.target_speed_mps = self.cruise_speed_mps
-        self._controller = Controller(self.target_speed)
+        self._controller = Controller(
+            self.target_speed,
+            speed_kp=self.traffic_speed_kp,
+            max_accel_mps2=self.traffic_max_accel_mps2,
+            max_decel_mps2=self.traffic_max_decel_mps2,
+        )
         self._controller.set_route(
             self.rx,
             self.ry,

@@ -41,3 +41,19 @@ def test_vehicle_startup_ramp_caps_target_speed_until_ramp_finishes():
         vehicle.cruise_speed_mps,
         rel_tol=1e-6,
     )
+
+
+def test_vehicle_controller_uses_softened_speed_gain_and_accel_limits():
+    vehicle = _make_vehicle(cruise_speed_mps=12.0)
+
+    assert math.isclose(vehicle._controller.speed_kp, 0.5, rel_tol=1e-9)
+    assert math.isclose(vehicle._controller.max_accel_mps2, 2.5, rel_tol=1e-9)
+    assert math.isclose(vehicle._controller.max_decel_mps2, 3.5, rel_tol=1e-9)
+
+    vehicle._controller._target_speed_mps = 12.0
+    vehicle._controller.v_mps = 0.0
+    assert math.isclose(vehicle._controller.pid_control(), 2.5, rel_tol=1e-9)
+
+    vehicle._controller._target_speed_mps = 0.0
+    vehicle._controller.v_mps = 12.0
+    assert math.isclose(vehicle._controller.pid_control(), -3.5, rel_tol=1e-9)

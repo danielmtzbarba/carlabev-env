@@ -184,6 +184,12 @@ Current random traffic startup policy:
 - `20%` start in `[0.25 * cruise, 0.5 * cruise]`
 - startup ramp duration: about `1.0 s`
 
+Current random traffic longitudinal controller tuning:
+
+- speed gain: `Kp = 0.5`
+- max commanded acceleration: `2.5 m/s^2`
+- max commanded deceleration: `3.5 m/s^2`
+
 These policies apply only to procedurally generated background traffic. Ego
 speed remains controlled by `ego_target_speed`, and authored scenario actors
 keep their explicit speeds unless they opt into the same behavior.

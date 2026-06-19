@@ -28,13 +28,23 @@ class Controller(State):
     rolling_resistance_mps2 = 0.05
     aero_drag_coeff = 0.002
 
-    def __init__(self, target_speed, L=2.9) -> None:
+    def __init__(
+        self,
+        target_speed,
+        L=2.9,
+        speed_kp=None,
+        max_accel_mps2=None,
+        max_decel_mps2=None,
+    ) -> None:
         super().__init__()
         self.time = 0.0
         self._target_speed = float(target_speed)
         self._target_speed_mps = speed_surface_to_mps(target_speed)
         self.max_steer = np.radians(30.0)  # [rad] max steering angle
         self.L = float(L)  # [m] Wheel base of vehicle
+        self.speed_kp = self.Kp if speed_kp is None else float(speed_kp)
+        self.max_accel_mps2 = None if max_accel_mps2 is None else float(max_accel_mps2)
+        self.max_decel_mps2 = None if max_decel_mps2 is None else float(max_decel_mps2)
     
     def set_target_speed(self, target_speed):
         self._target_speed = float(target_speed)
@@ -113,7 +123,10 @@ class Controller(State):
         :param target: (float)
         :return: (float)
         """
-        return self.Kp * (self._target_speed_mps - self.v_mps)
+        accel_cmd = self.speed_kp * (self._target_speed_mps - self.v_mps)
+        accel_upper = np.inf if self.max_accel_mps2 is None else self.max_accel_mps2
+        decel_lower = -np.inf if self.max_decel_mps2 is None else -self.max_decel_mps2
+        return float(np.clip(accel_cmd, decel_lower, accel_upper))
 
     def longitudinal_resistance_accel(self):
         speed_mps = abs(self.v_mps)

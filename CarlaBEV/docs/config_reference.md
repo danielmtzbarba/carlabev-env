@@ -201,6 +201,12 @@ Current built-in startup policy:
 - `60%` start uniformly in `[0, 0.25 * cruise]`
 - `20%` start uniformly in `[0.25 * cruise, 0.5 * cruise]`
 
+Current random traffic controller tuning:
+
+- proportional speed gain: `Kp = 0.5`
+- maximum commanded acceleration: `2.5 m/s^2`
+- maximum commanded deceleration: `3.5 m/s^2`
+
 This policy is applied only to procedurally generated traffic. Authored scenarios and scenario-specific actors keep their explicit startup speeds unless they opt into the same pattern.
 
 ## Scenario Reset Builders

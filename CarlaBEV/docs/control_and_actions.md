@@ -113,6 +113,7 @@ These are attached to `info["hero"]` on every step and then summarized into epis
 
 - Steering and longitudinal dynamics are heuristic rather than vehicle-calibrated.
 - Ego and controller-driven traffic now share the same passive resistance model.
+- Controller-driven traffic also uses a softer speed loop than ego command-space control, with `Kp = 0.5` and explicit `2.5 / 3.5 m/s^2` accel-decel clamps.
 - There is no tire model or slip-angle model.
 - The control layer is designed for DRL research rather than high-fidelity vehicle dynamics studies.
 

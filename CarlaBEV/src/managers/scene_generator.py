@@ -54,6 +54,8 @@ class SceneGenerator:
       - Predefined critical scenarios (catalogue)
     """
 
+    DEFAULT_RANDOM_NUM_VEHICLES = 16
+
     def __init__(self, config=None):
         if hasattr(config, "model_dump"):
             self.cfg = config.model_dump(mode="python")
@@ -139,7 +141,7 @@ class SceneGenerator:
         scene = options.get("scene", "rdm")
         config_file = options.get("config_file")
         traffic_enabled = options.get("traffic_enabled", self.traffic_enabled)
-        num_vehicles = options.get("num_vehicles", self.cfg.get("max_vehicles", 25))
+        num_vehicles = options.get("num_vehicles", self.DEFAULT_RANDOM_NUM_VEHICLES)
         dist_range = options.get("route_dist_range", self.cfg.get("route_dist_range", [30, 100]))
         ego_target_speed = options.get("ego_target_speed")
         vehicle_target_speed = options.get("vehicle_target_speed")

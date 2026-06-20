@@ -49,6 +49,7 @@ class PublicConfigContractTests(unittest.TestCase):
                 "action_space": "continuous",
                 "reward_type": "shaping",
                 "render_mode": "rgb_array",
+                "max_vehicles": 99,
             }
         )
 
@@ -59,6 +60,7 @@ class PublicConfigContractTests(unittest.TestCase):
         self.assertEqual(cfg.reward_profile_id, "shaping_base_v1")
         self.assertEqual(cfg.obs_space, "bev")
         self.assertFalse(cfg.masked)
+        self.assertFalse(hasattr(cfg, "max_vehicles"))
 
     def test_validate_env_config_rejects_missing_map_assets(self):
         with self.assertRaises(ValidationError):
@@ -185,6 +187,12 @@ class ResetBuilderTests(unittest.TestCase):
         self.assertEqual(options["route_seed"], 22)
         self.assertEqual(options["traffic_seed"], 33)
         self.assertEqual(options["scenario_seed"], 44)
+
+    def test_random_navigation_defaults_use_medium_like_vehicle_count_without_legacy_override(self):
+        options = build_random_navigation_options(RandomNavigationReset())
+
+        self.assertEqual(options["num_vehicles"], 16)
+        self.assertTrue(options["traffic_enabled"])
 
     def test_authored_scene_options_include_variation_seed(self):
         options = build_authored_scene_options(

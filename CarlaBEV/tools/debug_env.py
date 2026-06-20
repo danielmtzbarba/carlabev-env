@@ -97,7 +97,7 @@ def _persist_episode_record(record):
 def build_debug_reset_options(reset_mask, *, reset_index=0, overrides=None):
     seed_base = int(cfg.seed) + int(reset_index) * 1000
     request = RandomNavigationReset(
-        num_vehicles=cfg.env.max_vehicles,
+        difficulty_preset_id="medium",
         route_dist_range=(30, 130),
         ego_route_graph="canonical",
         scene_seed=seed_base,

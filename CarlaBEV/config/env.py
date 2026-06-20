@@ -75,7 +75,6 @@ class EnvConfig(BaseModel):
     reward_profile_id: str | None = None
 
     traffic_enabled: bool = True
-    max_vehicles: int = 50
     route_direction_metrics_enabled: bool = False
 
     @model_validator(mode="before")
@@ -251,7 +250,6 @@ def _to_env_mapping(value: Any):
         "max_actions",
         "scenes_path",
         "traffic_enabled",
-        "max_vehicles",
         "route_direction_metrics_enabled",
         "action_profile_id",
         "reward_profile_id",

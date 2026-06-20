@@ -154,7 +154,7 @@ def build_random_navigation_options(
     num_vehicles = (
         int(request.num_vehicles)
         if request.num_vehicles is not None
-        else (int(resolved.num_vehicles) if resolved is not None else 25)
+        else (int(resolved.num_vehicles) if resolved is not None else 16)
     )
     options["num_vehicles"] = num_vehicles
 

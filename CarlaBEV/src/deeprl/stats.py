@@ -27,6 +27,15 @@ class EpisodeStats:
         self.comfort_step_violations = []
         self.harsh_brake_flags = []
 
+    @staticmethod
+    def _progress_from_scene(info):
+        scene = info.get("scene", {})
+        route_length_m = float(scene.get("route_length", 0.0) or 0.0)
+        dist2goal_m = float(scene.get("dist2goal_m", 0.0) or 0.0)
+        if route_length_m <= 1e-6:
+            return None
+        return float(np.clip(1.0 - (dist2goal_m / route_length_m), 0.0, 1.0))
+
     def step(self, info):
         r = info["reward"]["reward"]
         self.rewards.append(r)
@@ -41,6 +50,10 @@ class EpisodeStats:
 
         if "progress" in info["reward"]:
             self.progress.append(info["reward"]["progress"])
+        else:
+            derived_progress = self._progress_from_scene(info)
+            if derived_progress is not None:
+                self.progress.append(derived_progress)
 
         if "ttc" in info["reward"]:
             self.ttc.append(info["reward"]["ttc"])
@@ -70,6 +83,10 @@ class EpisodeStats:
     @property
     def mean_progress(self):
         return float(np.mean(self.progress)) if self.progress else 0.0
+
+    @property
+    def final_progress(self):
+        return float(self.progress[-1]) if self.progress else 0.0
 
     def mean_abs_metric(self, key):
         values = self.comfort_values.get(key, [])
@@ -137,6 +154,7 @@ class Stats:
             "mean_speed": self.current.mean_speed,
             "mean_ttc": self.current.mean_ttc,
             "mean_progress": self.current.mean_progress,
+            "final_progress": self.current.final_progress,
             "mean_abs_accel_long": self.current.mean_abs_metric("accel_long"),
             "mean_abs_accel_lat": self.current.mean_abs_metric("accel_lat"),
             "mean_abs_jerk_long": self.current.mean_abs_metric("jerk_long"),

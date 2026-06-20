@@ -72,6 +72,7 @@ class SceneGenerator:
             ),
         }
         self.last_scene_context = {}
+        self.vehicle_spawn_retry_limit = 4
 
     @staticmethod
     def _sample_vehicle_startup(target_speed_mps, rng=None):
@@ -285,6 +286,7 @@ class SceneGenerator:
                 "fast": 1.15,
             },
             "scenario_param_vehicle_speed_jitter_frac": 0.05,
+            "scenario_param_vehicle_spawn_retry_limit": int(self.vehicle_spawn_retry_limit),
         }
         selected_route_profile = route_profile
         if route_profile_mix:
@@ -352,36 +354,46 @@ class SceneGenerator:
         # 2️⃣ Background vehicles
         sampled_vehicle_speeds = []
         sampled_vehicle_speed_classes = {"slow": 0, "medium": 0, "fast": 0}
+        total_vehicle_spawn_attempts = 0
         for _ in range(num_cars):
-            if traffic_rng is None:
-                import random
+            veh = None
+            for _attempt in range(self.vehicle_spawn_retry_limit):
+                total_vehicle_spawn_attempts += 1
+                if traffic_rng is None:
+                    import random
 
-                lane = random.choice(["L", "R"])
-            else:
-                lane = traffic_rng.choice(["L", "R"])
-            speed_profile = self._sample_vehicle_speed_profile(
-                vehicle_target_speed,
-                rng=traffic_rng,
-            )
-            veh, _ = get_actor(
-                "vehicle",
-                lane,
-                self.planners.all,
-                target_speed_mps=speed_profile["target_speed_mps"],
-                startup_config=self._sample_vehicle_startup(
-                    speed_profile["target_speed_mps"],
+                    lane = random.choice(["L", "R"])
+                else:
+                    lane = traffic_rng.choice(["L", "R"])
+                speed_profile = self._sample_vehicle_speed_profile(
+                    vehicle_target_speed,
                     rng=traffic_rng,
-                ),
-                speed_profile=speed_profile,
-                rng=traffic_rng,
-                np_rng=traffic_np_rng,
-            )
-            if veh is None:
-                continue
-            actors["vehicle"].append(veh)
-            sampled_vehicle_speeds.append(float(veh.cruise_speed_mps))
-            sampled_vehicle_speed_classes[veh.speed_class] += 1
+                )
+                veh, _ = get_actor(
+                    "vehicle",
+                    lane,
+                    self.planners.all,
+                    target_speed_mps=speed_profile["target_speed_mps"],
+                    startup_config=self._sample_vehicle_startup(
+                        speed_profile["target_speed_mps"],
+                        rng=traffic_rng,
+                    ),
+                    speed_profile=speed_profile,
+                    rng=traffic_rng,
+                    np_rng=traffic_np_rng,
+                )
+                if veh is not None:
+                    actors["vehicle"].append(veh)
+                    sampled_vehicle_speeds.append(float(veh.cruise_speed_mps))
+                    sampled_vehicle_speed_classes[veh.speed_class] += 1
+                    break
 
+        spawned_vehicle_count = len(actors["vehicle"])
+        self.last_scene_context["requested_num_vehicles"] = int(num_cars)
+        self.last_scene_context["spawned_num_vehicles"] = int(spawned_vehicle_count)
+        self.last_scene_context["vehicle_spawn_shortfall"] = int(num_cars - spawned_vehicle_count)
+        self.last_scene_context["traffic_count_exact"] = bool(spawned_vehicle_count == num_cars)
+        self.last_scene_context["vehicle_spawn_attempts"] = int(total_vehicle_spawn_attempts)
         if sampled_vehicle_speeds:
             self.last_scene_context["generated_vehicle_speed_classes"] = dict(sampled_vehicle_speed_classes)
             self.last_scene_context["generated_vehicle_speed_min_mps"] = float(min(sampled_vehicle_speeds))

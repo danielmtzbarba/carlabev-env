@@ -80,6 +80,12 @@ def _capture_spawn_state(
             "traffic_seed": info.get("scenario", {}).get("scenario_param_traffic_seed"),
             "base_vehicle_target_speed_mps": info.get("scenario", {}).get("scenario_param_vehicle_target_speed"),
             "vehicle_speed_mix": info.get("scenario", {}).get("scenario_param_vehicle_speed_mix"),
+            "requested_num_vehicles": info.get("scenario", {}).get("requested_num_vehicles"),
+            "spawned_num_vehicles": info.get("scenario", {}).get("spawned_num_vehicles"),
+            "vehicle_spawn_shortfall": info.get("scenario", {}).get("vehicle_spawn_shortfall"),
+            "traffic_count_exact": info.get("scenario", {}).get("traffic_count_exact"),
+            "vehicle_spawn_attempts": info.get("scenario", {}).get("vehicle_spawn_attempts"),
+            "vehicle_spawn_retry_limit": info.get("scenario", {}).get("scenario_param_vehicle_spawn_retry_limit"),
         }
     finally:
         env.close()
@@ -229,6 +235,22 @@ class SeededSceneConsistencyTests(unittest.TestCase):
             lower, upper = class_bounds[speed_class]
             self.assertGreaterEqual(cruise_speed_mps, lower - 1e-6)
             self.assertLessEqual(cruise_speed_mps, upper + 1e-6)
+
+    def test_random_traffic_records_requested_vs_spawned_vehicle_counts(self):
+        snapshot = _capture_spawn_state(seed=11, anchor_y_frac=0.5)
+
+        requested = int(snapshot["requested_num_vehicles"])
+        spawned = int(snapshot["spawned_num_vehicles"])
+        shortfall = int(snapshot["vehicle_spawn_shortfall"])
+        retry_limit = int(snapshot["vehicle_spawn_retry_limit"])
+        attempts = int(snapshot["vehicle_spawn_attempts"])
+
+        self.assertEqual(requested, 16)
+        self.assertEqual(spawned, snapshot["num_vehicles"])
+        self.assertEqual(shortfall, requested - spawned)
+        self.assertEqual(snapshot["traffic_count_exact"], spawned == requested)
+        self.assertGreaterEqual(attempts, spawned)
+        self.assertLessEqual(attempts, requested * retry_limit)
 
 
 if __name__ == "__main__":

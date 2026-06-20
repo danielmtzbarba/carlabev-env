@@ -14,6 +14,7 @@ from CarlaBEV.config import (
 class LoggerConfig:
     enabled: bool = True
     dir: str = "debug_log/"
+    mode: str = "standard"
 
 
 @dataclass

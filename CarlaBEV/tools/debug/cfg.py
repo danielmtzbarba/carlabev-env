@@ -44,6 +44,10 @@ class EnvConfig:
     # Traffic generation
     traffic_enabled: bool = True
     route_direction_metrics_enabled: bool = False
+    scene_library_enabled: bool = True
+    scene_library_path: str = "runs/scene_library.sqlite3"
+    scene_library_read_only: bool = False
+    scene_library_generator_version: str = "role_traffic_v1"
     # Curriculum
     curriculum_enabled: bool = False
     start_ep: int = 100
@@ -138,6 +142,10 @@ def to_public_env_config(env_cfg: EnvConfig) -> PublicEnvConfig:
         reward_mode=env_cfg.reward_type,
         traffic_enabled=env_cfg.traffic_enabled,
         route_direction_metrics_enabled=env_cfg.route_direction_metrics_enabled,
+        scene_library_enabled=env_cfg.scene_library_enabled,
+        scene_library_path=env_cfg.scene_library_path,
+        scene_library_read_only=env_cfg.scene_library_read_only,
+        scene_library_generator_version=env_cfg.scene_library_generator_version,
     )
 
 

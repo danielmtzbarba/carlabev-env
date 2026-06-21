@@ -76,6 +76,10 @@ class EnvConfig(BaseModel):
 
     traffic_enabled: bool = True
     route_direction_metrics_enabled: bool = False
+    scene_library_enabled: bool = True
+    scene_library_path: str = "runs/scene_library.sqlite3"
+    scene_library_read_only: bool = False
+    scene_library_generator_version: str = "role_traffic_v1"
 
     @model_validator(mode="before")
     @classmethod
@@ -251,6 +255,10 @@ def _to_env_mapping(value: Any):
         "scenes_path",
         "traffic_enabled",
         "route_direction_metrics_enabled",
+        "scene_library_enabled",
+        "scene_library_path",
+        "scene_library_read_only",
+        "scene_library_generator_version",
         "action_profile_id",
         "reward_profile_id",
     }}

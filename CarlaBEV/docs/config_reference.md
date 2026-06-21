@@ -61,6 +61,10 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 | `reward_profile_id` | `str | None` | `EnvConfig` validation, `CarlaBEV.build_reward_fn()` | Selects the concrete reward profile and parameters. |
 | `traffic_enabled` | `bool = True` | `SceneGenerator` defaults | Default switch for random-scene traffic when reset options do not override it. |
 | `route_direction_metrics_enabled` | `bool = False` | `CarlaBEV.reset()` | When enabled, adds smoothed route left/right/straight fractions to scenario metadata after spawn. |
+| `scene_library_enabled` | `bool = True` | `CarlaBEV.reset()` | Enables the SQLite scene-library cache for random-scene replay and metadata lookup. |
+| `scene_library_path` | `str = "runs/scene_library.sqlite3"` | `SceneLibrary` | Filesystem path for the scene-library SQLite database. |
+| `scene_library_read_only` | `bool = False` | `SceneLibrary` | When enabled, reads from the scene library without inserting new scenes. |
+| `scene_library_generator_version` | `str = "role_traffic_v1"` | `SceneLibrary` | Version string incorporated into the scene cache key so generator changes invalidate stale entries. |
 
 ### Observation And Wrapper Fields
 
@@ -93,6 +97,9 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
   - RGB observations are converted to grayscale and then frame-stacked
   - semantic observations are converted into channel-first masks and then stacked or fused
 - `validate_run_config()` rejects `obs_mode="vector"` through `make_env()`. Use `CarlaBEV(...)` directly for vector observations.
+- The scene library is enabled by default. Repeated resets with the same resolved
+  scene request can therefore become cache hits instead of rerunning full scene
+  generation.
 
 ## `RunConfig`
 

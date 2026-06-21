@@ -28,6 +28,7 @@ The tool currently uses:
 - `scene="rdm"`
 - the canonical Town01 ego route graph
 - the random-navigation preset/default traffic schema
+- the scene library cache enabled by default
 - per-reset seed offsets so repeated resets produce different scenes
 
 On reset it prints:
@@ -35,6 +36,7 @@ On reset it prints:
 - effective reset options
 - scenario metadata from `info["scenario"]`
 - `scene_descriptor` metadata from `info["scene_descriptor"]`
+- a debug line with `scene-cache hit` or `scene-cache miss` when the cache is enabled
 
 At episode end the standard log line now includes:
 

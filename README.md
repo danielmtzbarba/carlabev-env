@@ -245,6 +245,11 @@ Common random-navigation reset options include:
 - direct overrides such as `num_vehicles`, `route_dist_range`,
   `ego_target_speed`, and `vehicle_target_speed`
 
+Scene replay is now backed by a SQLite scene library by default. Repeated
+resets with the same resolved scene request can therefore reuse cached actor
+payloads instead of regenerating the full scene, and `debug_env.py` reports
+cache hits and misses on reset.
+
 Common `RunConfig` options include:
 
 - `num_envs`

@@ -108,6 +108,18 @@ def _persist_episode_record(record):
         handle.write(f"{json.dumps(record)}\n")
 
 
+def _log_scene_cache(info):
+    cache_info = info.get("scene_cache") or {}
+    if not cache_info.get("enabled", False):
+        return
+    status = "hit" if cache_info.get("hit", False) else "miss"
+    logger.debug(
+        "[debug-env] scene-cache {} key={}",
+        status,
+        cache_info.get("scene_key", "n/a"),
+    )
+
+
 def build_debug_reset_options(reset_mask, *, reset_index=0, overrides=None):
     seed_base = int(cfg.seed) + int(reset_index) * 1000
     request = RandomNavigationReset(
@@ -144,6 +156,7 @@ def main(size: int = 128):
     reset_index = 0
     options = build_debug_reset_options(np.array([True], dtype=bool), reset_index=reset_index)
     observation, info = envs.reset(options=options)
+    _log_scene_cache(info)
     if log_mode == "verbose":
         logger.info("[debug-env] reset-options {}", {k: v for k, v in options.items() if k != "reset_mask"})
         if info.get("scenario"):
@@ -217,6 +230,7 @@ def main(size: int = 128):
                     reset_index=reset_index,
                 )
                 observation, info = envs.reset(options=options)
+                _log_scene_cache(info)
                 if log_mode == "verbose" and info.get("scenario"):
                     logger.info("[debug-env] scenario {}", info["scenario"])
                 spawn_info = info.get("spawn_validation", {})

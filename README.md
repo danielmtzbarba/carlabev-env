@@ -290,6 +290,12 @@ resets with the same resolved scene request can therefore reuse cached actor
 payloads instead of regenerating the full scene, and `debug_env.py` reports
 cache hits and misses on reset.
 
+The intended downstream workflow is:
+
+- prebuild study-specific scene libraries ahead of training
+- point downstream study configs at those `.db` files
+- keep training/evaluation runs in read-only mode so study execution never mutates the prepared corpus
+
 Common `RunConfig` options include:
 
 - `num_envs`

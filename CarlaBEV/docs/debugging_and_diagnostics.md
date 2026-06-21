@@ -167,6 +167,11 @@ To populate the scene library without stepping episodes:
 uv run carlabev scene build-library --episodes 100
 ```
 
+This command is intended for ahead-of-time corpus preparation. A common
+downstream pattern is to build one library per study or per protocol, then run
+training with the scene library enabled in read-only mode so the experiment only
+reuses prepared scenes.
+
 To summarize the cached scene corpus:
 
 ```bash

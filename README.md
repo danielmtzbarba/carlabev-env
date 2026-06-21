@@ -171,6 +171,16 @@ uv run carlabev run interactive --reset-mode authored --scene-file CarlaBEV/asse
 uv run carlabev run interactive --reset-mode scenario --scenario-id lead_brake
 ```
 
+Scene-library analysis now supports focused subcommands:
+
+```bash
+uv run carlabev scene analyze-library
+uv run carlabev scene analyze-library summary
+uv run carlabev scene analyze-library breakdown --by difficulty --by route-profile
+uv run carlabev scene analyze-library quality
+uv run carlabev scene analyze-library query --limit 10
+```
+
 For the full set of debugging and route-diagnostics tools, see:
 
 - [Debugging And Diagnostics](CarlaBEV/docs/debugging_and_diagnostics.md)

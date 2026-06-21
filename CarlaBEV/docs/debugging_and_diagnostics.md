@@ -171,10 +171,23 @@ To summarize the cached scene corpus:
 
 ```bash
 uv run carlabev scene analyze-library
-uv run carlabev scene analyze-library --json
+uv run carlabev scene analyze-library summary
+uv run carlabev scene analyze-library breakdown --by difficulty --by route-profile
+uv run carlabev scene analyze-library quality
+uv run carlabev scene analyze-library query --limit 10
+uv run carlabev scene analyze-library quality --json
 ```
 
-The scene-library analysis reports:
+`carlabev scene analyze-library` without a subcommand defaults to `summary`.
+
+Available analysis modes:
+
+- `summary`: one-screen corpus health check
+- `breakdown`: grouped counts by metadata dimensions such as difficulty, route profile, and main role
+- `quality`: spawn usefulness metrics such as zero-near-ego rate and requested-traffic fulfillment
+- `query`: filtered row listing for targeted inspection
+
+The scene-library analysis reports and exposes:
 
 - total scene count
 - generator-version counts

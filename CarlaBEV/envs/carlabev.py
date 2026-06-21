@@ -143,11 +143,22 @@ class CarlaBEV(gym.Env):
             self._scene_descriptor = dict(cached_scene["scene_descriptor"])
             last_spawn_info = self._reset_map_and_validate(actors, rng_bundle)
             if last_spawn_info and not last_spawn_info.get("valid", False):
-                raise RuntimeError(
-                    f"Cached scene {scene_key} failed spawn validation: {last_spawn_info}"
-                )
-        else:
+                if self.scene_library is not None and not getattr(self.scene_library, "read_only", False):
+                    self.scene_library.delete_scene(scene_key)
+                    cached_scene = None
+                    self._scene_cache_info = {
+                        "enabled": True,
+                        "hit": False,
+                        "scene_key": scene_key,
+                        "evicted_invalid_cache": True,
+                    }
+                else:
+                    raise RuntimeError(
+                        f"Cached scene {scene_key} failed spawn validation: {last_spawn_info}"
+                    )
+        if cached_scene is None:
             self._scene_cache_info = {
+                **self._scene_cache_info,
                 "enabled": bool(self.scene_library is not None),
                 "hit": False,
                 "scene_key": scene_key,

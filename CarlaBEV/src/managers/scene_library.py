@@ -325,6 +325,12 @@ class SceneLibrary:
                 (utc_now_iso(), scene_key),
             )
 
+    def delete_scene(self, scene_key: str) -> None:
+        if self.read_only:
+            return
+        with self._connect() as conn:
+            conn.execute("DELETE FROM scenes WHERE scene_key = ?", (scene_key,))
+
     @staticmethod
     def _row_to_record(row: sqlite3.Row) -> dict[str, Any]:
         record = dict(row)

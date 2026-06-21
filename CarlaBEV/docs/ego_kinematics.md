@@ -6,12 +6,17 @@ This document describes the current ego-motion model used by CarlaBEV.
 
 The ego vehicle uses a kinematic bicycle update implemented in [state.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/control/state.py) and driven through [hero.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/actors/hero.py).
 
-State:
+Canonical runtime state:
 
-- `x`: world/surface x-position
-- `y`: world/surface y-position
+- `x_m`: world x-position in meters
+- `y_m`: world y-position in meters
 - `yaw`: heading in radians
-- `v`: longitudinal speed
+- `v_mps`: longitudinal speed in meters/second
+
+Compatibility exports:
+
+- `state`: legacy surface-frame `[x_surface, y_surface, yaw, v_surface]`
+- `state_m`: canonical metric `[x_m, y_m, yaw, v_mps]`
 
 Discrete-time update:
 
@@ -40,20 +45,26 @@ The ego action is mapped to:
 
 Then the simulator computes:
 
-`a_target = a_gas - a_brake - 0.05 v`
+`a_target = a_gas - a_brake - a_resist(v)`
+
+with:
+
+`a_resist(v) = c_roll + c_drag v^2`
 
 and smooths it with a first-order filter:
 
 `a_k = (1 - alpha) a_{k-1} + alpha a_target`
 
-with `alpha = 0.2`.
+with `alpha = 0.5`.
 
-After the main update, a small velocity damping is applied:
+Current command limits:
 
-- `v *= 0.9999`
-- `v *= 0.985`
+- full-throttle acceleration: `4.5 m/s^2`
+- full-brake deceleration: `0.6 * scale * meters_per_pixel`
 
-This is a simplified research vehicle model rather than a production vehicle model.
+The same explicit longitudinal resistance model is also used by
+controller-driven background vehicles so ego and traffic do not rely on
+different passive slow-down rules.
 
 ## Intended Behavior
 
@@ -84,8 +95,9 @@ This gives the policy enough turning authority for dynamic-object avoidance whil
 
 ## Notes
 
-- Speed is an internally scaled simulator quantity within the current runtime model.
-- The model uses simple damping rather than a calibrated drivetrain/brake model.
+- Internal ego dynamics now run in SI units.
+- Legacy surface-frame state is still exported for backward compatibility.
+- The model uses explicit rolling resistance and quadratic drag rather than multiplicative damping.
 - Collision footprint is coarse relative to real vehicle geometry.
 
 ## Implementation References

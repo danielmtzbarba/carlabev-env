@@ -3,6 +3,7 @@ import numpy as np
 import pygame
 
 from CarlaBEV.config.reward_profiles import get_reward_profile_spec
+from CarlaBEV.envs.geometry import route_length_meters
 from CarlaBEV.envs.world import BaseMap
 from CarlaBEV.envs.spaces import decode_action, get_obs_space, get_action_space
 from CarlaBEV.envs.renderer import Renderer
@@ -16,6 +17,11 @@ from CarlaBEV.src.control.route_metrics import (
 
 
 from CarlaBEV.src.managers.scene_generator import SceneGenerator
+from CarlaBEV.src.managers.scene_library import (
+    SceneLibrary,
+    deserialize_scene_payload,
+    serialize_scene_payload,
+)
 from CarlaBEV.src.randomness import build_rng_bundle
 
 
@@ -69,7 +75,17 @@ class CarlaBEV(gym.Env):
 
         self.map = BaseMap(self.cfg)
         self.scene_generator = SceneGenerator(self.cfg)
+        self.scene_library = self._build_scene_library()
         self.options = None
+
+    def _build_scene_library(self):
+        if not getattr(self.cfg, "scene_library_enabled", False):
+            return None
+        return SceneLibrary(
+            getattr(self.cfg, "scene_library_path", "CarlaBEV/assets/scenes/scene_library.db"),
+            generator_version=getattr(self.cfg, "scene_library_generator_version", "role_traffic_v1"),
+            read_only=getattr(self.cfg, "scene_library_read_only", False),
+        )
 
     def _get_obs(self):
         return self.render()
@@ -78,6 +94,10 @@ class CarlaBEV(gym.Env):
         info = {}
         if hasattr(self, "_scenario_context") and self._scenario_context:
             info["scenario"] = dict(self._scenario_context)
+        if hasattr(self, "_scene_descriptor") and self._scene_descriptor:
+            info["scene_descriptor"] = dict(self._scene_descriptor)
+        if hasattr(self, "_scene_cache_info") and self._scene_cache_info:
+            info["scene_cache"] = dict(self._scene_cache_info)
         return info
 
     def _resolve_rng_bundle(self, seed: int | None, options: dict) -> tuple[int, object]:
@@ -105,30 +125,52 @@ class CarlaBEV(gym.Env):
         self._current_step = 0
         self.stats.reset()
         self._scenario_context = {}
+        self._scene_descriptor = {}
+        self._scene_cache_info = {}
         max_reset_attempts = options.get("max_reset_attempts", 10)
         last_spawn_info = None
-
-        for _ in range(max_reset_attempts):
-            actors, len_route = self.scene_generator.build_scene(
-                options,
-                rng_bundle=rng_bundle,
-            )
-            self._scenario_context = self._extract_scenario_context(options)
-            self._scenario_context.update(getattr(self.scene_generator, "last_scene_context", {}) or {})
-            self.len_ego_route = len_route
-            self.num_vehicles = len(actors["vehicle"])
-            self.map.reset(actors, hero_np_rng=rng_bundle.route_np_rng)
-            if actors and actors.get("agent") is not None:
-                self._maybe_attach_route_direction_metrics()
-                last_spawn_info = self.map.spawn_validation_info()
-            else:
-                last_spawn_info = {"valid": True, "reason": "no_agent"}
-            if last_spawn_info["valid"]:
-                break
+        scene_key = self._scene_cache_key(options, rng_bundle)
+        cached_scene = self._load_cached_scene(scene_key)
+        if cached_scene is not None:
+            self._scene_cache_info = {
+                "enabled": True,
+                "hit": True,
+                "scene_key": scene_key,
+            }
+            actors = cached_scene["actors"]
+            len_route = self._route_length_from_cached_actors(actors)
+            self._scenario_context = dict(cached_scene["scenario_context"])
+            self._scene_descriptor = dict(cached_scene["scene_descriptor"])
+            last_spawn_info = self._reset_map_and_validate(actors, rng_bundle)
+            if last_spawn_info and not last_spawn_info.get("valid", False):
+                raise RuntimeError(
+                    f"Cached scene {scene_key} failed spawn validation: {last_spawn_info}"
+                )
         else:
-            raise RuntimeError(
-                f"Failed to reset into a valid initial state after {max_reset_attempts} attempts: {last_spawn_info}"
-            )
+            self._scene_cache_info = {
+                "enabled": bool(self.scene_library is not None),
+                "hit": False,
+                "scene_key": scene_key,
+            }
+            for _ in range(max_reset_attempts):
+                actors, len_route = self.scene_generator.build_scene(
+                    options,
+                    rng_bundle=rng_bundle,
+                )
+                self._scenario_context = self._extract_scenario_context(options)
+                self._scenario_context.update(getattr(self.scene_generator, "last_scene_context", {}) or {})
+                self._scene_descriptor = self._build_scene_descriptor()
+                last_spawn_info = self._reset_map_and_validate(actors, rng_bundle)
+                if last_spawn_info["valid"]:
+                    break
+            else:
+                raise RuntimeError(
+                    f"Failed to reset into a valid initial state after {max_reset_attempts} attempts: {last_spawn_info}"
+                )
+            self._store_cached_scene(scene_key, options, actors, last_spawn_info)
+
+        self.len_ego_route = len_route
+        self.num_vehicles = len(actors["vehicle"])
 
         if actors and actors.get("agent") is not None:
             rx, ry = self.map.route
@@ -146,6 +188,59 @@ class CarlaBEV(gym.Env):
         if last_spawn_info is not None:
             info["spawn_validation"] = last_spawn_info
         return self._get_obs(), info
+
+    def _reset_map_and_validate(self, actors, rng_bundle):
+        self.map.reset(actors, hero_np_rng=rng_bundle.route_np_rng)
+        if actors and actors.get("agent") is not None:
+            self._maybe_attach_route_direction_metrics()
+            return self.map.spawn_validation_info()
+        return {"valid": True, "reason": "no_agent"}
+
+    def _scene_cache_key(self, options, rng_bundle):
+        if self.scene_library is None:
+            return None
+        seeds = {
+            "scene_seed": options.get("scene_seed"),
+            "route_seed": options.get("route_seed", rng_bundle.route_seed),
+            "traffic_seed": options.get("traffic_seed", rng_bundle.traffic_seed),
+            "scenario_seed": options.get("scenario_seed", rng_bundle.scenario_seed),
+        }
+        return self.scene_library.build_scene_key(options, seeds)
+
+    def _load_cached_scene(self, scene_key):
+        if self.scene_library is None or scene_key is None:
+            return None
+        record = self.scene_library.get_scene_by_key(scene_key)
+        if record is None:
+            return None
+        self.scene_library.touch_scene(scene_key)
+        return {
+            "actors": deserialize_scene_payload(record["actors_payload"], map_size=self.size),
+            "scene_descriptor": record["scene_descriptor"],
+            "scenario_context": record["scenario_context"],
+        }
+
+    def _store_cached_scene(self, scene_key, options, actors, spawn_validation):
+        if self.scene_library is None or scene_key is None:
+            return
+        if not spawn_validation.get("valid", False):
+            return
+        self.scene_library.insert_scene(
+            scene_key=scene_key,
+            scene_descriptor=self._scene_descriptor,
+            scenario_context=self._scenario_context,
+            actors_payload=serialize_scene_payload(actors),
+            spawn_validation=spawn_validation,
+            resolved_options=options,
+        )
+
+    @staticmethod
+    def _route_length_from_cached_actors(actors):
+        agent = actors.get("agent")
+        if agent is None:
+            return 0.0
+        route_x, route_y, _, _ = agent
+        return route_length_meters(route_x, route_y)
 
     def _maybe_attach_route_direction_metrics(self):
         if not getattr(self.cfg, "route_direction_metrics_enabled", False):
@@ -181,6 +276,8 @@ class CarlaBEV(gym.Env):
             episode_summary["len_ego_route"] = self.len_ego_route
             if getattr(self, "_scenario_context", None):
                 episode_summary.update(self._scenario_context)
+            if getattr(self, "_scene_descriptor", None):
+                episode_summary["scene_descriptor"] = dict(self._scene_descriptor)
             return True, (cause == "max_actions"), {"episode_info": episode_summary}
         return False, False, {}
 
@@ -193,7 +290,10 @@ class CarlaBEV(gym.Env):
             "scenario_preset_scene",
             "scenario_preset_description",
             "config_file",
-            "difficulty_id",
+            "difficulty_preset_id",
+            "route_extent",
+            "traffic_density",
+            "speed_profile",
         )
         for key in keys:
             if key in options and options[key] is not None:
@@ -220,6 +320,45 @@ class CarlaBEV(gym.Env):
             context[f"scenario_param_{key}"] = value
         return context
 
+    def _build_scene_descriptor(self):
+        context = getattr(self, "_scenario_context", {}) or {}
+        descriptor = {}
+        direct_keys = (
+            "scene",
+            "difficulty_preset_id",
+            "route_extent",
+            "traffic_density",
+            "speed_profile",
+            "route_profile",
+            "scene_seed",
+            "route_seed",
+            "traffic_seed",
+            "requested_num_vehicles",
+            "spawned_num_vehicles",
+            "requested_num_vehicles_near_ego",
+            "spawned_num_vehicles_near_ego",
+            "spawned_role_counts",
+            "actor_roles",
+            "main_actor_role",
+        )
+        for key in direct_keys:
+            if key in context and context[key] is not None:
+                descriptor[key] = context[key]
+
+        param_to_descriptor = {
+            "scenario_param_scene_seed": "scene_seed",
+            "scenario_param_route_seed": "route_seed",
+            "scenario_param_traffic_seed": "traffic_seed",
+            "scenario_param_ego_route_graph": "ego_route_graph",
+            "scenario_param_num_vehicles_near_ego": "num_vehicles_near_ego",
+            "scenario_param_traffic_role_profile": "traffic_role_profile",
+            "scenario_param_guaranteed_candidate_role": "guaranteed_candidate_role",
+        }
+        for source_key, target_key in param_to_descriptor.items():
+            if target_key not in descriptor and source_key in context and context[source_key] is not None:
+                descriptor[target_key] = context[source_key]
+        return descriptor
+
     def step(self, action):
         self._simulate(action)
         reward, cause, info = self._compute_outcome()
@@ -236,8 +375,8 @@ class CarlaBEV(gym.Env):
         )
         if self.obs_mode == "vector":
             if self.map.hero is not None:
-                hero = self.map.hero.state
-                set_point = self.map.hero.set_point
+                hero = self.map.hero.state_m
+                set_point = self.map.hero.set_point_m
                 vector_data = np.concatenate([hero, set_point]).astype(np.float32)
                 self._observation = vector_data
             else:

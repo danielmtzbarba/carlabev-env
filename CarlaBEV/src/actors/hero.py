@@ -3,6 +3,7 @@ import math
 import numpy as np
 
 from CarlaBEV.src.control.stanley_controller import Controller
+from CarlaBEV.envs.geometry import SURFACE_METERS_PER_PIXEL, speed_surface_to_mps
 from CarlaBEV.semantics import SemanticClass, semantic_color_tuple
 from CarlaBEV.src.deeprl.comfort import compute_comfort_kinematics
 
@@ -47,7 +48,10 @@ class BaseAgent(Controller, Hero):
     dt = 0.1
     min_action_steer_deg = 8.0
     max_action_steer_deg = 18.0
-    steer_speed_scale = 0.35
+    # Reach minimum steering authority around 12.5 m/s instead of at ~1 m/s.
+    steer_speed_scale_mps = 0.10
+    accel_response_alpha = 0.5
+    accel_gain_mps2 = 4.5
 
     def __init__(
         self,
@@ -58,17 +62,27 @@ class BaseAgent(Controller, Hero):
         color=None,
         car_size=32,
         np_rng=None,
+        drivable_mask=None,
     ):
         Controller.__init__(self, target_speed=target_speed)
         Hero.__init__(self, window_size, color, car_size)
 
         xs, ys = route[0], route[1]
         self.acc = 0.0
-        self.meters_per_pixel = 40.0 / 128.0
+        self.meters_per_pixel = SURFACE_METERS_PER_PIXEL
+        self.max_accel_mps2 = self.accel_gain_mps2
+        self.max_brake_mps2 = 0.6 * self.scale * self.meters_per_pixel
         self._prev_comfort_accel_long = None
         self._prev_comfort_accel_lat = None
         self._prev_comfort_yaw_rate = None
-        self.last_control = {"cmd_gas": 0.0, "cmd_steer": 0.0, "cmd_brake": 0.0, "applied_delta": 0.0}
+        self.last_control = {
+            "cmd_gas": 0.0,
+            "cmd_steer": 0.0,
+            "cmd_brake": 0.0,
+            "applied_delta": 0.0,
+            "speed_surface": 0.0,
+            "speed_mps": 0.0,
+        }
         self.last_comfort = {
             "speed_mps": 0.0,
             "accel_long": 0.0,
@@ -78,9 +92,10 @@ class BaseAgent(Controller, Hero):
             "yaw_rate": 0.0,
             "yaw_acc": 0.0,
         }
+        self.drivable_mask = drivable_mask
         self._setup()
 
-        self.set_route(xs, ys, initial_speed, np_rng=np_rng)
+        self.set_route(xs, ys, initial_speed, np_rng=np_rng, drivable_mask=self.drivable_mask)
         
         # Initial control step to set target_idx
         _, self.target_idx = self.stanley_control()
@@ -95,32 +110,28 @@ class BaseAgent(Controller, Hero):
         delta = self.steering(steer)
         brake_val = self.brake(brake)
 
-        # Total longitudinal acceleration
-        # 0.05 * self.v is rolling resistance/friction
-        target_acc = acc_val - brake_val - 0.05 * self.v
+        # Total longitudinal acceleration with the same explicit resistance
+        # model used by controller-driven traffic actors.
+        target_acc = acc_val - brake_val - self.longitudinal_resistance_accel()
 
         # === Smooth acceleration (low-pass filter) ===
-        alpha = 0.2
+        alpha = self.accel_response_alpha
         self.acc = (1 - alpha) * self.acc + alpha * target_acc
 
         # === Update physics (bicycle model) ===
         # Controller (state.py) uses bicycle model:
         # yaw += v / L * tan(delta) * dt
         self.update(self.acc, delta)
-
-        # === Friction & velocity stabilization ===
-        self.v *= 0.9999
-        if abs(self.v) < 0.05:
-            self.v = 0.0
-
-        # natural drag proportional to speed
-        self.v *= 0.985
+        if abs(self.v_mps) < 0.05:
+            self.v_mps = 0.0
 
         self.last_control = {
             "cmd_gas": float(gas),
             "cmd_steer": float(steer),
             "cmd_brake": float(brake),
             "applied_delta": float(delta),
+            "speed_surface": float(self.v),
+            "speed_mps": float(self.speed_mps),
         }
         self.last_comfort = compute_comfort_kinematics(
             speed_px_s=self.v,
@@ -139,16 +150,27 @@ class BaseAgent(Controller, Hero):
 
     def accelerate(self, amount):
         """Return positive forward acceleration"""
-        return max(0.0, amount) * 1.0 * self.scale
+        return max(0.0, amount) * self.max_accel_mps2
+
+    @property
+    def speed_surface(self) -> float:
+        return float(self.v)
+
+    @property
+    def speed_mps(self) -> float:
+        return float(speed_surface_to_mps(self.v))
     
     def steering(self, steer_action):
         """Map normalized steering actions to a meaningful wheel angle."""
-        if abs(self.v) < 0.1:
+        speed_mps = abs(self.speed_mps)
+        if speed_mps < 0.1:
             return 0.0
 
         # Give the policy enough steering authority to make lane changes and
         # avoidance maneuvers, while tapering at higher speed to avoid twitchy turns.
-        steer_deg = self.max_action_steer_deg / (1.0 + self.steer_speed_scale * abs(self.v))
+        steer_deg = self.max_action_steer_deg / (
+            1.0 + self.steer_speed_scale_mps * speed_mps
+        )
         steer_deg = np.clip(
             steer_deg,
             self.min_action_steer_deg,
@@ -158,8 +180,8 @@ class BaseAgent(Controller, Hero):
         return delta
 
     def brake(self, amount):
-        speed_factor = np.clip(abs(self.v) / 5.0, 0.3, 1.0)
-        return max(0.0, amount) * 0.6 * self.scale * speed_factor
+        speed_factor = np.clip(abs(self.speed_mps) / 5.0, 0.3, 1.0)
+        return max(0.0, amount) * self.max_brake_mps2 * speed_factor
 
 
 class DiscreteAgent(BaseAgent):

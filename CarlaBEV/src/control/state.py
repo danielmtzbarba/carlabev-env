@@ -1,5 +1,9 @@
 import numpy as np
 
+from CarlaBEV.envs.geometry import (
+    distance_meters_to_surface,
+    distance_surface_to_meters,
+)
 from CarlaBEV.src.control.utils import angle_mod
 
 
@@ -15,15 +19,15 @@ class State:
 
     def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0):
         """Instantiate the object."""
-        self.x = x
-        self.y = y
+        self._x_m = distance_surface_to_meters(x)
+        self._y_m = distance_surface_to_meters(y)
         self.yaw = yaw
-        self.v = v
+        self._v_mps = distance_surface_to_meters(v)
         #
-        self.x_1 = x
-        self.y_1 = y
+        self._x_1_m = self._x_m
+        self._y_1_m = self._y_m
         self.yaw_1 = yaw
-        self.v_1 = v
+        self._v_1_mps = self._v_mps
         #
 
     def update(self, acceleration, delta):
@@ -37,18 +41,103 @@ class State:
         """
         delta = np.clip(delta, -self.max_steer, self.max_steer)
         #
-        self.x_1 = self.x
-        self.y_1 = self.y
+        self._x_1_m = self._x_m
+        self._y_1_m = self._y_m
         self.yaw_1 = self.yaw
-        self.v_1 = self.v
+        self._v_1_mps = self._v_mps
         #
-        self.x += self.v * np.cos(self.yaw) * self.dt
-        self.y += self.v * np.sin(self.yaw) * self.dt
+        self._x_m += self._v_mps * np.cos(self.yaw) * self.dt
+        self._y_m += self._v_mps * np.sin(self.yaw) * self.dt
         # Kinematic bicycle heading update.
-        self.yaw += self.v / self.L * np.tan(delta) * self.dt
-        self.v += acceleration * self.dt
+        self.yaw += self._v_mps / self.L * np.tan(delta) * self.dt
+        self._v_mps += acceleration * self.dt
         self.yaw = angle_mod(self.yaw)
-        self.v = np.clip(self.v, -1 * self._target_speed, self._target_speed)
+        speed_limit_mps = getattr(self, "_speed_limit_mps", self._target_speed_mps)
+        self._v_mps = np.clip(self._v_mps, -1 * speed_limit_mps, speed_limit_mps)
+
+    @property
+    def x(self):
+        return distance_meters_to_surface(self._x_m)
+
+    @x.setter
+    def x(self, value):
+        self._x_m = distance_surface_to_meters(value)
+
+    @property
+    def y(self):
+        return distance_meters_to_surface(self._y_m)
+
+    @y.setter
+    def y(self, value):
+        self._y_m = distance_surface_to_meters(value)
+
+    @property
+    def v(self):
+        return distance_meters_to_surface(self._v_mps)
+
+    @v.setter
+    def v(self, value):
+        self._v_mps = distance_surface_to_meters(value)
+
+    @property
+    def x_1(self):
+        return distance_meters_to_surface(self._x_1_m)
+
+    @x_1.setter
+    def x_1(self, value):
+        self._x_1_m = distance_surface_to_meters(value)
+
+    @property
+    def y_1(self):
+        return distance_meters_to_surface(self._y_1_m)
+
+    @y_1.setter
+    def y_1(self, value):
+        self._y_1_m = distance_surface_to_meters(value)
+
+    @property
+    def v_1(self):
+        return distance_meters_to_surface(self._v_1_mps)
+
+    @v_1.setter
+    def v_1(self, value):
+        self._v_1_mps = distance_surface_to_meters(value)
+
+    @property
+    def x_m(self):
+        return float(self._x_m)
+
+    @x_m.setter
+    def x_m(self, value):
+        self._x_m = float(value)
+
+    @property
+    def y_m(self):
+        return float(self._y_m)
+
+    @y_m.setter
+    def y_m(self, value):
+        self._y_m = float(value)
+
+    @property
+    def v_mps(self):
+        return float(self._v_mps)
+
+    @v_mps.setter
+    def v_mps(self, value):
+        self._v_mps = float(value)
+
+    @property
+    def x_1_m(self):
+        return float(self._x_1_m)
+
+    @property
+    def y_1_m(self):
+        return float(self._y_1_m)
+
+    @property
+    def v_1_mps(self):
+        return float(self._v_1_mps)
 
     @property
     def state(self):
@@ -60,6 +149,10 @@ class State:
         return [self.x, self.y, self.yaw, self.v]
 
     @property
+    def state_m(self):
+        return [self.x_m, self.y_m, self.yaw, self.v_mps]
+
+    @property
     def last_state(self):
         """
         Get the last state of the vehicle.
@@ -67,3 +160,7 @@ class State:
         :return: (list) [x, y, yaw, v]
         """
         return [self.x_1, self.y_1, self.yaw_1, self.v_1]
+
+    @property
+    def last_state_m(self):
+        return [self.x_1_m, self.y_1_m, self.yaw_1, self.v_1_mps]

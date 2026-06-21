@@ -11,6 +11,7 @@ from CarlaBEV.envs import wrap_env
 
 from CarlaBEV.envs.carlabev import CarlaBEV
 from CarlaBEV.envs.geometry import (
+    SURFACE_METERS_PER_PIXEL,
     meters_to_surface,
     raw_to_meters,
     raw_to_surface,
@@ -26,6 +27,11 @@ from CarlaBEV.src.actors.hero import ContinuousAgent
 from CarlaBEV.src.managers.actor_manager import ActorManager
 from CarlaBEV.src.control.stanley_controller import Controller
 from CarlaBEV.src.deeprl.carl_reward_fn import CaRLRewardFn
+from CarlaBEV.src.planning.town01_canonical_graph import (
+    build_town01_canonical_vehicle_graph,
+    summarize_canonical_graph,
+    validate_town01_canonical_vehicle_graph,
+)
 from CarlaBEV.wrappers.rgb_to_semantic import semantic_mask_channels
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -62,7 +68,7 @@ def check_bicycle_yaw_update() -> CheckResult:
     ctrl.x = 0.0
     ctrl.y = 0.0
     ctrl.yaw = 0.0
-    ctrl.v = 5.0
+    ctrl.v_mps = 5.0
 
     delta = 0.2
     yaw_before = ctrl.yaw
@@ -119,22 +125,40 @@ def check_straight_route_motion() -> CheckResult:
     )
 
 
-def _base_info(speed_value: float) -> dict:
+def _base_info(speed_mps: float) -> dict:
+    speed_surface = speed_mps_to_surface(speed_mps)
+    state_surface = [1.0, 0.0, 0.0, speed_surface]
+    last_state_surface = [0.0, 0.0, 0.0, speed_surface]
+    state_metric = [*surface_to_meters(state_surface[:2]), 0.0, speed_mps]
+    last_state_metric = [*surface_to_meters(last_state_surface[:2]), 0.0, speed_mps]
+    next_wps = (
+        np.array([0.0, 2.0, 4.0, 6.0, 8.0], dtype=float),
+        np.array([0.0, 0.0, 0.0, 0.0, 0.0], dtype=float),
+        np.zeros(5, dtype=float),
+    )
+    next_wps_m = (
+        next_wps[0] * SURFACE_METERS_PER_PIXEL,
+        next_wps[1] * SURFACE_METERS_PER_PIXEL,
+        next_wps[2],
+    )
     return {
         "hero": {
-            "state": [1.0, 0.0, 0.0, speed_value],
-            "last_state": [0.0, 0.0, 0.0, speed_value],
+            "state": state_surface,
+            "state_m": state_metric,
+            "last_state": last_state_surface,
+            "last_state_m": last_state_metric,
             "dist2wp": 0.0,
+            "dist2wp_m": 0.0,
             "set_point": np.array([2.0, 0.0, 0.0], dtype=float),
-            "next_wps": (
-                np.array([0.0, 2.0, 4.0, 6.0, 8.0], dtype=float),
-                np.array([0.0, 0.0, 0.0, 0.0, 0.0], dtype=float),
-                np.zeros(5, dtype=float),
-            ),
+            "set_point_m": np.array([*surface_to_meters((2.0, 0.0)), 0.0], dtype=float),
+            "next_wps": next_wps,
+            "next_wps_m": next_wps_m,
         },
         "scene": {
             "dist2goal": 9.0,
             "dist2goal_t_1": 10.0,
+            "dist2goal_m": float(surface_to_meters((9.0, 0.0))[0]),
+            "dist2goal_t_1_m": float(surface_to_meters((10.0, 0.0))[0]),
             "num_vehicles": 0,
             "route_length": 10.0,
             "speed_limit": 35.0,
@@ -152,15 +176,15 @@ def check_reward_speed_penalty_monotonicity() -> CheckResult:
     reward_fn = CaRLRewardFn()
     reward_fn.reset([0.0, 10.0, 20.0], [0.0, 0.0, 0.0])
 
-    info_low = _base_info(speed_value=10.0)
+    info_low = _base_info(speed_mps=8.0)
     _, _, _, out_low = reward_fn.step(info_low)
     p_low = out_low["reward"]["penalties"]["speed"]
 
-    info_mid = _base_info(speed_value=36.0)
+    info_mid = _base_info(speed_mps=12.0)
     _, _, _, out_mid = reward_fn.step(info_mid)
     p_mid = out_mid["reward"]["penalties"]["speed"]
 
-    info_high = _base_info(speed_value=80.0)
+    info_high = _base_info(speed_mps=20.0)
     _, _, _, out_high = reward_fn.step(info_high)
     p_high = out_high["reward"]["penalties"]["speed"]
 
@@ -477,6 +501,29 @@ def check_scenario_spawn_validity() -> CheckResult:
     )
 
 
+def check_town01_canonical_graph() -> CheckResult:
+    graph = build_town01_canonical_vehicle_graph()
+    problems = validate_town01_canonical_vehicle_graph(graph)
+    summary = summarize_canonical_graph(graph)
+
+    if problems:
+        return fail_result(
+            "town01_canonical_graph",
+            f"Canonical graph validation failed: {problems}",
+        )
+
+    return pass_result(
+        "town01_canonical_graph",
+        (
+            "Canonical Town01 graph is structurally valid. "
+            f"nodes={summary.node_count}, edges={summary.edge_count}, "
+            f"weak_components={summary.weak_component_count}, "
+            f"junctions={summary.junction_count}, "
+            f"junction_connectors={summary.junction_connector_count}"
+        ),
+    )
+
+
 def main() -> int:
     checks = [
         run_check("bicycle_yaw_update", check_bicycle_yaw_update),
@@ -497,6 +544,7 @@ def main() -> int:
         run_check("fov_anchor_stability", check_fov_anchor_stability),
         run_check("geometry_roundtrip", check_geometry_roundtrip),
         run_check("scenario_spawn_validity", check_scenario_spawn_validity),
+        run_check("town01_canonical_graph", check_town01_canonical_graph),
     ]
 
     width = max(len(result.name) for result in checks)

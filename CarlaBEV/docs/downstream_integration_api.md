@@ -4,6 +4,10 @@
 
 This document describes the stable public integration API for downstream libraries such as `carlabev-lab`.
 
+For a field-by-field reference of accepted simulator config and reset parameters, see:
+
+- [Configuration Reference](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/docs/config_reference.md)
+
 The supported external API surface lives under `CarlaBEV.config` and `CarlaBEV.scenarios`.
 
 Older internal and debug modules still exist for compatibility, but downstream code should not treat them as the contract. Historically the effective API surface was spread across:
@@ -147,28 +151,42 @@ These should not live in the same object.
 
 Suggested `EnvConfig` fields:
 
+- `seed: int`
+- `fps: int`
 - `map_name: str`
 - `size: int`
+- `env_id: str`
 - `obs_size: tuple[int, int]`
 - `obs_mode: Literal["bev_rgb", "bev_semantic", "vector"]`
 - `semantic_mask_ch: Literal["binary", "2-class", "4-class", "5-class", "6-class", "7-class"]`
+- `temporal_fusion_mode: Literal["stack", "vehicle_temporal", "vehicle_weighted"]`
 - `frame_stack: int`
 - `fov_masked: bool`
+- `ego_anchor_x_frac: float`
+- `ego_anchor_y_frac: float`
 - `action_mode: Literal["discrete", "continuous"]`
+- `action_profile_id: str | None`
 - `reward_mode: Literal["shaping", "carl"]`
+- `reward_profile_id: str | None`
 - `render_mode: Literal["human", "rgb_array"]`
+- `max_actions: int`
+- `scenes_path: str`
+- `traffic_enabled: bool`
+- `route_direction_metrics_enabled: bool`
+
+Suggested `RunConfig` fields:
+
+- `env: EnvConfig`
+- `exp_name: str`
+- `num_envs: int`
+- `seed: int`
 - `capture_video: bool`
+- `capture_every: int`
 - `video_output_dir: str | None`
 - `video_episode_indices: list[int] | None`
 - `video_name_prefix: str`
-- `fps: int`
-- `max_actions: int`
-- `difficulty_id: str | None`
-- `action_profile_id: str | None`
-- `reward_profile_id: str | None`
-- `traffic_enabled: bool`
-- `max_vehicles: int`
-- `route_direction_metrics_enabled: bool`
+- `cuda: bool`
+- `torch_deterministic: bool`
 
 Notably absent:
 
@@ -204,6 +222,15 @@ That is clearer for downstream users and easier to validate.
 
 If vector mode remains roadmap-only for some construction paths, validation should reject unsupported combinations explicitly.
 
+When used through `CarlaBEV(...)` directly, vector observations use metric units:
+
+- ego state: `[x_m, y_m, yaw, v_mps]`
+- current set point: `[setpoint_x_m, setpoint_y_m, setpoint_yaw]`
+
+The lower-level `info["hero"]["state"]` field is retained only as a legacy
+surface-frame compatibility export. New integrations should prefer
+`info["hero"]["state_m"]`.
+
 ### 3. Make reward mode explicit
 
 Today external code uses values like `"shaping"` and `"carl"`, while the environment internally checks only whether the value equals `"carl"`.
@@ -237,10 +264,18 @@ That lets current internals evolve without leaking inconsistencies downstream.
 ```python
 @dataclass
 class RandomNavigationReset:
-    difficulty_id: str | None = None
-    num_vehicles: int = 25
-    route_dist_range: tuple[int, int] = (30, 130)
+    difficulty_preset_id: str | None = None
+    route_extent: Literal["short", "medium", "large"] | None = None
+    traffic_density: Literal["none", "low", "medium", "dense"] | None = None
+    speed_profile: Literal["slow", "medium", "fast"] | None = None
+    num_vehicles: int | None = None
+    num_vehicles_near_ego: int | None = None
+    route_dist_range: tuple[int, int] | None = None
+    ego_target_speed: float | None = None
+    vehicle_target_speed: float | None = None
     ego_route_graph: str = "full_vehicle"
+    traffic_role_profile: str | None = None
+    guaranteed_candidate_role: str | None = None
     route_profile: str | None = None
     route_profile_mix: dict[str, float] | None = None
     min_turns: int | None = None
@@ -258,9 +293,18 @@ Maps to:
 ```python
 {
     "scene": "rdm",
+    "difficulty_preset_id": ...,
+    "route_extent": ...,
+    "traffic_density": ...,
+    "speed_profile": ...,
     "num_vehicles": ...,
+    "num_vehicles_near_ego": ...,
     "route_dist_range": [...],
+    "ego_target_speed": ...,
+    "vehicle_target_speed": ...,
     "ego_route_graph": ...,
+    "traffic_role_profile": ...,
+    "guaranteed_candidate_role": ...,
     "route_profile": ...,
     "route_profile_mix": ...,
     "min_turns": ...,
@@ -276,13 +320,15 @@ Maps to:
 
 Planner note:
 
-- `ego_route_graph="full_vehicle"` is the current default because it preserves
-  connected intersection traversal and restores turning-route diversity
-- the legacy `right_lane` and `left_lane` lane graphs currently over-collapse
-  to straight corridors because their intersection nodes are disconnected
-- `full_vehicle` is still an undirected graph, so downstream users should treat
-  it as a diversity-preserving fallback rather than a guaranteed lane-legal
-  traffic-direction planner
+- `ego_route_graph="full_vehicle"` remains the compatibility default
+- `full_vehicle` now resolves to the canonical Town01 directed vehicle graph
+- `canonical` is the clearer preferred alias for new integrations
+- `left_lane` and `right_lane` remain supported as filtered views over the same
+  canonical graph
+- ego route constraints such as `min_turns` are evaluated against traversed
+  semantic junction connectors when the canonical graph is used
+- nearby traffic can be requested with role-aware controls such as
+  `traffic_role_profile` and `guaranteed_candidate_role`
 
 ### `ScenarioPresetReset`
 

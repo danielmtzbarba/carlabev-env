@@ -41,7 +41,12 @@ dependencies = [
   "opencv-python",
   "matplotlib",
   "pydantic>=2",
+  "plotly>=6.8.0",
+  "loguru>=0.7.3",
 ]
+
+[project.scripts]
+carlabev = "CarlaBEV.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/danielmtzbarba/carlabev-env"

@@ -136,6 +136,7 @@ def find_route_in_range(
     intersection_required=None,
     planner_key=None,
     node_cls=None,
+    turn_metric_mode="geometry",
 ):
     """
     Create a route for `actor` within a valid distance range.
@@ -160,6 +161,12 @@ def find_route_in_range(
     start_node = None
     end_node = None
 
+    use_semantic_turn_metrics = (
+        turn_metric_mode == "semantic"
+        and hasattr(lane_planner, "supports_semantic_turn_metrics")
+        and lane_planner.supports_semantic_turn_metrics()
+    )
+
     for attempt in range(max_attempts):
         # Sample random nodes as start/end of route
         if planner_key is None and node_cls is None:
@@ -174,14 +181,20 @@ def find_route_in_range(
             continue
 
         path, _ = lane_planner.find_path(start_node.id, end_node.id, actor_type)
+        raw_path = path
+        if hasattr(lane_planner, "shortest_path_nodes"):
+            try:
+                raw_path = lane_planner.shortest_path_nodes(start_node.id, end_node.id)
+            except Exception:
+                raw_path = path
 
-        if not path or len(path) < 2:
+        if not raw_path or len(raw_path) < 2:
             continue  # no valid path found
 
         # Compute route waypoints
         rx, ry = [], []
         total_dist_surface = 0.0
-        for prev, curr in zip(path[:-1], path[1:]):
+        for prev, curr in zip(raw_path[:-1], raw_path[1:]):
             px1, py1 = lane_planner.get_node_pos_surface(prev)
             px2, py2 = lane_planner.get_node_pos_surface(curr)
             dist_surface = np.hypot(px2 - px1, py2 - py1)
@@ -193,7 +206,10 @@ def find_route_in_range(
 
         # Check if route is within the range
         if min_dist_meters <= total_dist_meters <= max_dist_meters:
-            route_metrics = compute_route_profile_metrics(rx, ry)
+            if use_semantic_turn_metrics:
+                route_metrics = lane_planner.compute_path_route_metrics(raw_path)
+            else:
+                route_metrics = compute_route_profile_metrics(rx, ry)
             if not matches_route_profile(
                 route_metrics,
                 route_profile=route_profile,

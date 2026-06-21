@@ -10,7 +10,12 @@ from CarlaBEV.config.action_profiles import (
     get_action_profile_spec,
     list_action_profile_ids,
 )
-from CarlaBEV.config.difficulty import list_difficulty_ids
+from CarlaBEV.config.difficulty import (
+    list_difficulty_preset_ids,
+    list_route_extent_ids,
+    list_speed_profile_ids,
+    list_traffic_density_ids,
+)
 from CarlaBEV.config.reward_profiles import (
     get_reward_profile_spec,
     list_reward_profile_ids,
@@ -70,8 +75,11 @@ class EnvConfig(BaseModel):
     reward_profile_id: str | None = None
 
     traffic_enabled: bool = True
-    max_vehicles: int = 50
     route_direction_metrics_enabled: bool = False
+    scene_library_enabled: bool = True
+    scene_library_path: str = "CarlaBEV/assets/scenes/scene_library.db"
+    scene_library_read_only: bool = False
+    scene_library_generator_version: str = "role_traffic_v1"
 
     @model_validator(mode="before")
     @classmethod
@@ -246,8 +254,11 @@ def _to_env_mapping(value: Any):
         "max_actions",
         "scenes_path",
         "traffic_enabled",
-        "max_vehicles",
         "route_direction_metrics_enabled",
+        "scene_library_enabled",
+        "scene_library_path",
+        "scene_library_read_only",
+        "scene_library_generator_version",
         "action_profile_id",
         "reward_profile_id",
     }}
@@ -345,7 +356,10 @@ def get_env_capabilities() -> dict[str, Any]:
         "action_profile_ids": list_action_profile_ids(),
         "reward_modes": ["shaping", "carl"],
         "reward_profile_ids": list_reward_profile_ids(),
-        "difficulty_ids": list_difficulty_ids(),
+        "difficulty_preset_ids": list_difficulty_preset_ids(),
+        "route_extent_ids": list_route_extent_ids(),
+        "traffic_density_ids": list_traffic_density_ids(),
+        "speed_profile_ids": list_speed_profile_ids(),
         "render_modes": ["human", "rgb_array"],
         "supports_vector_make_env": False,
         "scenario_ids": list_scenario_ids(),

@@ -72,7 +72,11 @@ Project documentation lives in `CarlaBEV/docs/`:
 - [Control And Actions](CarlaBEV/docs/control_and_actions.md)
 - [Coordinate Conventions](CarlaBEV/docs/coordinate_conventions.md)
 - [Scenario Specifications](CarlaBEV/docs/scenario_specifications.md)
+- [Configuration Reference](CarlaBEV/docs/config_reference.md)
+- [Route Generation And Planning](CarlaBEV/docs/route_generation_and_planning.md)
+- [Debugging And Diagnostics](CarlaBEV/docs/debugging_and_diagnostics.md)
 - [Public Integration API](CarlaBEV/docs/downstream_integration_api.md)
+- [Town01 Canonical Graph Plan](CarlaBEV/docs/town01_canonical_graph_plan.md)
 
 These docs describe the simulator as it exists in the repository today.
 
@@ -126,22 +130,67 @@ uv add CarlaBEV
 
 ## Running The Simulator
 
+### CLI
+
+CarlaBEV now ships with a packaged CLI:
+
+```bash
+uv run carlabev --help
+```
+
+Phase-1 command groups:
+
+- `carlabev run interactive`
+- `carlabev scene design`
+- `carlabev scene build-library`
+- `carlabev scene analyze-library`
+- `carlabev scene analyze-routes`
+- `carlabev graph build-town01-canonical`
+- `carlabev graph visualize-town01-canonical`
+- `carlabev graph validate-town01-joins`
+- `carlabev validate simulator-semantics`
+- `carlabev viz semantic-channels`
+- `carlabev viz vehicle-temporal-fusion`
+
 ### Debug Viewer
 
 The fastest way to inspect the simulator manually is:
 
 ```bash
-uv run CarlaBEV/tools/debug_env.py
+uv run carlabev run interactive
 ```
 
-This launches a `pygame` window and steps the environment with keyboard control.
+This launches a `pygame` window, drives the ego vehicle with keyboard control,
+and now resets through the random traffic generator.
+
+You can switch the reset source without changing tools:
+
+```bash
+uv run carlabev run interactive --reset-mode random
+uv run carlabev run interactive --reset-mode authored --scene-file CarlaBEV/assets/scenes/leadbrake-01.01.json
+uv run carlabev run interactive --reset-mode scenario --scenario-id lead_brake
+```
+
+Scene-library analysis now supports focused subcommands:
+
+```bash
+uv run carlabev scene analyze-library
+uv run carlabev scene analyze-library summary
+uv run carlabev scene analyze-library breakdown --by difficulty --by route-profile
+uv run carlabev scene analyze-library quality
+uv run carlabev scene analyze-library query --limit 10
+```
+
+For the full set of debugging and route-diagnostics tools, see:
+
+- [Debugging And Diagnostics](CarlaBEV/docs/debugging_and_diagnostics.md)
 
 ### Validity Checks
 
 The repository includes a simulator validation script:
 
 ```bash
-uv run python CarlaBEV/tools/validate_simulator_semantics.py
+uv run carlabev validate simulator-semantics
 ```
 
 This checks core simulator contracts such as:
@@ -201,13 +250,20 @@ from CarlaBEV.config import (
 )
 ```
 
-Important environment options include:
+Common `EnvConfig` options include:
 
 - `map_name`
 - `obs_mode`: `bev_rgb`, `bev_semantic`, or `vector`
-- `difficulty_id`: random-scene difficulty preset such as `rt_no_traffic_v1`, `rt_easy_v1`, `rt_medium_v1`, `rt_hard_v1`
 - `action_profile_id`: action profile preset such as `discrete9_v1`, `discrete13_v1`, `continuous_gsb_v1`
 - `reward_profile_id`: reward profile preset such as `carl_base_v1`, `carl_safety_v1`, `shaping_base_v1`
+- `action_mode`: `discrete` or `continuous`
+- `reward_mode`: `shaping` or `carl`
+- `size`: base BEV size
+- `obs_size`: final resized observation size
+- `frame_stack`
+- `traffic_enabled`
+- `route_direction_metrics_enabled`: attach one-time smoothed-route fractions
+  (`straight_fraction`, `left_turn_fraction`, `right_turn_fraction`) to reset info
 - `semantic_mask_ch`: semantic channel layout used when
   `obs_mode="bev_semantic"`
   - `binary`: drivable
@@ -217,42 +273,52 @@ Important environment options include:
   - `6-class`: non_drivable, drivable, sidewalk, vehicle, pedestrian, route
   - `7-class`: non_drivable, drivable, sidewalk, vehicle, pedestrian, route,
     traffic_light_red
-- `action_mode`: `discrete` or `continuous`
-- `reward_mode`: `shaping` or `carl`
-- `size`: base BEV size
-- `obs_size`: final resized observation size
-- `frame_stack`
-- `traffic_enabled`
-- `max_vehicles`
-- `route_direction_metrics_enabled`: attach one-time smoothed-route fractions
-  (`straight_fraction`, `left_turn_fraction`, `right_turn_fraction`) to reset info
-- `RandomNavigationReset.ego_route_graph`: choose the planner asset used for ego
-  route sampling. `full_vehicle` is now the default because it preserves
-  intersection connectivity and route diversity. `right_lane` and `left_lane`
-  remain available for diagnostics, but their current graph assets collapse
-  heavily toward straight routes.
+
+Common random-navigation reset options include:
+
+- `difficulty_preset_id`: `no_traffic`, `easy`, `medium`, `hard`
+- `route_extent`: `short`, `medium`, or `large`
+- `traffic_density`: `none`, `low`, `medium`, or `dense`
+- `speed_profile`: `slow`, `medium`, or `fast`
+- role-aware traffic controls such as `num_vehicles_near_ego`,
+  `traffic_role_profile`, and `guaranteed_candidate_role`
+- direct overrides such as `num_vehicles`, `route_dist_range`,
+  `ego_target_speed`, and `vehicle_target_speed`
+
+Scene replay is now backed by a SQLite scene library by default. Repeated
+resets with the same resolved scene request can therefore reuse cached actor
+payloads instead of regenerating the full scene, and `debug_env.py` reports
+cache hits and misses on reset.
+
+The intended downstream workflow is:
+
+- prebuild study-specific scene libraries ahead of training
+- point downstream study configs at those `.db` files
+- keep training/evaluation runs in read-only mode so study execution never mutates the prepared corpus
+
+Common `RunConfig` options include:
+
+- `num_envs`
 - `capture_video`: enable wrapper-based RGB video recording
+- `capture_every`
 - `video_output_dir`: explicit video artifact directory for the current run
 - `video_episode_indices`: optional explicit episode ids to record
 - `video_name_prefix`: output filename prefix for recorded videos
 
-Legacy names such as `obs_space`, `masked`, `action_space`, and `reward_type` are accepted for compatibility, but new integrations should use the canonical `*_mode` fields.
+For the full list of accepted `EnvConfig`, `RunConfig`, and reset-builder fields,
+plus where each parameter is actually consumed in the runtime, see:
 
-Semantic observations are produced by wrapper-time decoding of the rendered BEV
-using the shared definitions in `CarlaBEV/semantics.py`.
+- [Configuration Reference](CarlaBEV/docs/config_reference.md)
 
-Reward and collision/off-road logic do not read `semantic_mask_ch` directly.
-They use semantic tile classes sampled from the authoritative map under the ego,
-so changing the semantic observation layout changes the NN input contract, not
-the reward contract.
+Legacy names such as `obs_space`, `masked`, `action_space`, and `reward_type`
+are accepted for compatibility, but new integrations should use the canonical
+`*_mode` fields.
 
-Current planner caveat:
+Route-generation controls, canonical planner aliases, and ego turn constraints
+are documented in:
 
-- `full_vehicle` uses the connected vehicle graph and restores turning routes
-- that graph is currently undirected, so it should be treated as a connectivity
-  fallback and comparison tool rather than a final lane-legal planner
-- the long-term fix is a connected directed lane graph with valid
-  intersection-turn transitions
+- [Route Generation And Planning](CarlaBEV/docs/route_generation_and_planning.md)
+- [Public Integration API](CarlaBEV/docs/downstream_integration_api.md)
 
 ## Comfort Signals
 
@@ -342,7 +408,7 @@ from CarlaBEV.config import RandomNavigationReset, build_random_navigation_optio
 
 options = build_random_navigation_options(
     RandomNavigationReset(
-        difficulty_id="rt_medium_v1",
+        difficulty_preset_id="medium",
         scene_seed=1000,
         route_seed=2000,
         traffic_seed=3000,
@@ -357,8 +423,25 @@ Practical interpretation:
 
 - fixed scene schedule: reuse the same `scene_seed` every reset
 - deterministic diverse schedule: provide a different per-episode `scene_seed`
-- route-only perturbation: hold `traffic_seed` fixed and vary `route_seed`
+- route-relative traffic perturbation: hold `traffic_seed` fixed and vary `route_seed`
 - traffic-only perturbation: hold `route_seed` fixed and vary `traffic_seed`
+
+## Scene Descriptor
+
+Random-navigation resets and episode summaries now expose a `scene_descriptor`
+payload intended for analysis and dataset-style logging.
+
+The descriptor captures scene-level metadata such as:
+
+- `scene_seed`, `route_seed`, `traffic_seed`
+- `num_vehicles_near_ego`
+- `traffic_role_profile`
+- `guaranteed_candidate_role`
+- `spawned_role_counts`
+- `actor_roles`
+- `main_actor_role`
+
+This lets downstream analysis separate scene description from episode outcome.
 
 ## Research Scope
 

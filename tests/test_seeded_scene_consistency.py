@@ -25,14 +25,17 @@ def _capture_spawn_state(
     route_seed: int | None = None,
     traffic_seed: int | None = None,
     scene_seed: int | None = None,
+    reset_kwargs: dict[str, object] | None = None,
 ) -> dict[str, object]:
     env = _make_env(anchor_y_frac=anchor_y_frac)
+    reset_kwargs = dict(reset_kwargs or {})
     options = build_random_navigation_options(
         RandomNavigationReset(
-            difficulty_id="rt_medium_v1",
+            difficulty_preset_id=reset_kwargs.pop("difficulty_preset_id", "medium"),
             scene_seed=scene_seed,
             route_seed=route_seed,
             traffic_seed=traffic_seed,
+            **reset_kwargs,
         )
     )
     try:
@@ -40,6 +43,9 @@ def _capture_spawn_state(
         hero = env.map.hero
         route_x, route_y = env.map.route
         vehicles = []
+        vehicle_initial_speeds_mps = []
+        vehicle_cruise_speeds_mps = []
+        vehicle_speed_classes = []
         for actor in env.map.actor_manager.actors.get("vehicle", []):
             ax, ay, ayaw, av = actor.state
             vehicles.append(
@@ -50,8 +56,12 @@ def _capture_spawn_state(
                     round(float(av), 6),
                 )
             )
+            vehicle_initial_speeds_mps.append(round(float(actor.initial_speed_mps), 6))
+            vehicle_cruise_speeds_mps.append(round(float(actor.cruise_speed_mps), 6))
+            vehicle_speed_classes.append(str(actor.speed_class))
         return {
             "spawn_validation": info.get("spawn_validation"),
+            "scene_descriptor": info.get("scene_descriptor"),
             "hero_pose": (
                 round(float(hero.x), 4),
                 round(float(hero.y), 4),
@@ -64,11 +74,22 @@ def _capture_spawn_state(
                 len(route_x),
             ),
             "vehicles": tuple(vehicles[:16]),
+            "vehicle_initial_speeds_mps": tuple(vehicle_initial_speeds_mps[:16]),
+            "vehicle_cruise_speeds_mps": tuple(vehicle_cruise_speeds_mps[:16]),
+            "vehicle_speed_classes": tuple(vehicle_speed_classes[:16]),
             "num_vehicles": int(env.num_vehicles),
             "route_length": round(float(env.len_ego_route), 6),
             "scene_seed": info.get("scenario", {}).get("scenario_param_scene_seed"),
             "route_seed": info.get("scenario", {}).get("scenario_param_route_seed"),
             "traffic_seed": info.get("scenario", {}).get("scenario_param_traffic_seed"),
+            "base_vehicle_target_speed_mps": info.get("scenario", {}).get("scenario_param_vehicle_target_speed"),
+            "vehicle_speed_mix": info.get("scenario", {}).get("scenario_param_vehicle_speed_mix"),
+            "requested_num_vehicles": info.get("scenario", {}).get("requested_num_vehicles"),
+            "spawned_num_vehicles": info.get("scenario", {}).get("spawned_num_vehicles"),
+            "vehicle_spawn_shortfall": info.get("scenario", {}).get("vehicle_spawn_shortfall"),
+            "traffic_count_exact": info.get("scenario", {}).get("traffic_count_exact"),
+            "vehicle_spawn_attempts": info.get("scenario", {}).get("vehicle_spawn_attempts"),
+            "vehicle_spawn_retry_limit": info.get("scenario", {}).get("scenario_param_vehicle_spawn_retry_limit"),
         }
     finally:
         env.close()
@@ -77,7 +98,7 @@ def _capture_spawn_state(
 def _capture_render_alignment(*, seed: int, anchor_y_frac: float) -> dict[str, object]:
     env = _make_env(anchor_y_frac=anchor_y_frac)
     options = build_random_navigation_options(
-        RandomNavigationReset(difficulty_id="rt_medium_v1")
+        RandomNavigationReset(difficulty_preset_id="medium")
     )
     try:
         env.reset(seed=seed, options=options)
@@ -149,7 +170,7 @@ class SeededSceneConsistencyTests(unittest.TestCase):
 
         self.assertEqual(first, second)
 
-    def test_route_seed_changes_route_without_changing_traffic(self):
+    def test_route_seed_changes_route_and_can_retarget_nearby_traffic(self):
         first = _capture_spawn_state(
             seed=11,
             anchor_y_frac=0.5,
@@ -164,7 +185,12 @@ class SeededSceneConsistencyTests(unittest.TestCase):
         )
 
         self.assertNotEqual(first["route"], second["route"])
-        self.assertEqual(first["vehicles"], second["vehicles"])
+        self.assertEqual(first["traffic_seed"], second["traffic_seed"])
+        self.assertEqual(
+            first["scene_descriptor"]["traffic_role_profile"],
+            second["scene_descriptor"]["traffic_role_profile"],
+        )
+        self.assertNotEqual(first["vehicles"], second["vehicles"])
 
     def test_traffic_seed_changes_traffic_without_changing_route(self):
         first = _capture_spawn_state(
@@ -182,6 +208,97 @@ class SeededSceneConsistencyTests(unittest.TestCase):
 
         self.assertEqual(first["route"], second["route"])
         self.assertNotEqual(first["vehicles"], second["vehicles"])
+
+    def test_random_traffic_vehicles_spawn_below_cruise_speed(self):
+        snapshot = _capture_spawn_state(seed=11, anchor_y_frac=0.5)
+
+        self.assertGreater(len(snapshot["vehicle_initial_speeds_mps"]), 0)
+        for initial_speed_mps, cruise_speed_mps in zip(
+            snapshot["vehicle_initial_speeds_mps"],
+            snapshot["vehicle_cruise_speeds_mps"],
+        ):
+            self.assertGreaterEqual(initial_speed_mps, 0.0)
+            self.assertLessEqual(initial_speed_mps, 0.5 * cruise_speed_mps + 1e-6)
+            self.assertLessEqual(initial_speed_mps, cruise_speed_mps)
+
+    def test_random_traffic_vehicle_cruise_speeds_follow_sampled_speed_classes(self):
+        snapshot = _capture_spawn_state(seed=11, anchor_y_frac=0.5)
+
+        self.assertEqual(
+            snapshot["vehicle_speed_mix"],
+            {"slow": 0.55, "medium": 0.35, "fast": 0.1},
+        )
+        base_speed = float(snapshot["base_vehicle_target_speed_mps"])
+        class_bounds = {
+            "slow": (0.80 * 0.95 * base_speed, 0.80 * 1.05 * base_speed),
+            "medium": (1.00 * 0.95 * base_speed, 1.00 * 1.05 * base_speed),
+            "fast": (1.15 * 0.95 * base_speed, 1.15 * 1.05 * base_speed),
+        }
+
+        self.assertGreater(len(snapshot["vehicle_speed_classes"]), 0)
+        for speed_class, cruise_speed_mps in zip(
+            snapshot["vehicle_speed_classes"],
+            snapshot["vehicle_cruise_speeds_mps"],
+        ):
+            self.assertIn(speed_class, class_bounds)
+            lower, upper = class_bounds[speed_class]
+            self.assertGreaterEqual(cruise_speed_mps, lower - 1e-6)
+            self.assertLessEqual(cruise_speed_mps, upper + 1e-6)
+
+    def test_random_traffic_records_requested_vs_spawned_vehicle_counts(self):
+        snapshot = _capture_spawn_state(seed=11, anchor_y_frac=0.5)
+
+        requested = int(snapshot["requested_num_vehicles"])
+        spawned = int(snapshot["spawned_num_vehicles"])
+        shortfall = int(snapshot["vehicle_spawn_shortfall"])
+        retry_limit = int(snapshot["vehicle_spawn_retry_limit"])
+        attempts = int(snapshot["vehicle_spawn_attempts"])
+
+        self.assertEqual(requested, 16)
+        self.assertEqual(spawned, snapshot["num_vehicles"])
+        self.assertEqual(shortfall, requested - spawned)
+        self.assertEqual(snapshot["traffic_count_exact"], spawned == requested)
+        self.assertGreaterEqual(attempts, spawned)
+        self.assertLessEqual(attempts, requested * retry_limit)
+
+    def test_scene_descriptor_exposes_seeded_role_schema(self):
+        snapshot = _capture_spawn_state(seed=11, anchor_y_frac=0.5)
+
+        descriptor = snapshot["scene_descriptor"]
+        self.assertIsInstance(descriptor, dict)
+        self.assertEqual(descriptor["scene"], "rdm")
+        self.assertEqual(descriptor["difficulty_preset_id"], "medium")
+        self.assertEqual(descriptor["scene_seed"], snapshot["scene_seed"])
+        self.assertEqual(descriptor["route_seed"], snapshot["route_seed"])
+        self.assertEqual(descriptor["traffic_seed"], snapshot["traffic_seed"])
+        self.assertEqual(descriptor["num_vehicles_near_ego"], 4)
+        self.assertEqual(descriptor["traffic_role_profile"], "mix")
+        self.assertEqual(descriptor["guaranteed_candidate_role"], "mix")
+        self.assertEqual(descriptor["requested_num_vehicles_near_ego"], 4)
+        self.assertIn("spawned_role_counts", descriptor)
+        self.assertEqual(sum(descriptor["spawned_role_counts"].values()), snapshot["num_vehicles"])
+        self.assertEqual(len(descriptor["actor_roles"]), snapshot["num_vehicles"])
+        self.assertIn(
+            descriptor["main_actor_role"],
+            {"lead", "rear", "cross_path", "opposite_lane", "background"},
+        )
+
+    def test_explicit_role_based_reset_spawns_guaranteed_lead_candidate(self):
+        snapshot = _capture_spawn_state(
+            seed=11,
+            anchor_y_frac=0.5,
+            reset_kwargs={
+                "num_vehicles": 4,
+                "num_vehicles_near_ego": 4,
+                "traffic_role_profile": "mix",
+                "guaranteed_candidate_role": "lead",
+            },
+        )
+
+        descriptor = snapshot["scene_descriptor"]
+        self.assertEqual(descriptor["requested_num_vehicles_near_ego"], 4)
+        self.assertGreaterEqual(descriptor["spawned_num_vehicles_near_ego"], 1)
+        self.assertGreaterEqual(descriptor["spawned_role_counts"].get("lead", 0), 1)
 
 
 if __name__ == "__main__":

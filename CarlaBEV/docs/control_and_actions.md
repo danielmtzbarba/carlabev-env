@@ -40,7 +40,15 @@ Each step:
 2. Gas is mapped to longitudinal acceleration.
 3. Steering input is mapped to a wheel angle.
 4. Brake is mapped to a deceleration term.
-5. The resulting controls are passed to the kinematic bicycle integrator.
+5. Explicit rolling resistance and quadratic drag are subtracted.
+6. The longitudinal command is low-pass filtered.
+7. The resulting controls are passed to the kinematic bicycle integrator.
+
+Current longitudinal tuning:
+
+- full-throttle acceleration: `4.5 m/s^2`
+- acceleration filter: `alpha = 0.5`
+- shared passive resistance: `0.05 + 0.002 v^2` in SI units
 
 ## Steering Command
 
@@ -104,6 +112,8 @@ These are attached to `info["hero"]` on every step and then summarized into epis
 ## Notes
 
 - Steering and longitudinal dynamics are heuristic rather than vehicle-calibrated.
+- Ego and controller-driven traffic now share the same passive resistance model.
+- Controller-driven traffic also uses a softer speed loop than ego command-space control, with `Kp = 0.5` and explicit `2.5 / 3.5 m/s^2` accel-decel clamps.
 - There is no tire model or slip-angle model.
 - The control layer is designed for DRL research rather than high-fidelity vehicle dynamics studies.
 

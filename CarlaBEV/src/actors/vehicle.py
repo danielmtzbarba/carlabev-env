@@ -3,6 +3,8 @@ from CarlaBEV.semantics import SemanticClass, semantic_color_tuple
 
 
 class Vehicle(Actor):
+    reacts_to_traffic = True
+
     def __init__(
         self,
         map_size,
@@ -28,3 +30,4 @@ class Vehicle(Actor):
             np_rng=np_rng,
         )
         self.set_cruise_speed_mps(target_speed)
+        self.traffic_role = "unassigned"

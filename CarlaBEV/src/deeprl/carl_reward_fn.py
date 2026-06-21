@@ -1,5 +1,6 @@
 import numpy as np
 
+from CarlaBEV.envs.geometry import SURFACE_METERS_PER_PIXEL, distance_surface_to_meters
 from CarlaBEV.src.control.utils import lateral_error
 from CarlaBEV.src.deeprl.reward_signals import carl_ttc_penalty
 from CarlaBEV.src.deeprl.comfort import DEFAULT_COMFORT_BOUNDS, count_comfort_violations
@@ -11,9 +12,7 @@ from CarlaBEV.semantics import (
 )
 
 
-# 0.625 or 0.39 or 0.47  if bev.size in meters is 40, 50, or 60 respectively
-visible_meters_in_bev = 40
-meters_per_pixel = visible_meters_in_bev / 128
+meters_per_pixel = SURFACE_METERS_PER_PIXEL
 lane_half_width_m = 3.0
 
 
@@ -113,16 +112,16 @@ class CaRLRewardFn:
 
         # Hard penalties
         self.terminal_penalty = -1.0
+        self.out_of_bounds_threshold_m = distance_surface_to_meters(50.0)
 
         # Comfort thresholds from CaRL (CARLA table)
         self.comfort_bounds = dict(DEFAULT_COMFORT_BOUNDS)
 
     # =====================================================
     def reset(self, rx, ry):
-        self._route = list(zip(rx, ry))
+        self._route = [(x * meters_per_pixel, y * meters_per_pixel) for x, y in zip(rx, ry)]
         self._route_lengths = cumulative_lengths(self._route)
-        route_total_px = self._route_lengths[-1]
-        self._route_total_m = route_total_px * meters_per_pixel
+        self._route_total_m = self._route_lengths[-1]
         #
         self.prev_speed = None
         self.prev_yaw = None
@@ -132,10 +131,6 @@ class CaRLRewardFn:
         self.prev_dist2goal = None
         self._step_count = 0
         self._s_prev = None
-
-    def _speed_to_mps(self, speed_value):
-        # Controller state integrates x += v * dt, so v behaves like px/s.
-        return float(speed_value) * meters_per_pixel
 
     def _speed_limit_to_mps(self, speed_limit_value):
         # Preserve compatibility with existing configs where the scene speed
@@ -199,7 +194,7 @@ class CaRLRewardFn:
             return self.terminal_penalty, True, "collision", info
 
         # out of bounds
-        if info["hero"]["dist2wp"] > 50:
+        if info["hero"]["dist2wp_m"] > self.out_of_bounds_threshold_m:
             info["reward"]["cause"] = "out_of_bounds"
             info["reward"]["reward"] = self.terminal_penalty
             return self.terminal_penalty, True, "out_of_bounds", info
@@ -207,26 +202,24 @@ class CaRLRewardFn:
         # -------------------------
         # 2. Route completion RC_t
         # -------------------------
-        x, y, yaw, speed = info["hero"]["state"]
-        speed_mps = self._speed_to_mps(speed)
+        x, y, yaw, speed_mps = info["hero"]["state_m"]
 
-        # Compute arc-length progress along route (in pixels)
+        # Compute arc-length progress along route (in meters)
         s_t = compute_route_progress(x, y, self._route, self._route_lengths)
 
         # Initialize buffer on first step
         if not hasattr(self, "_s_prev") or self._s_prev is None:
             self._s_prev = s_t
 
-        # Raw delta progress in pixels
-        RC_raw_px = max(0.0, s_t - self._s_prev)
+        RC_raw_m = max(0.0, s_t - self._s_prev)
 
         # Update previous for next time step
         self._s_prev = s_t
 
         # Convert to normalized RC_t in [0,1]
-        route_total_px = self._route_lengths[-1]  # pixels
-        if route_total_px > 0:
-            RC_t = RC_raw_px / route_total_px
+        route_total_m = self._route_lengths[-1]
+        if route_total_m > 0:
+            RC_t = RC_raw_m / route_total_m
         else:
             RC_t = 0.0
 
@@ -237,10 +230,10 @@ class CaRLRewardFn:
         p_factors = {}
 
         # 3.1 distance to route center
-        xs, ys, _ = info["hero"]["next_wps"]
+        xs, ys, _ = info["hero"]["next_wps_m"]
         wps = np.array([xs, ys]).T
         dist2route = lateral_error(x, y, wps, signed=True)
-        dist_m = abs(dist2route) * meters_per_pixel
+        dist_m = abs(dist2route)
 
         if dist_m <= 0.0:
             p_route = 1.0
@@ -267,11 +260,9 @@ class CaRLRewardFn:
         p_factors["speed"] = p_speed
 
         # 3.4 TTC
-        hero_state = info["hero"]["state"]
+        hero_state = info["hero"]["state_m"]
         actors_state = info["collision"]["actors_state"]
-        p_ttc, ttc = carl_ttc_penalty(
-            hero_state, actors_state, threshold=self.ttc_threshold, meters_per_pixel=meters_per_pixel
-        )
+        p_ttc, ttc = carl_ttc_penalty(hero_state, actors_state, threshold=self.ttc_threshold)
         p_ttc = max(self.ttc_penalty_floor, float(p_ttc))
         p_factors["ttc"] = float(p_ttc)
 
@@ -360,8 +351,7 @@ class CaRLRewardFn:
         if all(key in info["hero"] for key in ("accel_long", "accel_lat", "jerk_long", "jerk_lat", "yaw_rate", "yaw_acc")):
             return info
 
-        x, y, yaw, speed = info["hero"]["state"]
-        speed_mps = self._speed_to_mps(speed)
+        x, y, yaw, speed_mps = info["hero"]["state_m"]
         dt = self.dt
 
         if self.prev_yaw is None:

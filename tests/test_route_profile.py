@@ -9,7 +9,7 @@ from CarlaBEV.src.control.route_profile import (
 
 def test_build_random_navigation_options_includes_route_profile_controls():
     request = RandomNavigationReset(
-        difficulty_id="rt_medium_v1",
+        difficulty_preset_id="medium",
         route_profile="single_left",
         route_profile_mix={"mostly_straight": 0.5, "single_left": 0.5},
         min_turns=1,

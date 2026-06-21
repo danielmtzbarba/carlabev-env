@@ -26,10 +26,13 @@ class RandomNavigationReset(BaseModel):
     traffic_density: TrafficDensityId | None = None
     speed_profile: SpeedProfileId | None = None
     num_vehicles: int | None = None
+    num_vehicles_near_ego: int | None = None
     route_dist_range: tuple[int, int] | None = None
     ego_target_speed: float | None = None
     vehicle_target_speed: float | None = None
     ego_route_graph: str = "full_vehicle"
+    traffic_role_profile: str | None = None
+    guaranteed_candidate_role: str | None = None
     route_profile: str | None = None
     route_profile_mix: dict[str, float] | None = None
     min_turns: int | None = None
@@ -85,6 +88,18 @@ def build_random_navigation_options(
     *,
     reset_mask=None,
 ) -> dict[str, Any]:
+    near_ego_defaults = {
+        "no_traffic": 0,
+        "easy": 2,
+        "medium": 4,
+        "hard": 6,
+    }
+    guaranteed_role_defaults = {
+        "no_traffic": None,
+        "easy": "lead",
+        "medium": "mix",
+        "hard": "mix",
+    }
     resolved = None
     difficulty_preset_id = request.difficulty_preset_id
     if difficulty_preset_id is not None:
@@ -158,6 +173,16 @@ def build_random_navigation_options(
     )
     options["num_vehicles"] = num_vehicles
 
+    if request.num_vehicles_near_ego is not None:
+        num_vehicles_near_ego = int(request.num_vehicles_near_ego)
+    elif difficulty_preset_id is not None:
+        num_vehicles_near_ego = int(near_ego_defaults[difficulty_preset_id])
+    elif num_vehicles <= 0:
+        num_vehicles_near_ego = 0
+    else:
+        num_vehicles_near_ego = min(int(num_vehicles), 4)
+    options["num_vehicles_near_ego"] = num_vehicles_near_ego
+
     traffic_enabled = (
         bool(num_vehicles > 0)
         if request.traffic_density is None and resolved is None
@@ -182,6 +207,18 @@ def build_random_navigation_options(
     )
     if vehicle_target_speed is not None:
         options["vehicle_target_speed"] = vehicle_target_speed
+
+    traffic_role_profile = request.traffic_role_profile
+    if traffic_role_profile is None and num_vehicles_near_ego > 0:
+        traffic_role_profile = "mix"
+    if traffic_role_profile is not None:
+        options["traffic_role_profile"] = str(traffic_role_profile)
+
+    guaranteed_candidate_role = request.guaranteed_candidate_role
+    if guaranteed_candidate_role is None and difficulty_preset_id is not None:
+        guaranteed_candidate_role = guaranteed_role_defaults[difficulty_preset_id]
+    if guaranteed_candidate_role is not None:
+        options["guaranteed_candidate_role"] = str(guaranteed_candidate_role)
 
     if request.route_profile is not None:
         options["route_profile"] = request.route_profile

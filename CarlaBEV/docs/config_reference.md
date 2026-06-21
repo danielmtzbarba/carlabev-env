@@ -60,7 +60,6 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 | `reward_mode` | `"shaping" | "carl"` | `CarlaBEV.build_reward_fn()` | Selects which reward-function family gets instantiated. |
 | `reward_profile_id` | `str | None` | `EnvConfig` validation, `CarlaBEV.build_reward_fn()` | Selects the concrete reward profile and parameters. |
 | `traffic_enabled` | `bool = True` | `SceneGenerator` defaults | Default switch for random-scene traffic when reset options do not override it. |
-| `max_vehicles` | `int = 50` | `SceneGenerator` defaults | Default number of random traffic vehicles when reset options do not override it. |
 | `route_direction_metrics_enabled` | `bool = False` | `CarlaBEV.reset()` | When enabled, adds smoothed route left/right/straight fractions to scenario metadata after spawn. |
 
 ### Observation And Wrapper Fields
@@ -154,11 +153,14 @@ Current axis expansions:
 
 | Field | Type / Default | Effect |
 | --- | --- | --- |
-| `num_vehicles` | `int | None` | Direct override for background-vehicle count after preset/axis resolution. |
+| `num_vehicles` | `int | None` | Direct override for total random-traffic count after preset/axis resolution. |
+| `num_vehicles_near_ego` | `int | None` | Direct override for the number of role-based vehicles the generator should prioritize around the ego route. |
 | `route_dist_range` | `tuple[int, int] | None` | Direct override for ego route-distance sampling band. |
 | `ego_target_speed` | `float | None` | Direct override for ego target speed in m/s. |
 | `vehicle_target_speed` | `float | None` | Direct override for random traffic vehicle cruise speed in m/s. |
 | `ego_route_graph` | `str = "full_vehicle"` | Selects the planner alias used for ego route sampling. |
+| `traffic_role_profile` | `str | None` | Selects which nearby actor roles should be sampled around the ego route. Supports `lead`, `rear`, `cross_path`, `opposite_lane`, and `mix`. |
+| `guaranteed_candidate_role` | `str | None` | Requests at least one nearby vehicle with a specific role. Supports the same values as `traffic_role_profile`. |
 | `route_profile` | `str | None` | Optional route-profile filter such as `mostly_straight`, `single_left`, or `multi_turn`. |
 | `route_profile_mix` | `dict[str, float] | None` | Weighted sampling over route-profile labels before route generation. |
 | `min_turns` | `int | None` | Minimum semantic turn count for sampled routes. |
@@ -177,11 +179,57 @@ Current axis expansions:
 
 If omitted, [CarlaBEV.reset()](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/carlabev.py:87) resolves missing seeds from the incoming `seed` argument and the config seed.
 
+### Random Traffic Role Model
+
+Procedural traffic is no longer treated purely as map-wide ambient background
+traffic. The generator now uses a two-level contract:
+
+- `num_vehicles` controls the total requested traffic count
+- `num_vehicles_near_ego` controls how many of those vehicles should be
+  prioritized around the ego route
+
+Supported nearby traffic roles:
+
+- `lead`
+- `rear`
+- `cross_path`
+- `opposite_lane`
+- `mix`
+
+Current preset defaults for `num_vehicles_near_ego` and guaranteed role:
+
+- `no_traffic`: `0`, no guaranteed role
+- `easy`: `2`, guaranteed `lead`
+- `medium`: `4`, guaranteed `mix`
+- `hard`: `6`, guaranteed `mix`
+
+Current built-in `mix` weights:
+
+- `lead`: `40%`
+- `rear`: `20%`
+- `cross_path`: `25%`
+- `opposite_lane`: `15%`
+
+The runtime exposes a stable `scene_descriptor` on reset and episode-end info.
+The descriptor currently includes:
+
+- route and seed metadata such as `scene_seed`, `route_seed`, `traffic_seed`
+- requested and spawned traffic counts
+- `traffic_role_profile`
+- `guaranteed_candidate_role`
+- `spawned_role_counts`
+- `actor_roles`
+- `main_actor_role`
+
 ### Random Traffic Startup Behavior
 
-Randomly generated background vehicles do not currently spawn at cruise speed anymore. The runtime now samples a low-speed startup state and ramps each vehicle back toward cruise over roughly `1.0 s`.
+Randomly generated vehicles do not currently spawn at cruise speed anymore. The
+runtime now samples a low-speed startup state and ramps each vehicle back
+toward cruise over roughly `1.0 s`.
 
-Random traffic also no longer uses one identical cruise speed for every vehicle. Instead, each background vehicle samples its own cruise target around the scene-level `vehicle_target_speed`.
+Random traffic also no longer uses one identical cruise speed for every
+vehicle. Instead, each vehicle samples its own cruise target around the
+scene-level `vehicle_target_speed`.
 
 Current built-in random traffic speed mix:
 
@@ -207,7 +255,9 @@ Current random traffic controller tuning:
 - maximum commanded acceleration: `2.5 m/s^2`
 - maximum commanded deceleration: `3.5 m/s^2`
 
-This policy is applied only to procedurally generated traffic. Authored scenarios and scenario-specific actors keep their explicit startup speeds unless they opt into the same pattern.
+This policy is applied only to procedurally generated traffic. Authored
+scenarios and scenario-specific actors keep their explicit startup speeds
+unless they opt into the same pattern.
 
 ## Scenario Reset Builders
 

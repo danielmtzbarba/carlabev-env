@@ -167,7 +167,10 @@ class ResetBuilderTests(unittest.TestCase):
         self.assertEqual(options["traffic_density"], "medium")
         self.assertEqual(options["speed_profile"], "medium")
         self.assertEqual(options["num_vehicles"], 16)
+        self.assertEqual(options["num_vehicles_near_ego"], 4)
         self.assertEqual(options["route_dist_range"], [40, 100])
+        self.assertEqual(options["traffic_role_profile"], "mix")
+        self.assertEqual(options["guaranteed_candidate_role"], "mix")
         self.assertAlmostEqual(options["ego_target_speed"], 30.0 / 3.6)
         self.assertAlmostEqual(options["vehicle_target_speed"], 30.0 / 3.6)
 
@@ -192,7 +195,22 @@ class ResetBuilderTests(unittest.TestCase):
         options = build_random_navigation_options(RandomNavigationReset())
 
         self.assertEqual(options["num_vehicles"], 16)
+        self.assertEqual(options["num_vehicles_near_ego"], 4)
         self.assertTrue(options["traffic_enabled"])
+
+    def test_random_navigation_allows_explicit_near_ego_role_schema(self):
+        options = build_random_navigation_options(
+            RandomNavigationReset(
+                difficulty_preset_id="hard",
+                num_vehicles_near_ego=5,
+                traffic_role_profile="rear",
+                guaranteed_candidate_role="cross_path",
+            )
+        )
+
+        self.assertEqual(options["num_vehicles_near_ego"], 5)
+        self.assertEqual(options["traffic_role_profile"], "rear")
+        self.assertEqual(options["guaranteed_candidate_role"], "cross_path")
 
     def test_authored_scene_options_include_variation_seed(self):
         options = build_authored_scene_options(

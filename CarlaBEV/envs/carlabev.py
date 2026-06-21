@@ -78,6 +78,8 @@ class CarlaBEV(gym.Env):
         info = {}
         if hasattr(self, "_scenario_context") and self._scenario_context:
             info["scenario"] = dict(self._scenario_context)
+        if hasattr(self, "_scene_descriptor") and self._scene_descriptor:
+            info["scene_descriptor"] = dict(self._scene_descriptor)
         return info
 
     def _resolve_rng_bundle(self, seed: int | None, options: dict) -> tuple[int, object]:
@@ -105,6 +107,7 @@ class CarlaBEV(gym.Env):
         self._current_step = 0
         self.stats.reset()
         self._scenario_context = {}
+        self._scene_descriptor = {}
         max_reset_attempts = options.get("max_reset_attempts", 10)
         last_spawn_info = None
 
@@ -115,6 +118,7 @@ class CarlaBEV(gym.Env):
             )
             self._scenario_context = self._extract_scenario_context(options)
             self._scenario_context.update(getattr(self.scene_generator, "last_scene_context", {}) or {})
+            self._scene_descriptor = self._build_scene_descriptor()
             self.len_ego_route = len_route
             self.num_vehicles = len(actors["vehicle"])
             self.map.reset(actors, hero_np_rng=rng_bundle.route_np_rng)
@@ -181,6 +185,8 @@ class CarlaBEV(gym.Env):
             episode_summary["len_ego_route"] = self.len_ego_route
             if getattr(self, "_scenario_context", None):
                 episode_summary.update(self._scenario_context)
+            if getattr(self, "_scene_descriptor", None):
+                episode_summary["scene_descriptor"] = dict(self._scene_descriptor)
             return True, (cause == "max_actions"), {"episode_info": episode_summary}
         return False, False, {}
 
@@ -222,6 +228,45 @@ class CarlaBEV(gym.Env):
                 continue
             context[f"scenario_param_{key}"] = value
         return context
+
+    def _build_scene_descriptor(self):
+        context = getattr(self, "_scenario_context", {}) or {}
+        descriptor = {}
+        direct_keys = (
+            "scene",
+            "difficulty_preset_id",
+            "route_extent",
+            "traffic_density",
+            "speed_profile",
+            "route_profile",
+            "scene_seed",
+            "route_seed",
+            "traffic_seed",
+            "requested_num_vehicles",
+            "spawned_num_vehicles",
+            "requested_num_vehicles_near_ego",
+            "spawned_num_vehicles_near_ego",
+            "spawned_role_counts",
+            "actor_roles",
+            "main_actor_role",
+        )
+        for key in direct_keys:
+            if key in context and context[key] is not None:
+                descriptor[key] = context[key]
+
+        param_to_descriptor = {
+            "scenario_param_scene_seed": "scene_seed",
+            "scenario_param_route_seed": "route_seed",
+            "scenario_param_traffic_seed": "traffic_seed",
+            "scenario_param_ego_route_graph": "ego_route_graph",
+            "scenario_param_num_vehicles_near_ego": "num_vehicles_near_ego",
+            "scenario_param_traffic_role_profile": "traffic_role_profile",
+            "scenario_param_guaranteed_candidate_role": "guaranteed_candidate_role",
+        }
+        for source_key, target_key in param_to_descriptor.items():
+            if target_key not in descriptor and source_key in context and context[source_key] is not None:
+                descriptor[target_key] = context[source_key]
+        return descriptor
 
     def step(self, action):
         self._simulate(action)

@@ -172,7 +172,6 @@ Suggested `EnvConfig` fields:
 - `max_actions: int`
 - `scenes_path: str`
 - `traffic_enabled: bool`
-- `max_vehicles: int`
 - `route_direction_metrics_enabled: bool`
 
 Suggested `RunConfig` fields:
@@ -270,10 +269,13 @@ class RandomNavigationReset:
     traffic_density: Literal["none", "low", "medium", "dense"] | None = None
     speed_profile: Literal["slow", "medium", "fast"] | None = None
     num_vehicles: int | None = None
+    num_vehicles_near_ego: int | None = None
     route_dist_range: tuple[int, int] | None = None
     ego_target_speed: float | None = None
     vehicle_target_speed: float | None = None
     ego_route_graph: str = "full_vehicle"
+    traffic_role_profile: str | None = None
+    guaranteed_candidate_role: str | None = None
     route_profile: str | None = None
     route_profile_mix: dict[str, float] | None = None
     min_turns: int | None = None
@@ -296,10 +298,13 @@ Maps to:
     "traffic_density": ...,
     "speed_profile": ...,
     "num_vehicles": ...,
+    "num_vehicles_near_ego": ...,
     "route_dist_range": [...],
     "ego_target_speed": ...,
     "vehicle_target_speed": ...,
     "ego_route_graph": ...,
+    "traffic_role_profile": ...,
+    "guaranteed_candidate_role": ...,
     "route_profile": ...,
     "route_profile_mix": ...,
     "min_turns": ...,
@@ -322,6 +327,8 @@ Planner note:
   canonical graph
 - ego route constraints such as `min_turns` are evaluated against traversed
   semantic junction connectors when the canonical graph is used
+- nearby traffic can be requested with role-aware controls such as
+  `traffic_role_profile` and `guaranteed_candidate_role`
 
 ### `ScenarioPresetReset`
 

@@ -27,13 +27,22 @@ The tool currently uses:
 
 - `scene="rdm"`
 - the canonical Town01 ego route graph
-- traffic counts derived from the debug config
+- the random-navigation preset/default traffic schema
 - per-reset seed offsets so repeated resets produce different scenes
 
 On reset it prints:
 
 - effective reset options
 - scenario metadata from `info["scenario"]`
+- `scene_descriptor` metadata from `info["scene_descriptor"]`
+
+At episode end the standard log line now includes:
+
+- requested/spawned traffic count
+- the dominant or guaranteed nearby `role`
+- route label
+- target speed
+- final progress
 
 This makes it useful for quickly checking whether route and traffic generation
 behave as expected in the real environment loop.

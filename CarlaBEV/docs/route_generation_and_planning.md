@@ -151,18 +151,35 @@ straight/left/right fractions.
 
 ## Traffic Generation
 
-Traffic generation is intentionally simpler than ego generation.
+Traffic generation is now centered around the ego corridor rather than around
+map-wide ambient population.
 
-Background vehicles still use random planner sampling without ego-style turn
-constraints. That is by design:
+The current model is:
 
-- ego routes may require minimum-turn filtering
-- traffic routes remain random and lightweight
+- build the ego route first
+- try to satisfy `num_vehicles_near_ego` with role-based traffic around that route
+- use `guaranteed_candidate_role` as the first nearby role request when present
+- optionally fill any remaining `num_vehicles` budget with `background` vehicles
 
-This keeps the ego route contract explicit without over-constraining background
-actors.
+Supported nearby roles:
 
-Random traffic now also applies two lightweight runtime policies after route
+- `lead`
+- `rear`
+- `cross_path`
+- `opposite_lane`
+- `mix`
+
+`mix` currently samples:
+
+- `lead`: `40%`
+- `rear`: `20%`
+- `cross_path`: `25%`
+- `opposite_lane`: `15%`
+
+This keeps the ego route contract explicit while making traffic around the ego
+much more useful for training and failure analysis.
+
+Procedural traffic still applies two lightweight runtime policies after route
 sampling:
 
 - per-vehicle cruise-speed variation around the scene-level
@@ -190,9 +207,28 @@ Current random traffic longitudinal controller tuning:
 - max commanded acceleration: `2.5 m/s^2`
 - max commanded deceleration: `3.5 m/s^2`
 
-These policies apply only to procedurally generated background traffic. Ego
-speed remains controlled by `ego_target_speed`, and authored scenario actors
-keep their explicit speeds unless they opt into the same behavior.
+These policies apply only to procedurally generated traffic. Ego speed remains
+controlled by `ego_target_speed`, and authored scenario actors keep their
+explicit speeds unless they opt into the same behavior.
+
+## Scene Descriptor
+
+Every random-navigation reset now exposes a `scene_descriptor` through reset
+info and episode summaries.
+
+It is intended to be the stable scene-level analysis payload and currently
+includes:
+
+- seed metadata such as `scene_seed`, `route_seed`, and `traffic_seed`
+- traffic request metadata such as `num_vehicles_near_ego`,
+  `traffic_role_profile`, and `guaranteed_candidate_role`
+- spawned summaries such as `spawned_role_counts`, `actor_roles`, and
+  `main_actor_role`
+
+This allows downstream tools to separate:
+
+- scene description: what was requested/generated at reset
+- episode outcome: what the policy actually did in that scene
 
 ## Route Distribution Utility
 

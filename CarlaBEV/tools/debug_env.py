@@ -60,10 +60,22 @@ def _format_traffic_label(record):
     return "n/a"
 
 
+def _format_main_role(record):
+    descriptor = record.get("scene_descriptor") or {}
+    main_role = descriptor.get("main_actor_role")
+    if main_role is not None:
+        return str(main_role)
+    role_counts = descriptor.get("spawned_role_counts")
+    if isinstance(role_counts, dict) and role_counts:
+        return max(role_counts, key=role_counts.get)
+    return "n/a"
+
+
 def _log_episode_end(record, mode):
     target_speed = _format_target_speed(record)
     route_label = _format_route_label(record)
     traffic_label = _format_traffic_label(record)
+    main_role = _format_main_role(record)
     target_text = "n/a" if target_speed is None else f"{target_speed:.1f} m/s"
     progress = float(record.get("final_progress", record.get("mean_progress", 0.0)))
     logger.opt(colors=True).info(
@@ -72,6 +84,7 @@ def _log_episode_end(record, mode):
         "<cyan>R</cyan> <yellow>{episode_return:.1f}</yellow> | "
         "<cyan>steps</cyan> <yellow>{length}</yellow> | "
         "<cyan>traffic</cyan> <yellow>{traffic}</yellow> | "
+        "<cyan>role</cyan> <yellow>{main_role}</yellow> | "
         "<cyan>route</cyan> <yellow>{route}</yellow> | "
         "<cyan>target</cyan> <yellow>{target_speed}</yellow> | "
         "<cyan>progress</cyan> <yellow>{progress:.2f}</yellow>",
@@ -80,6 +93,7 @@ def _log_episode_end(record, mode):
         episode_return=float(record["return"]),
         length=int(record["length"]),
         traffic=traffic_label,
+        main_role=main_role,
         route=route_label,
         target_speed=target_text,
         progress=progress,

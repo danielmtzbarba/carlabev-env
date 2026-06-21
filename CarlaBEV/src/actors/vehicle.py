@@ -30,3 +30,4 @@ class Vehicle(Actor):
             np_rng=np_rng,
         )
         self.set_cruise_speed_mps(target_speed)
+        self.traffic_role = "unassigned"

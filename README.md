@@ -222,7 +222,6 @@ Common `EnvConfig` options include:
 - `obs_size`: final resized observation size
 - `frame_stack`
 - `traffic_enabled`
-- `max_vehicles`
 - `route_direction_metrics_enabled`: attach one-time smoothed-route fractions
   (`straight_fraction`, `left_turn_fraction`, `right_turn_fraction`) to reset info
 - `semantic_mask_ch`: semantic channel layout used when
@@ -241,7 +240,10 @@ Common random-navigation reset options include:
 - `route_extent`: `short`, `medium`, or `large`
 - `traffic_density`: `none`, `low`, `medium`, or `dense`
 - `speed_profile`: `slow`, `medium`, or `fast`
-- direct overrides such as `num_vehicles`, `route_dist_range`, `ego_target_speed`, and `vehicle_target_speed`
+- role-aware traffic controls such as `num_vehicles_near_ego`,
+  `traffic_role_profile`, and `guaranteed_candidate_role`
+- direct overrides such as `num_vehicles`, `route_dist_range`,
+  `ego_target_speed`, and `vehicle_target_speed`
 
 Common `RunConfig` options include:
 
@@ -370,8 +372,25 @@ Practical interpretation:
 
 - fixed scene schedule: reuse the same `scene_seed` every reset
 - deterministic diverse schedule: provide a different per-episode `scene_seed`
-- route-only perturbation: hold `traffic_seed` fixed and vary `route_seed`
+- route-relative traffic perturbation: hold `traffic_seed` fixed and vary `route_seed`
 - traffic-only perturbation: hold `route_seed` fixed and vary `traffic_seed`
+
+## Scene Descriptor
+
+Random-navigation resets and episode summaries now expose a `scene_descriptor`
+payload intended for analysis and dataset-style logging.
+
+The descriptor captures scene-level metadata such as:
+
+- `scene_seed`, `route_seed`, `traffic_seed`
+- `num_vehicles_near_ego`
+- `traffic_role_profile`
+- `guaranteed_candidate_role`
+- `spawned_role_counts`
+- `actor_roles`
+- `main_actor_role`
+
+This lets downstream analysis separate scene description from episode outcome.
 
 ## Research Scope
 

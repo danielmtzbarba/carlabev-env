@@ -8,6 +8,12 @@ The most important split is:
 - `RunConfig`: vector-env and capture/wrapper behavior around the simulator
 - reset builders in `CarlaBEV.config.reset`: per-episode scene sampling behavior
 
+For operator workflows, the supported command surface is now the packaged
+`carlabev` CLI. The public CLI wraps stable workflows such as interactive
+runtime inspection, scene-library population, route-distribution analysis,
+graph tooling, and simulator validation. Internal helper modules under
+`CarlaBEV/internal/` are not part of the public CLI contract.
+
 ## Runtime Flow
 
 ### `EnvConfig`
@@ -62,7 +68,7 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 | `traffic_enabled` | `bool = True` | `SceneGenerator` defaults | Default switch for random-scene traffic when reset options do not override it. |
 | `route_direction_metrics_enabled` | `bool = False` | `CarlaBEV.reset()` | When enabled, adds smoothed route left/right/straight fractions to scenario metadata after spawn. |
 | `scene_library_enabled` | `bool = True` | `CarlaBEV.reset()` | Enables the SQLite scene-library cache for random-scene replay and metadata lookup. |
-| `scene_library_path` | `str = "runs/scene_library.sqlite3"` | `SceneLibrary` | Filesystem path for the scene-library SQLite database. |
+| `scene_library_path` | `str = "CarlaBEV/assets/scenes/scene_library.db"` | `SceneLibrary` | Filesystem path for the scene-library SQLite database. |
 | `scene_library_read_only` | `bool = False` | `SceneLibrary` | When enabled, reads from the scene library without inserting new scenes. |
 | `scene_library_generator_version` | `str = "role_traffic_v1"` | `SceneLibrary` | Version string incorporated into the scene cache key so generator changes invalidate stale entries. |
 

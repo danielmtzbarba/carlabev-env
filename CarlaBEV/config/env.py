@@ -77,7 +77,7 @@ class EnvConfig(BaseModel):
     traffic_enabled: bool = True
     route_direction_metrics_enabled: bool = False
     scene_library_enabled: bool = True
-    scene_library_path: str = "runs/scene_library.sqlite3"
+    scene_library_path: str = "CarlaBEV/assets/scenes/scene_library.db"
     scene_library_read_only: bool = False
     scene_library_generator_version: str = "role_traffic_v1"
 

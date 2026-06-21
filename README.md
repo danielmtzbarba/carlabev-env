@@ -130,16 +130,46 @@ uv add CarlaBEV
 
 ## Running The Simulator
 
+### CLI
+
+CarlaBEV now ships with a packaged CLI:
+
+```bash
+uv run carlabev --help
+```
+
+Phase-1 command groups:
+
+- `carlabev run interactive`
+- `carlabev scene design`
+- `carlabev scene build-library`
+- `carlabev scene analyze-library`
+- `carlabev scene analyze-routes`
+- `carlabev graph build-town01-canonical`
+- `carlabev graph visualize-town01-canonical`
+- `carlabev graph validate-town01-joins`
+- `carlabev validate simulator-semantics`
+- `carlabev viz semantic-channels`
+- `carlabev viz vehicle-temporal-fusion`
+
 ### Debug Viewer
 
 The fastest way to inspect the simulator manually is:
 
 ```bash
-uv run CarlaBEV/tools/debug_env.py
+uv run carlabev run interactive
 ```
 
 This launches a `pygame` window, drives the ego vehicle with keyboard control,
 and now resets through the random traffic generator.
+
+You can switch the reset source without changing tools:
+
+```bash
+uv run carlabev run interactive --reset-mode random
+uv run carlabev run interactive --reset-mode authored --scene-file CarlaBEV/assets/scenes/leadbrake-01.01.json
+uv run carlabev run interactive --reset-mode scenario --scenario-id lead_brake
+```
 
 For the full set of debugging and route-diagnostics tools, see:
 
@@ -150,7 +180,7 @@ For the full set of debugging and route-diagnostics tools, see:
 The repository includes a simulator validation script:
 
 ```bash
-uv run python CarlaBEV/tools/validate_simulator_semantics.py
+uv run carlabev validate simulator-semantics
 ```
 
 This checks core simulator contracts such as:

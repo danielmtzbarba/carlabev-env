@@ -4,12 +4,13 @@ import unittest
 from CarlaBEV.config import EnvConfig, RandomNavigationReset, build_random_navigation_options
 from CarlaBEV.envs.carlabev import CarlaBEV
 from CarlaBEV.src.managers.scene_library import SceneLibrary
+from CarlaBEV.tools.build_scene_library import build_scene_library
 
 
 class SceneLibraryTests(unittest.TestCase):
     def test_scene_library_supports_metadata_queries(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = f"{tmpdir}/scene_library.sqlite3"
+            db_path = f"{tmpdir}/scene_library.db"
             library = SceneLibrary(db_path, generator_version="test_v1")
 
             library.insert_scene(
@@ -65,7 +66,7 @@ class SceneLibraryTests(unittest.TestCase):
 
     def test_env_reset_persists_scene_to_library(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = f"{tmpdir}/scene_library.sqlite3"
+            db_path = f"{tmpdir}/scene_library.db"
             env = CarlaBEV(
                 EnvConfig(
                     map_name="Town01",
@@ -105,6 +106,29 @@ class SceneLibraryTests(unittest.TestCase):
             self.assertFalse(info_first["scene_cache"]["hit"])
             self.assertTrue(info_second["scene_cache"]["hit"])
             self.assertEqual(record["use_count"], 2)
+
+    def test_build_scene_library_generates_without_stepping_and_reuses_cache(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = f"{tmpdir}/scene_library.db"
+
+            first = build_scene_library(
+                episodes=3,
+                difficulty_preset_id="easy",
+                seed_offset=500,
+                scene_library_path=db_path,
+            )
+            second = build_scene_library(
+                episodes=3,
+                difficulty_preset_id="easy",
+                seed_offset=500,
+                scene_library_path=db_path,
+            )
+
+            self.assertEqual(first["misses"], 3)
+            self.assertEqual(first["hits"], 0)
+            self.assertEqual(first["unique_scene_keys"], 3)
+            self.assertEqual(second["hits"], 3)
+            self.assertEqual(second["misses"], 0)
 
 
 if __name__ == "__main__":

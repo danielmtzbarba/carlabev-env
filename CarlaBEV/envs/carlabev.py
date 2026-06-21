@@ -82,7 +82,7 @@ class CarlaBEV(gym.Env):
         if not getattr(self.cfg, "scene_library_enabled", False):
             return None
         return SceneLibrary(
-            getattr(self.cfg, "scene_library_path", "runs/scene_library.sqlite3"),
+            getattr(self.cfg, "scene_library_path", "CarlaBEV/assets/scenes/scene_library.db"),
             generator_version=getattr(self.cfg, "scene_library_generator_version", "role_traffic_v1"),
             read_only=getattr(self.cfg, "scene_library_read_only", False),
         )

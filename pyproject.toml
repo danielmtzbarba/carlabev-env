@@ -45,6 +45,9 @@ dependencies = [
   "loguru>=0.7.3",
 ]
 
+[project.scripts]
+carlabev = "CarlaBEV.cli.main:main"
+
 [project.urls]
 Homepage = "https://github.com/danielmtzbarba/carlabev-env"
 Repository = "https://github.com/danielmtzbarba/carlabev-env"

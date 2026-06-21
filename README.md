@@ -152,6 +152,15 @@ Phase-1 command groups:
 - `carlabev viz semantic-channels`
 - `carlabev viz vehicle-temporal-fusion`
 
+`carlabev scene build-library` supports both a legacy flat `--seed-offset`
+workflow and a structured study-seed workflow. New downstream integrations
+should prefer:
+
+- `--study-id`
+- `--backbone-id`
+- `--study-seed`
+- `--episode-index-start`
+
 ### Debug Viewer
 
 The fastest way to inspect the simulator manually is:

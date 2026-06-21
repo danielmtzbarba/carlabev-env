@@ -172,6 +172,27 @@ downstream pattern is to build one library per study or per protocol, then run
 training with the scene library enabled in read-only mode so the experiment only
 reuses prepared scenes.
 
+For study-driven corpus preparation, prefer the structured seed mode instead of
+the older flat `--seed-offset` convention. Example:
+
+```bash
+uv run carlabev scene build-library \
+  --scene-library-path assets/scene_libraries/ppo_navigation.db \
+  --study-id PPO_NAVIGATION \
+  --backbone-id traffic_fixed_train \
+  --study-seed 7 \
+  --episodes 1000 \
+  --route-extent medium \
+  --speed-profile medium \
+  --num-vehicles 4 \
+  --num-vehicles-near-ego 4 \
+  --traffic-role-profile mix \
+  --guaranteed-candidate-role mix
+```
+
+This derives deterministic scene, route, traffic, and scenario seeds from the
+tuple `(study_id, backbone_id, study_seed, episode_index, kind)`.
+
 To summarize the cached scene corpus:
 
 ```bash

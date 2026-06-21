@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -15,11 +16,31 @@ logger.remove()
 logger.add(sys.stdout, format="{message}", colorize=True)
 
 
+def _derive_structured_seed(
+    *,
+    study_id: str,
+    backbone_id: str,
+    study_seed: int,
+    episode_index: int,
+    kind: str,
+) -> int:
+    token = f"{study_id}:{backbone_id}:{study_seed}:{episode_index}:{kind}"
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return int(digest[:16], 16) % (2**31 - 1)
+
+
 def build_scene_library(
     *,
     episodes: int,
     difficulty_preset_id: str = "medium",
+    route_extent: str | None = None,
+    traffic_density: str | None = None,
+    speed_profile: str | None = None,
     seed_offset: int = 0,
+    study_seed: int | None = None,
+    study_id: str = "manual",
+    backbone_id: str = "default",
+    episode_index_start: int = 0,
     scene_library_path: str = "CarlaBEV/assets/scenes/scene_library.db",
     route_dist_range: tuple[int, int] | None = None,
     num_vehicles: int | None = None,
@@ -47,19 +68,57 @@ def build_scene_library(
     samples: list[dict] = []
     try:
         for episode in range(int(episodes)):
-            seed_base = int(seed_offset) + episode * 1000
+            episode_index = int(episode_index_start) + episode
+            if study_seed is not None:
+                scene_seed = _derive_structured_seed(
+                    study_id=study_id,
+                    backbone_id=backbone_id,
+                    study_seed=int(study_seed),
+                    episode_index=episode_index,
+                    kind="scene",
+                )
+                route_seed = _derive_structured_seed(
+                    study_id=study_id,
+                    backbone_id=backbone_id,
+                    study_seed=int(study_seed),
+                    episode_index=episode_index,
+                    kind="route",
+                )
+                traffic_seed = _derive_structured_seed(
+                    study_id=study_id,
+                    backbone_id=backbone_id,
+                    study_seed=int(study_seed),
+                    episode_index=episode_index,
+                    kind="traffic",
+                )
+                scenario_seed = _derive_structured_seed(
+                    study_id=study_id,
+                    backbone_id=backbone_id,
+                    study_seed=int(study_seed),
+                    episode_index=episode_index,
+                    kind="scenario",
+                )
+            else:
+                seed_base = int(seed_offset) + episode * 1000
+                scene_seed = seed_base
+                route_seed = seed_base + 1
+                traffic_seed = seed_base + 2
+                scenario_seed = seed_base + 3
             request = RandomNavigationReset(
                 difficulty_preset_id=difficulty_preset_id,
+                route_extent=route_extent,
+                traffic_density=traffic_density,
+                speed_profile=speed_profile,
                 route_dist_range=route_dist_range,
                 num_vehicles=num_vehicles,
                 num_vehicles_near_ego=num_vehicles_near_ego,
                 traffic_role_profile=traffic_role_profile,
                 guaranteed_candidate_role=guaranteed_candidate_role,
                 ego_route_graph=ego_route_graph,
-                scene_seed=seed_base,
-                route_seed=seed_base + 1,
-                traffic_seed=seed_base + 2,
-                scenario_seed=seed_base + 3,
+                scene_seed=scene_seed,
+                route_seed=route_seed,
+                traffic_seed=traffic_seed,
+                scenario_seed=scenario_seed,
             )
             options = build_random_navigation_options(request)
             _, info = env.reset(options=options)
@@ -74,8 +133,10 @@ def build_scene_library(
             scene_keys.append(scene_key)
             sample = {
                 "episode": episode,
+                "episode_index": episode_index,
                 "scene_key": scene_key,
                 "cache_hit": cache_hit,
+                "study_seed": study_seed,
                 "scene_seed": descriptor.get("scene_seed"),
                 "route_seed": descriptor.get("route_seed"),
                 "traffic_seed": descriptor.get("traffic_seed"),
@@ -101,6 +162,12 @@ def build_scene_library(
     summary = {
         "episodes": int(episodes),
         "difficulty_preset_id": difficulty_preset_id,
+        "route_extent": route_extent,
+        "traffic_density": traffic_density,
+        "speed_profile": speed_profile,
+        "study_seed": study_seed,
+        "study_id": study_id,
+        "backbone_id": backbone_id,
         "scene_library_path": scene_library_path,
         "hits": hits,
         "misses": misses,
@@ -126,7 +193,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Build the SQLite scene library without stepping episodes.")
     parser.add_argument("--episodes", type=int, default=100)
     parser.add_argument("--difficulty-preset-id", default="medium")
+    parser.add_argument("--route-extent", default=None)
+    parser.add_argument("--traffic-density", default=None)
+    parser.add_argument("--speed-profile", default=None)
     parser.add_argument("--seed-offset", type=int, default=0)
+    parser.add_argument("--study-seed", type=int, default=None)
+    parser.add_argument("--study-id", default="manual")
+    parser.add_argument("--backbone-id", default="default")
+    parser.add_argument("--episode-index-start", type=int, default=0)
     parser.add_argument(
         "--scene-library-path",
         default="CarlaBEV/assets/scenes/scene_library.db",
@@ -154,7 +228,14 @@ def main() -> int:
     summary = build_scene_library(
         episodes=args.episodes,
         difficulty_preset_id=args.difficulty_preset_id,
+        route_extent=args.route_extent,
+        traffic_density=args.traffic_density,
+        speed_profile=args.speed_profile,
         seed_offset=args.seed_offset,
+        study_seed=args.study_seed,
+        study_id=args.study_id,
+        backbone_id=args.backbone_id,
+        episode_index_start=args.episode_index_start,
         scene_library_path=args.scene_library_path,
         route_dist_range=route_dist_range,
         num_vehicles=args.num_vehicles,

@@ -28,6 +28,9 @@ class TestCli(unittest.TestCase):
                 scene_key="scene-a",
                 scene_descriptor={
                     "scene": "rdm",
+                    "scene_benchmark_id": "navigation_medium_v1",
+                    "scene_profile_id": "easy",
+                    "scene_split": "train",
                     "difficulty_preset_id": "easy",
                     "route_profile": "mostly_straight",
                     "main_actor_role": "lead",
@@ -44,6 +47,9 @@ class TestCli(unittest.TestCase):
                 scene_key="scene-b",
                 scene_descriptor={
                     "scene": "rdm",
+                    "scene_benchmark_id": "navigation_medium_v1",
+                    "scene_profile_id": "hard",
+                    "scene_split": "eval",
                     "difficulty_preset_id": "hard",
                     "route_profile": "multi_turn",
                     "main_actor_role": "cross_path",
@@ -64,7 +70,7 @@ class TestCli(unittest.TestCase):
             quality = collect_scene_library_quality(db_path)
             breakdown = collect_scene_library_breakdown(
                 db_path,
-                group_by=["difficulty", "route-profile"],
+                group_by=["scene-benchmark", "scene-profile", "scene-split", "difficulty", "route-profile"],
             )
             query = collect_scene_library_query(
                 db_path,
@@ -75,10 +81,16 @@ class TestCli(unittest.TestCase):
             )
 
         self.assertEqual(summary["total_scenes"], 2)
+        self.assertEqual(summary["scene_benchmark_counts"]["navigation_medium_v1"], 2)
+        self.assertEqual(summary["scene_profile_counts"]["easy"], 1)
+        self.assertEqual(summary["scene_split_counts"]["train"], 1)
         self.assertEqual(summary["difficulty_counts"]["easy"], 1)
         self.assertEqual(summary["route_profile_counts"]["mostly_straight"], 1)
         self.assertEqual(summary["main_actor_role_counts"]["lead"], 1)
         self.assertAlmostEqual(quality["zero_spawned_rate"], 0.5)
+        self.assertEqual(breakdown["breakdowns"]["scene-benchmark"]["navigation_medium_v1"], 2)
+        self.assertEqual(breakdown["breakdowns"]["scene-profile"]["hard"], 1)
+        self.assertEqual(breakdown["breakdowns"]["scene-split"]["eval"], 1)
         self.assertEqual(breakdown["breakdowns"]["difficulty"]["hard"], 1)
         self.assertEqual(breakdown["breakdowns"]["route-profile"]["multi_turn"], 1)
         self.assertEqual(query["total_matches"], 1)

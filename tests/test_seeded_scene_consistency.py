@@ -14,6 +14,7 @@ def _make_env(*, anchor_y_frac: float) -> CarlaBEV:
         size=128,
         ego_anchor_x_frac=0.5,
         ego_anchor_y_frac=anchor_y_frac,
+        scene_library_enabled=False,
     )
     return CarlaBEV(cfg)
 
@@ -283,11 +284,28 @@ class SeededSceneConsistencyTests(unittest.TestCase):
             {"lead", "rear", "cross_path", "opposite_lane", "background"},
         )
 
+    def test_scene_descriptor_exposes_explicit_scene_profile_id(self):
+        snapshot = _capture_spawn_state(
+            seed=11,
+            anchor_y_frac=0.5,
+            reset_kwargs={
+                "scene_benchmark_id": "navigation_medium_v1",
+                "scene_profile_id": "difficulty_hard",
+                "scene_split": "train",
+            },
+        )
+
+        descriptor = snapshot["scene_descriptor"]
+        self.assertEqual(descriptor["scene_benchmark_id"], "navigation_medium_v1")
+        self.assertEqual(descriptor["scene_profile_id"], "difficulty_hard")
+        self.assertEqual(descriptor["scene_split"], "train")
+
     def test_explicit_role_based_reset_spawns_guaranteed_lead_candidate(self):
         snapshot = _capture_spawn_state(
             seed=11,
             anchor_y_frac=0.5,
             reset_kwargs={
+                "scene_profile_id": "lead_focus",
                 "num_vehicles": 4,
                 "num_vehicles_near_ego": 4,
                 "traffic_role_profile": "mix",

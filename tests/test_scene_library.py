@@ -17,6 +17,9 @@ class SceneLibraryTests(unittest.TestCase):
                 scene_key="scene-a",
                 scene_descriptor={
                     "scene": "rdm",
+                    "scene_benchmark_id": "navigation_medium_v1",
+                    "scene_profile_id": "easy",
+                    "scene_split": "train",
                     "difficulty_preset_id": "easy",
                     "route_profile": "mostly_straight",
                     "main_actor_role": "lead",
@@ -37,6 +40,9 @@ class SceneLibraryTests(unittest.TestCase):
                 scene_key="scene-b",
                 scene_descriptor={
                     "scene": "rdm",
+                    "scene_benchmark_id": "navigation_medium_v1",
+                    "scene_profile_id": "hard",
+                    "scene_split": "eval",
                     "difficulty_preset_id": "hard",
                     "route_profile": "single_right",
                     "main_actor_role": "cross_path",
@@ -55,6 +61,9 @@ class SceneLibraryTests(unittest.TestCase):
             )
 
             results = library.get_scene_by_filters(
+                scene_benchmark_id="navigation_medium_v1",
+                scene_profile_id="hard",
+                scene_split="eval",
                 difficulty_preset_id="hard",
                 route_profile="single_right",
                 main_actor_role="cross_path",
@@ -81,6 +90,9 @@ class SceneLibraryTests(unittest.TestCase):
             )
             options = build_random_navigation_options(
                 RandomNavigationReset(
+                    scene_benchmark_id="navigation_medium_v1",
+                    scene_profile_id="difficulty_easy",
+                    scene_split="train",
                     difficulty_preset_id="easy",
                     scene_seed=101,
                     route_seed=102,
@@ -98,6 +110,9 @@ class SceneLibraryTests(unittest.TestCase):
 
             self.assertEqual(len(records), 1)
             record = records[0]
+            self.assertEqual(record["scene_descriptor"]["scene_benchmark_id"], "navigation_medium_v1")
+            self.assertEqual(record["scene_descriptor"]["scene_profile_id"], "difficulty_easy")
+            self.assertEqual(record["scene_descriptor"]["scene_split"], "train")
             self.assertEqual(record["scene_descriptor"]["difficulty_preset_id"], "easy")
             self.assertEqual(
                 info_first["scene_descriptor"]["scene_seed"],
@@ -113,12 +128,18 @@ class SceneLibraryTests(unittest.TestCase):
 
             first = build_scene_library(
                 episodes=3,
+                scene_benchmark_id="navigation_medium_v1",
+                scene_profile_id="difficulty_easy",
+                scene_split="train",
                 difficulty_preset_id="easy",
                 seed_offset=500,
                 scene_library_path=db_path,
             )
             second = build_scene_library(
                 episodes=3,
+                scene_benchmark_id="navigation_medium_v1",
+                scene_profile_id="difficulty_easy",
+                scene_split="train",
                 difficulty_preset_id="easy",
                 seed_offset=500,
                 scene_library_path=db_path,

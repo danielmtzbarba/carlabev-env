@@ -32,6 +32,9 @@ def _derive_structured_seed(
 def build_scene_library(
     *,
     episodes: int,
+    scene_benchmark_id: str | None = None,
+    scene_profile_id: str | None = None,
+    scene_split: str | None = None,
     difficulty_preset_id: str = "medium",
     route_extent: str | None = None,
     traffic_density: str | None = None,
@@ -105,6 +108,9 @@ def build_scene_library(
                 traffic_seed = seed_base + 2
                 scenario_seed = seed_base + 3
             request = RandomNavigationReset(
+                scene_benchmark_id=scene_benchmark_id,
+                scene_profile_id=scene_profile_id,
+                scene_split=scene_split,
                 difficulty_preset_id=difficulty_preset_id,
                 route_extent=route_extent,
                 traffic_density=traffic_density,
@@ -140,6 +146,9 @@ def build_scene_library(
                 "scene_seed": descriptor.get("scene_seed"),
                 "route_seed": descriptor.get("route_seed"),
                 "traffic_seed": descriptor.get("traffic_seed"),
+                "scene_benchmark_id": descriptor.get("scene_benchmark_id"),
+                "scene_profile_id": descriptor.get("scene_profile_id"),
+                "scene_split": descriptor.get("scene_split"),
                 "route_profile": descriptor.get("route_profile"),
                 "main_actor_role": descriptor.get("main_actor_role"),
             }
@@ -161,6 +170,9 @@ def build_scene_library(
 
     summary = {
         "episodes": int(episodes),
+        "scene_benchmark_id": scene_benchmark_id,
+        "scene_profile_id": scene_profile_id,
+        "scene_split": scene_split,
         "difficulty_preset_id": difficulty_preset_id,
         "route_extent": route_extent,
         "traffic_density": traffic_density,
@@ -192,6 +204,9 @@ def build_scene_library(
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Build the SQLite scene library without stepping episodes.")
     parser.add_argument("--episodes", type=int, default=100)
+    parser.add_argument("--scene-benchmark-id", default=None)
+    parser.add_argument("--scene-profile-id", default=None)
+    parser.add_argument("--scene-split", default=None)
     parser.add_argument("--difficulty-preset-id", default="medium")
     parser.add_argument("--route-extent", default=None)
     parser.add_argument("--traffic-density", default=None)
@@ -227,6 +242,9 @@ def main() -> int:
 
     summary = build_scene_library(
         episodes=args.episodes,
+        scene_benchmark_id=args.scene_benchmark_id,
+        scene_profile_id=args.scene_profile_id,
+        scene_split=args.scene_split,
         difficulty_preset_id=args.difficulty_preset_id,
         route_extent=args.route_extent,
         traffic_density=args.traffic_density,

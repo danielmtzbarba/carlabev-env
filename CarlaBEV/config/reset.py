@@ -21,6 +21,9 @@ from CarlaBEV.src.scenes.scenarios.specs import (
 class RandomNavigationReset(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
+    scene_benchmark_id: str | None = None
+    scene_profile_id: str | None = None
+    scene_split: str | None = None
     difficulty_preset_id: str | None = None
     route_extent: RouteExtentId | None = None
     traffic_density: TrafficDensityId | None = None
@@ -140,6 +143,12 @@ def build_random_navigation_options(
         "scene": "rdm",
         "ego_route_graph": request.ego_route_graph,
     }
+    if request.scene_benchmark_id is not None:
+        options["scene_benchmark_id"] = str(request.scene_benchmark_id)
+    if request.scene_profile_id is not None:
+        options["scene_profile_id"] = str(request.scene_profile_id)
+    if request.scene_split is not None:
+        options["scene_split"] = str(request.scene_split)
     if difficulty_preset_id is not None:
         options["difficulty_preset_id"] = get_difficulty_spec(
             difficulty_preset_id

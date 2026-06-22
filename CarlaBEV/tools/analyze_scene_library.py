@@ -10,6 +10,9 @@ from rich.table import Table
 
 
 FIELD_ALIASES = {
+    "scene-benchmark": "scene_benchmark_id",
+    "scene-profile": "scene_profile_id",
+    "scene-split": "scene_split",
     "difficulty": "difficulty_preset_id",
     "route-profile": "route_profile",
     "main-role": "main_actor_role",
@@ -27,6 +30,9 @@ ROLE_MIN_FILTERS = {
 
 QUERY_COLUMNS = [
     "scene_id",
+    "scene_benchmark_id",
+    "scene_profile_id",
+    "scene_split",
     "difficulty_preset_id",
     "route_profile",
     "main_actor_role",
@@ -51,6 +57,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default="CarlaBEV/assets/scenes/scene_library.db",
     )
     shared.add_argument("--json", action="store_true", dest="as_json")
+    shared.add_argument("--scene-benchmark", default=None)
+    shared.add_argument("--scene-profile", default=None)
+    shared.add_argument("--scene-split", default=None)
     shared.add_argument("--difficulty", default=None)
     shared.add_argument("--route-profile", default=None)
     shared.add_argument("--main-role", default=None)
@@ -105,6 +114,9 @@ def _open_conn(db_path: str) -> sqlite3.Connection:
 
 def _base_filters(args) -> dict[str, Any]:
     return {
+        "scene_profile_id": args.scene_profile,
+        "scene_benchmark_id": args.scene_benchmark,
+        "scene_split": args.scene_split,
         "difficulty_preset_id": args.difficulty,
         "route_profile": args.route_profile,
         "main_actor_role": args.main_role,
@@ -113,11 +125,24 @@ def _base_filters(args) -> dict[str, Any]:
     }
 
 
-def _where_from_filters(filters: dict[str, Any]) -> tuple[str, list[Any]]:
+def _scene_columns(conn: sqlite3.Connection) -> set[str]:
+    return {
+        str(row["name"])
+        for row in conn.execute("PRAGMA table_info(scenes)").fetchall()
+    }
+
+
+def _where_from_filters(
+    filters: dict[str, Any],
+    *,
+    available_columns: set[str] | None = None,
+) -> tuple[str, list[Any]]:
     where: list[str] = []
     params: list[Any] = []
     for column, value in filters.items():
         if value is None:
+            continue
+        if available_columns is not None and column not in available_columns:
             continue
         where.append(f"{column} = ?")
         params.append(value)
@@ -127,8 +152,16 @@ def _where_from_filters(filters: dict[str, Any]) -> tuple[str, list[Any]]:
     return sql, params
 
 
-def _count_by(conn: sqlite3.Connection, filters: dict[str, Any], column: str) -> dict[str, int]:
-    where_sql, params = _where_from_filters(filters)
+def _count_by(
+    conn: sqlite3.Connection,
+    filters: dict[str, Any],
+    column: str,
+    *,
+    available_columns: set[str],
+) -> dict[str, int]:
+    if column not in available_columns:
+        return {}
+    where_sql, params = _where_from_filters(filters, available_columns=available_columns)
     rows = conn.execute(
         f"""
         SELECT COALESCE(CAST({column} AS TEXT), 'null') AS label, COUNT(*) AS count
@@ -142,8 +175,17 @@ def _count_by(conn: sqlite3.Connection, filters: dict[str, Any], column: str) ->
     return {str(row["label"]): int(row["count"]) for row in rows}
 
 
-def _cross_breakdown(conn: sqlite3.Connection, filters: dict[str, Any], first: str, second: str) -> list[dict[str, Any]]:
-    where_sql, params = _where_from_filters(filters)
+def _cross_breakdown(
+    conn: sqlite3.Connection,
+    filters: dict[str, Any],
+    first: str,
+    second: str,
+    *,
+    available_columns: set[str],
+) -> list[dict[str, Any]]:
+    if first not in available_columns or second not in available_columns:
+        return []
+    where_sql, params = _where_from_filters(filters, available_columns=available_columns)
     rows = conn.execute(
         f"""
         SELECT
@@ -167,7 +209,8 @@ def collect_scene_library_summary(db_path: str, *, filters: dict[str, Any] | Non
     filters = filters or {}
     conn = _open_conn(db_path)
     try:
-        where_sql, params = _where_from_filters(filters)
+        available_columns = _scene_columns(conn)
+        where_sql, params = _where_from_filters(filters, available_columns=available_columns)
         total_scenes = int(conn.execute(f"SELECT COUNT(*) AS count FROM scenes{where_sql}", params).fetchone()["count"])
         result = {
             "mode": "summary",
@@ -178,6 +221,9 @@ def collect_scene_library_summary(db_path: str, *, filters: dict[str, Any] | Non
         if total_scenes == 0:
             result.update(
                 {
+                    "scene_profile_counts": {},
+                    "scene_split_counts": {},
+                    "scene_benchmark_counts": {},
                     "difficulty_counts": {},
                     "route_profile_counts": {},
                     "main_actor_role_counts": {},
@@ -235,11 +281,30 @@ def collect_scene_library_summary(db_path: str, *, filters: dict[str, Any] | Non
                 "near_ego_presence_rate": float(aggregate["near_ego_presence_rate"] or 0.0),
                 "main_actor_role_rate": float(aggregate["main_actor_role_rate"] or 0.0),
                 "intersection_like_rate": float(aggregate["intersection_like_rate"] or 0.0),
-                "generator_version_counts": _count_by(conn, filters, "generator_version"),
-                "difficulty_counts": _count_by(conn, filters, "difficulty_preset_id"),
-                "route_profile_counts": _count_by(conn, filters, "route_profile"),
-                "main_actor_role_counts": _count_by(conn, filters, "main_actor_role"),
-                "traffic_role_profile_counts": _count_by(conn, filters, "traffic_role_profile"),
+                "generator_version_counts": _count_by(
+                    conn, filters, "generator_version", available_columns=available_columns
+                ),
+                "scene_benchmark_counts": _count_by(
+                    conn, filters, "scene_benchmark_id", available_columns=available_columns
+                ),
+                "scene_profile_counts": _count_by(
+                    conn, filters, "scene_profile_id", available_columns=available_columns
+                ),
+                "scene_split_counts": _count_by(
+                    conn, filters, "scene_split", available_columns=available_columns
+                ),
+                "difficulty_counts": _count_by(
+                    conn, filters, "difficulty_preset_id", available_columns=available_columns
+                ),
+                "route_profile_counts": _count_by(
+                    conn, filters, "route_profile", available_columns=available_columns
+                ),
+                "main_actor_role_counts": _count_by(
+                    conn, filters, "main_actor_role", available_columns=available_columns
+                ),
+                "traffic_role_profile_counts": _count_by(
+                    conn, filters, "traffic_role_profile", available_columns=available_columns
+                ),
                 "role_presence_rates": role_presence,
             }
         )
@@ -259,6 +324,7 @@ def collect_scene_library_breakdown(
     group_by = group_by or []
     conn = _open_conn(db_path)
     try:
+        available_columns = _scene_columns(conn)
         result: dict[str, Any] = {
             "mode": "breakdown",
             "scene_library_path": db_path,
@@ -266,14 +332,20 @@ def collect_scene_library_breakdown(
         }
         if cross is not None:
             result["cross"] = list(cross)
-            result["rows"] = _cross_breakdown(conn, filters, cross[0], cross[1])
+            result["rows"] = _cross_breakdown(
+                conn,
+                filters,
+                cross[0],
+                cross[1],
+                available_columns=available_columns,
+            )
             return result
 
         requested = group_by or ["difficulty"]
         mapped = [FIELD_ALIASES[name] for name in requested]
         result["group_by"] = requested
         result["breakdowns"] = {
-            name: _count_by(conn, filters, column)
+            name: _count_by(conn, filters, column, available_columns=available_columns)
             for name, column in zip(requested, mapped, strict=True)
         }
         return result
@@ -285,7 +357,8 @@ def collect_scene_library_quality(db_path: str, *, filters: dict[str, Any] | Non
     filters = filters or {}
     conn = _open_conn(db_path)
     try:
-        where_sql, params = _where_from_filters(filters)
+        available_columns = _scene_columns(conn)
+        where_sql, params = _where_from_filters(filters, available_columns=available_columns)
         total_scenes = int(conn.execute(f"SELECT COUNT(*) AS count FROM scenes{where_sql}", params).fetchone()["count"])
         result = {
             "mode": "quality",
@@ -383,25 +456,28 @@ def collect_scene_library_query(
     if traffic_seed is not None:
         extra_filters["traffic_seed"] = int(traffic_seed)
 
-    where_sql, params = _where_from_filters(extra_filters)
-    extra_where: list[str] = []
-    if min_near_ego is not None:
-        extra_where.append("COALESCE(spawned_num_vehicles_near_ego, 0) >= ?")
-        params.append(int(min_near_ego))
-    for column, minimum in role_mins.items():
-        extra_where.append(f"COALESCE({column}, 0) >= ?")
-        params.append(int(minimum))
-    if extra_where:
-        if where_sql:
-            where_sql += " AND " + " AND ".join(extra_where)
-        else:
-            where_sql = " WHERE " + " AND ".join(extra_where)
-
     conn = _open_conn(db_path)
     try:
+        available_columns = _scene_columns(conn)
+        where_sql, params = _where_from_filters(extra_filters, available_columns=available_columns)
+        extra_where: list[str] = []
+        if min_near_ego is not None and "spawned_num_vehicles_near_ego" in available_columns:
+            extra_where.append("COALESCE(spawned_num_vehicles_near_ego, 0) >= ?")
+            params.append(int(min_near_ego))
+        for column, minimum in role_mins.items():
+            if column not in available_columns:
+                continue
+            extra_where.append(f"COALESCE({column}, 0) >= ?")
+            params.append(int(minimum))
+        if extra_where:
+            if where_sql:
+                where_sql += " AND " + " AND ".join(extra_where)
+            else:
+                where_sql = " WHERE " + " AND ".join(extra_where)
+        selected_columns = [column for column in QUERY_COLUMNS if column in available_columns]
         rows = conn.execute(
             f"""
-            SELECT {", ".join(QUERY_COLUMNS)}
+            SELECT {", ".join(selected_columns)}
             FROM scenes
             {where_sql}
             ORDER BY created_at DESC, scene_id DESC
@@ -409,7 +485,10 @@ def collect_scene_library_query(
             """,
             [*params, int(limit)],
         ).fetchall()
-        data_rows = [{key: row[key] for key in QUERY_COLUMNS} for row in rows]
+        data_rows = [
+            {key: (row[key] if key in selected_columns else None) for key in QUERY_COLUMNS}
+            for row in rows
+        ]
         return {
             "mode": "query",
             "scene_library_path": db_path,
@@ -459,6 +538,9 @@ def _render_summary(console: Console, summary: dict[str, Any]) -> None:
     console.print(table)
     for title, key in (
         ("Generator Versions", "generator_version_counts"),
+        ("Scene Benchmarks", "scene_benchmark_counts"),
+        ("Scene Profiles", "scene_profile_counts"),
+        ("Scene Splits", "scene_split_counts"),
         ("Difficulty Presets", "difficulty_counts"),
         ("Route Profiles", "route_profile_counts"),
         ("Main Actor Roles", "main_actor_role_counts"),
@@ -507,6 +589,9 @@ def _render_breakdown(console: Console, breakdown: dict[str, Any]) -> None:
 def _render_query(console: Console, payload: dict[str, Any]) -> None:
     table = Table(title="Query Results")
     table.add_column("scene_id", justify="right")
+    table.add_column("scene_benchmark", justify="left")
+    table.add_column("scene_profile", justify="left")
+    table.add_column("scene_split", justify="left")
     table.add_column("difficulty", justify="left")
     table.add_column("route_profile", justify="left")
     table.add_column("main_role", justify="left")
@@ -520,6 +605,9 @@ def _render_query(console: Console, payload: dict[str, Any]) -> None:
     for row in payload.get("rows", []):
         table.add_row(
             str(row["scene_id"]),
+            str(row["scene_benchmark_id"]),
+            str(row["scene_profile_id"]),
+            str(row["scene_split"]),
             str(row["difficulty_preset_id"]),
             str(row["route_profile"]),
             str(row["main_actor_role"]),

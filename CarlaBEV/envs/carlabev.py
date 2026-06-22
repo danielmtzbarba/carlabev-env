@@ -301,6 +301,9 @@ class CarlaBEV(gym.Env):
             "scenario_preset_scene",
             "scenario_preset_description",
             "config_file",
+            "scene_benchmark_id",
+            "scene_profile_id",
+            "scene_split",
             "difficulty_preset_id",
             "route_extent",
             "traffic_density",
@@ -336,6 +339,9 @@ class CarlaBEV(gym.Env):
         descriptor = {}
         direct_keys = (
             "scene",
+            "scene_benchmark_id",
+            "scene_profile_id",
+            "scene_split",
             "difficulty_preset_id",
             "route_extent",
             "traffic_density",

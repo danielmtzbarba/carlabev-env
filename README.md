@@ -285,7 +285,10 @@ Common `EnvConfig` options include:
 
 Common random-navigation reset options include:
 
+- `scene_benchmark_id`: optional benchmark namespace for shared scene corpora
 - `difficulty_preset_id`: `no_traffic`, `easy`, `medium`, `hard`
+- `scene_profile_id`: optional study-facing profile label such as `medium`
+- `scene_split`: optional benchmark split label such as `train` or `eval`
 - `route_extent`: `short`, `medium`, or `large`
 - `traffic_density`: `none`, `low`, `medium`, or `dense`
 - `speed_profile`: `slow`, `medium`, or `fast`
@@ -301,9 +304,9 @@ cache hits and misses on reset.
 
 The intended downstream workflow is:
 
-- prebuild study-specific scene libraries ahead of training
+- prebuild benchmark- or study-specific scene libraries ahead of training
 - point downstream study configs at those `.db` files
-- keep training/evaluation runs in read-only mode so study execution never mutates the prepared corpus
+- keep training/evaluation runs in read-only mode so execution never mutates the prepared corpus
 
 Common `RunConfig` options include:
 
@@ -443,6 +446,7 @@ payload intended for analysis and dataset-style logging.
 The descriptor captures scene-level metadata such as:
 
 - `scene_seed`, `route_seed`, `traffic_seed`
+- `scene_benchmark_id`, `scene_profile_id`, `scene_split`
 - `num_vehicles_near_ego`
 - `traffic_role_profile`
 - `guaranteed_candidate_role`

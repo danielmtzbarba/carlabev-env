@@ -226,6 +226,7 @@ Current built-in `mix` weights:
 The runtime exposes a stable `scene_descriptor` on reset and episode-end info.
 The descriptor currently includes:
 
+- benchmark metadata such as `scene_benchmark_id`, `scene_profile_id`, and `scene_split`
 - route and seed metadata such as `scene_seed`, `route_seed`, `traffic_seed`
 - requested and spawned traffic counts
 - `traffic_role_profile`

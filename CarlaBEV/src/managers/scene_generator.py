@@ -505,6 +505,9 @@ class SceneGenerator:
         # --- Case 1: Random scene generation ---
         if isinstance(scene, str) and scene == "rdm":
             self.last_scene_context.update({
+                "scene_benchmark_id": options.get("scene_benchmark_id"),
+                "scene_profile_id": options.get("scene_profile_id"),
+                "scene_split": options.get("scene_split"),
                 "difficulty_preset_id": options.get("difficulty_preset_id"),
                 "route_extent": options.get("route_extent"),
                 "traffic_density": options.get("traffic_density"),

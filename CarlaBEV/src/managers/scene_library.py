@@ -20,6 +20,12 @@ ROLE_COLUMN_MAP = {
     "background": "spawned_role_background",
 }
 
+OPTIONAL_SCENE_COLUMNS = {
+    "scene_benchmark_id": "TEXT",
+    "scene_profile_id": "TEXT",
+    "scene_split": "TEXT",
+}
+
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -138,6 +144,9 @@ class SceneLibrary:
                     last_used_at TEXT,
                     use_count INTEGER NOT NULL DEFAULT 0,
                     scene_kind TEXT NOT NULL,
+                    scene_benchmark_id TEXT,
+                    scene_profile_id TEXT,
+                    scene_split TEXT,
                     difficulty_preset_id TEXT,
                     route_extent TEXT,
                     traffic_density TEXT,
@@ -170,12 +179,33 @@ class SceneLibrary:
                     resolved_options_json TEXT NOT NULL
                 );
 
-                CREATE INDEX IF NOT EXISTS idx_scenes_route_profile ON scenes(route_profile);
-                CREATE INDEX IF NOT EXISTS idx_scenes_main_actor_role ON scenes(main_actor_role);
-                CREATE INDEX IF NOT EXISTS idx_scenes_difficulty ON scenes(difficulty_preset_id);
-                CREATE INDEX IF NOT EXISTS idx_scenes_seed_triplet ON scenes(scene_seed, route_seed, traffic_seed);
-                CREATE INDEX IF NOT EXISTS idx_scenes_role_route ON scenes(main_actor_role, route_profile);
                 """
+            )
+            existing_columns = {
+                str(row["name"])
+                for row in conn.execute("PRAGMA table_info(scenes)").fetchall()
+            }
+            for column_name, column_type in OPTIONAL_SCENE_COLUMNS.items():
+                if column_name in existing_columns:
+                    continue
+                conn.execute(f"ALTER TABLE scenes ADD COLUMN {column_name} {column_type}")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scenes_route_profile ON scenes(route_profile)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scenes_scene_profile ON scenes(scene_profile_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scenes_main_actor_role ON scenes(main_actor_role)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scenes_difficulty ON scenes(difficulty_preset_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scenes_seed_triplet ON scenes(scene_seed, route_seed, traffic_seed)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_scenes_role_route ON scenes(main_actor_role, route_profile)"
             )
 
     def build_scene_key(self, resolved_options: dict[str, Any], seeds: dict[str, Any]) -> str:
@@ -205,6 +235,9 @@ class SceneLibrary:
     def get_scene_by_filters(
         self,
         *,
+        scene_benchmark_id: str | None = None,
+        scene_profile_id: str | None = None,
+        scene_split: str | None = None,
         difficulty_preset_id: str | None = None,
         route_profile: str | None = None,
         main_actor_role: str | None = None,
@@ -213,6 +246,15 @@ class SceneLibrary:
     ) -> list[dict[str, Any]]:
         where = []
         params: list[Any] = []
+        if scene_benchmark_id is not None:
+            where.append("scene_benchmark_id = ?")
+            params.append(str(scene_benchmark_id))
+        if scene_profile_id is not None:
+            where.append("scene_profile_id = ?")
+            params.append(str(scene_profile_id))
+        if scene_split is not None:
+            where.append("scene_split = ?")
+            params.append(str(scene_split))
         if difficulty_preset_id is not None:
             where.append("difficulty_preset_id = ?")
             params.append(str(difficulty_preset_id))
@@ -259,6 +301,9 @@ class SceneLibrary:
             "last_used_at": now,
             "use_count": 1,
             "scene_kind": str(descriptor.get("scene", resolved_options.get("scene", "unknown"))),
+            "scene_benchmark_id": descriptor.get("scene_benchmark_id"),
+            "scene_profile_id": descriptor.get("scene_profile_id"),
+            "scene_split": descriptor.get("scene_split"),
             "difficulty_preset_id": descriptor.get("difficulty_preset_id"),
             "route_extent": descriptor.get("route_extent"),
             "traffic_density": descriptor.get("traffic_density"),

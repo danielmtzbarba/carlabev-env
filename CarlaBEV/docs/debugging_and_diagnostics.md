@@ -168,9 +168,9 @@ uv run carlabev scene build-library --episodes 100
 ```
 
 This command is intended for ahead-of-time corpus preparation. A common
-downstream pattern is to build one library per study or per protocol, then run
-training with the scene library enabled in read-only mode so the experiment only
-reuses prepared scenes.
+downstream pattern is to build one library per benchmark, study, or protocol,
+then run training with the scene library enabled in read-only mode so the
+experiment only reuses prepared scenes.
 
 For study-driven corpus preparation, prefer the structured seed mode instead of
 the older flat `--seed-offset` convention. Example:
@@ -178,6 +178,9 @@ the older flat `--seed-offset` convention. Example:
 ```bash
 uv run carlabev scene build-library \
   --scene-library-path assets/scene_libraries/ppo_navigation.db \
+  --scene-benchmark-id navigation_medium_v1 \
+  --scene-profile-id medium \
+  --scene-split train \
   --study-id PPO_NAVIGATION \
   --backbone-id traffic_fixed_train \
   --study-seed 7 \
@@ -198,7 +201,7 @@ To summarize the cached scene corpus:
 ```bash
 uv run carlabev scene analyze-library
 uv run carlabev scene analyze-library summary
-uv run carlabev scene analyze-library breakdown --by difficulty --by route-profile
+uv run carlabev scene analyze-library breakdown --by scene-benchmark --by scene-profile --by scene-split
 uv run carlabev scene analyze-library quality
 uv run carlabev scene analyze-library query --limit 10
 uv run carlabev scene analyze-library quality --json
@@ -209,7 +212,7 @@ uv run carlabev scene analyze-library quality --json
 Available analysis modes:
 
 - `summary`: one-screen corpus health check
-- `breakdown`: grouped counts by metadata dimensions such as difficulty, route profile, and main role
+- `breakdown`: grouped counts by metadata dimensions such as benchmark, profile, split, difficulty, route profile, and main role
 - `quality`: spawn usefulness metrics such as zero-near-ego rate and requested-traffic fulfillment
 - `query`: filtered row listing for targeted inspection
 

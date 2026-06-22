@@ -196,6 +196,20 @@ uv run carlabev scene build-library \
 This derives deterministic scene, route, traffic, and scenario seeds from the
 tuple `(study_id, backbone_id, study_seed, episode_index, kind)`.
 
+For benchmark-owned corpora shared across multiple downstream studies, the
+recommended pattern is:
+
+1. write per-seed or per-shard scene libraries with the same benchmark metadata
+2. merge those shard databases downstream into one canonical benchmark DB
+3. train in read-only / require-hit mode against that merged benchmark corpus
+
+The key metadata fields that let downstream tools safely merge and analyze those
+corpora are:
+
+- `scene_benchmark_id`
+- `scene_profile_id`
+- `scene_split`
+
 To summarize the cached scene corpus:
 
 ```bash

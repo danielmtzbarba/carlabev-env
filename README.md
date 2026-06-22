@@ -456,6 +456,11 @@ The descriptor captures scene-level metadata such as:
 
 This lets downstream analysis separate scene description from episode outcome.
 
+Those same descriptor fields also support benchmark-owned scene corpora in
+downstream repos: shard builders can emit per-seed libraries tagged with
+`scene_benchmark_id`, `scene_profile_id`, and `scene_split`, then merge them
+into one canonical benchmark database for read-only experiment reuse.
+
 ## Research Scope
 
 CarlaBEV is a strong fit for:

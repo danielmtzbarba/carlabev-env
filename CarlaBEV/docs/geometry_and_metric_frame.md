@@ -10,7 +10,7 @@ The simulator now distinguishes three geometry layers:
 2. Surface/world runtime coordinates
 3. Metric coordinates in meters
 
-The conversion helpers live in [geometry.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/geometry.py).
+The conversion helpers live in [geometry.py](../envs/geometry.py).
 
 ## Raw Asset Coordinates
 
@@ -23,18 +23,21 @@ Examples:
 
 ## Surface/World Runtime Coordinates
 
-The current runtime uses a surface/world frame that matches the map surfaces used for rendering and actor state.
+The surface/world frame matches map rasters, route assets, and compatibility actor properties. It is distinct from the metric state integrated by the dynamics.
 
 This is the coordinate frame used by:
 
-- ego and actor state propagation
+- compatibility actor pose and speed views (`x`, `y`, `v`, `state`)
 - camera following
 - crop and rotation logic
 - current collision rectangles
 
 ## Metric Coordinates
 
-Metric conversions are now explicit.
+Metric conversions are explicit. `State` stores and integrates `x_m`, `y_m`,
+and `v_mps`; yaw is in radians. `state_m` exposes those values, while `state`
+converts position and speed back to surface units for compatibility. Controllers
+convert surface route geometry into meters before computing motion.
 
 Constants:
 
@@ -51,7 +54,7 @@ Derived conversions:
 
 ## Route Length
 
-Route length is now tracked in meters through [actor_manager.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/managers/actor_manager.py) and [scenes/utils.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/scenes/utils.py).
+Route length is now tracked in meters through [actor_manager.py](../src/managers/actor_manager.py) and [scenes/utils.py](../src/scenes/utils.py).
 
 For a route `(rx, ry)`:
 
@@ -72,7 +75,7 @@ Some scenario anchors are defined in map-specific coordinates and are converted 
 
 ## Validation
 
-Geometry roundtrip validation is implemented in [validate_simulator_semantics.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/tools/validate_simulator_semantics.py).
+Geometry roundtrip validation is implemented in [validate_simulator_semantics.py](../tools/validate_simulator_semantics.py).
 
 It checks consistency across:
 
@@ -82,13 +85,13 @@ It checks consistency across:
 
 ## Notes
 
-- Runtime actor state uses the surface/world frame used by the simulator runtime.
+- Actor dynamics state uses SI units; surface/world properties expose converted compatibility values.
 - Some handcrafted scenario anchors are map-specific.
 - Collision and target footprints use rectangle approximations in the runtime frame.
 
 ## Implementation References
 
-- [geometry.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/geometry.py)
-- [map_graph.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/planning/map_graph.py)
-- [graph_planner.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/planning/graph_planner.py)
-- [scenes/utils.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/scenes/utils.py)
+- [geometry.py](../envs/geometry.py)
+- [map_graph.py](../src/planning/map_graph.py)
+- [graph_planner.py](../src/planning/graph_planner.py)
+- [scenes/utils.py](../src/scenes/utils.py)

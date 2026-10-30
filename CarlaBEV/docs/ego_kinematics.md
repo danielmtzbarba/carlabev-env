@@ -4,7 +4,7 @@ This document describes the current ego-motion model used by CarlaBEV.
 
 ## Model
 
-The ego vehicle uses a kinematic bicycle update implemented in [state.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/control/state.py) and driven through [hero.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/actors/hero.py).
+The ego vehicle uses a kinematic bicycle update implemented in [state.py](../src/control/state.py) and driven through [hero.py](../src/actors/hero.py).
 
 Canonical runtime state:
 
@@ -31,7 +31,7 @@ Discrete-time update:
 where:
 
 - `dt = 0.1 s`
-- `L = 2.9`
+- `L = 2.9 m`
 - `delta` is the steering angle command
 - `a` is the filtered longitudinal acceleration command
 
@@ -60,7 +60,11 @@ with `alpha = 0.5`.
 Current command limits:
 
 - full-throttle acceleration: `4.5 m/s^2`
-- full-brake deceleration: `0.6 * scale * meters_per_pixel`
+- brake coefficient: `max_brake_mps2 = 0.6 * scale * meters_per_pixel`
+- applied braking: `max(0, brake) * max_brake_mps2 * clip(abs(v_mps) / 5, 0.3, 1.0)`
+
+The coefficient is the upper braking magnitude; the speed factor reduces it at
+low speed before passive resistance and acceleration filtering are applied.
 
 The same explicit longitudinal resistance model is also used by
 controller-driven background vehicles so ego and traffic do not rely on
@@ -78,7 +82,7 @@ They are not intended to model tire slip, load transfer, or high-speed transient
 
 ## Steering Authority
 
-Steering authority is defined in [hero.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/actors/hero.py).
+Steering authority is defined in [hero.py](../src/actors/hero.py).
 
 Current limits:
 
@@ -102,6 +106,6 @@ This gives the policy enough turning authority for dynamic-object avoidance whil
 
 ## Implementation References
 
-- [state.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/control/state.py)
-- [hero.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/actors/hero.py)
-- [stanley_controller.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/control/stanley_controller.py)
+- [state.py](../src/control/state.py)
+- [hero.py](../src/actors/hero.py)
+- [stanley_controller.py](../src/control/stanley_controller.py)

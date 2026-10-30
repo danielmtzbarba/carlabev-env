@@ -18,22 +18,22 @@ graph tooling, and simulator validation. Internal helper modules under
 
 ### `EnvConfig`
 
-`EnvConfig` is validated in [CarlaBEV/config/env.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/config/env.py:39).
+`EnvConfig` is validated in [CarlaBEV/config/env.py](../config/env.py).
 
 It is consumed in three different places:
 
-- [CarlaBEV/envs/carlabev.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/carlabev.py:45)
+- [CarlaBEV/envs/carlabev.py](../envs/carlabev.py)
   Core simulator construction, action/observation spaces, reward-function selection, random-scene defaults.
-- [CarlaBEV/envs/world.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/world.py:25)
+- [CarlaBEV/envs/world.py](../envs/world.py)
   Map loading, FOV anchoring, and render surface sizing.
-- [CarlaBEV/envs/__init__.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/__init__.py:40)
+- [CarlaBEV/envs/__init__.py](../envs/__init__.py)
   Observation wrappers such as resize, semantic masking, frame stacking, and temporal vehicle fusion.
 
 ### `RunConfig`
 
-`RunConfig` is validated in [CarlaBEV/config/env.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/config/env.py:182).
+`RunConfig` is validated in [CarlaBEV/config/env.py](../config/env.py).
 
-It is consumed only when building environments through [CarlaBEV/envs/__init__.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/__init__.py:108):
+It is consumed only when building environments through [CarlaBEV/envs/__init__.py](../envs/__init__.py):
 
 - vector-env construction
 - video capture configuration
@@ -41,13 +41,13 @@ It is consumed only when building environments through [CarlaBEV/envs/__init__.p
 
 ### Reset Requests
 
-Typed reset requests are defined in [CarlaBEV/config/reset.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/config/reset.py:17).
+Typed reset requests are defined in [CarlaBEV/config/reset.py](../config/reset.py).
 
 They are translated into `env.reset(options=...)` dictionaries, which are then consumed in:
 
-- [CarlaBEV/envs/carlabev.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/carlabev.py:87)
+- [CarlaBEV/envs/carlabev.py](../envs/carlabev.py)
   Seed resolution, reset retries, and scenario metadata export.
-- [CarlaBEV/src/managers/scene_generator.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/managers/scene_generator.py:92)
+- [CarlaBEV/src/managers/scene_generator.py](../src/managers/scene_generator.py)
   Random navigation, authored scenes, and scenario sampling.
 
 ## `EnvConfig`
@@ -60,26 +60,26 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 | `fps` | `int = 15` | `Renderer` | Human-render frame rate cap. |
 | `size` | `int = 128` | `CarlaBEV`, `BaseMap`, `get_obs_space()` | Native simulator raster size and direct observation size before wrappers. |
 | `map_name` | `str = "Town01"` | `EnvConfig` validation, `BaseMap`, `SceneGenerator` | Selects the map assets and route planners. Today the runtime effectively assumes `Town01`. |
-| `render_mode` | `"human" | "rgb_array"` | `CarlaBEV.render()` | `human` opens a pygame viewer; `rgb_array` keeps rendering off-screen. |
-| `action_mode` | `"discrete" | "continuous"` | `CarlaBEV`, `BaseMap`, action-profile validation | Selects the environment action-space family and hero actor class. |
-| `action_profile_id` | `str | None` | `EnvConfig` validation, `envs/spaces.py` | Selects the exact discrete action set or continuous bounds. |
-| `reward_mode` | `"shaping" | "carl"` | `CarlaBEV.build_reward_fn()` | Selects which reward-function family gets instantiated. |
-| `reward_profile_id` | `str | None` | `EnvConfig` validation, `CarlaBEV.build_reward_fn()` | Selects the concrete reward profile and parameters. |
+| `render_mode` | `"human" \| "rgb_array"` | `CarlaBEV.render()` | `human` opens a pygame viewer; `rgb_array` keeps rendering off-screen. |
+| `action_mode` | `"discrete" \| "continuous"` | `CarlaBEV`, `BaseMap`, action-profile validation | Selects the environment action-space family and hero actor class. |
+| `action_profile_id` | `str \| None` | `EnvConfig` validation, `envs/spaces.py` | Selects the exact discrete action set or continuous bounds. |
+| `reward_mode` | `"shaping" \| "carl"` | `CarlaBEV.build_reward_fn()` | Selects which reward-function family gets instantiated. |
+| `reward_profile_id` | `str \| None` | `EnvConfig` validation, `CarlaBEV.build_reward_fn()` | Selects the concrete reward profile and parameters. |
 | `traffic_enabled` | `bool = True` | `SceneGenerator` defaults | Default switch for random-scene traffic when reset options do not override it. |
 | `route_direction_metrics_enabled` | `bool = False` | `CarlaBEV.reset()` | When enabled, adds smoothed route left/right/straight fractions to scenario metadata after spawn. |
 | `scene_library_enabled` | `bool = True` | `CarlaBEV.reset()` | Enables the SQLite scene-library cache for random-scene replay and metadata lookup. |
 | `scene_library_path` | `str = "CarlaBEV/assets/scenes/scene_library.db"` | `SceneLibrary` | Filesystem path for the scene-library SQLite database. |
-| `scene_library_read_only` | `bool = False` | `SceneLibrary` | When enabled, reads from the scene library without inserting new scenes. |
+| `scene_library_read_only` | `bool = False` | `SceneLibrary` | Suppresses scene insertion/deletion. Schema and usage-counter writes still occur; misses may generate scenes. |
 | `scene_library_generator_version` | `str = "role_traffic_v1"` | `SceneLibrary` | Version string incorporated into the scene cache key so generator changes invalidate stale entries. |
 
 ### Observation And Wrapper Fields
 
 | Field | Type / Default | Consumed In | Effect |
 | --- | --- | --- | --- |
-| `obs_mode` | `"bev_rgb" | "bev_semantic" | "vector"` default `"bev_semantic"` | `CarlaBEV`, `wrap_env()` | Chooses raw simulator observation family. |
+| `obs_mode` | `"bev_rgb" \| "bev_semantic" \| "vector"` default `"bev_semantic"` | `CarlaBEV`, `wrap_env()` | Chooses raw simulator observation family. |
 | `obs_size` | `tuple[int, int] = (96, 96)` | `wrap_env()` | Resize target applied only when building through `make_env()`. No effect on direct `CarlaBEV(...)` observations. |
-| `semantic_mask_ch` | `"binary" | "2-class" | "4-class" | "5-class" | "6-class" | "7-class"` default `"6-class"` | `wrap_env()`, semantic wrappers | Chooses semantic channel layout for semantic observations. |
-| `temporal_fusion_mode` | `"stack" | "vehicle_temporal" | "vehicle_weighted"` default `"stack"` | `wrap_env()` | Controls how stacked semantic frames are exposed after frame stacking. |
+| `semantic_mask_ch` | `"binary" \| "2-class" \| "4-class" \| "5-class" \| "6-class" \| "7-class"` default `"6-class"` | `wrap_env()`, semantic wrappers | Chooses semantic channel layout for semantic observations. |
+| `temporal_fusion_mode` | `"stack" \| "vehicle_temporal" \| "vehicle_weighted"` default `"stack"` | `wrap_env()` | Controls how stacked semantic frames are exposed after frame stacking. |
 | `fov_masked` | `bool = False` | `BaseMap` | Applies the static FOV mask after cropping/rotation. |
 | `ego_anchor_x_frac` | `float = 0.5` | `BaseMap` | Horizontal ego anchor inside the rendered FOV crop. |
 | `ego_anchor_y_frac` | `float = 0.5` | `BaseMap` | Vertical ego anchor inside the rendered FOV crop. |
@@ -117,8 +117,8 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 | `seed` | `int = 1` | `wrap_env()` | Seeds the wrapped action space. In eval mode this is forced to `999`. |
 | `capture_video` | `bool = False` | `make_env()` / `wrap_env()` | Enables `RecordVideo` on env index `0`. |
 | `capture_every` | `int = 50` | `wrap_env()` | Default episode interval for captured videos outside eval mode. |
-| `video_output_dir` | `str | None = None` | `wrap_env()` | Explicit capture directory. |
-| `video_episode_indices` | `list[int] | None = None` | `wrap_env()` | Explicit set of episode IDs to capture. |
+| `video_output_dir` | `str \| None = None` | `wrap_env()` | Explicit capture directory. |
+| `video_episode_indices` | `list[int] \| None = None` | `wrap_env()` | Explicit set of episode IDs to capture. |
 | `video_name_prefix` | `str = "rl-video"` | `wrap_env()` | Prefix for generated video filenames. |
 | `cuda` | `bool = True` | Downstream/training code | Not consumed by the simulator runtime itself. |
 | `torch_deterministic` | `bool = True` | Downstream/training code | Not consumed by the simulator runtime itself. |
@@ -131,12 +131,12 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 
 | Field | Type / Default | Effect |
 | --- | --- | --- |
-| `difficulty_preset_id` | `str | None` | Expands to a preset combination of `route_extent`, `traffic_density`, and `speed_profile`. |
-| `route_extent` | `"short" | "medium" | "large" | None` | Selects the route-distance band used for ego route sampling. |
-| `traffic_density` | `"none" | "low" | "medium" | "dense" | None` | Selects whether traffic is enabled and how many vehicles are spawned. |
-| `speed_profile` | `"slow" | "medium" | "fast" | None` | Selects ego and background-vehicle target speeds. |
+| `difficulty_preset_id` | `str \| None` | Expands to a preset combination of `route_extent`, `traffic_density`, and `speed_profile`. |
+| `route_extent` | `"short" \| "medium" \| "large" \| None` | Selects the route-distance band used for ego route sampling. |
+| `traffic_density` | `"none" \| "low" \| "medium" \| "dense" \| None` | Selects whether traffic is enabled and how many vehicles are spawned. |
+| `speed_profile` | `"slow" \| "medium" \| "fast" \| None` | Selects ego and background-vehicle target speeds. |
 
-Preset resolution and axis registries live in [CarlaBEV/config/difficulty.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/config/difficulty.py:1).
+Preset resolution and axis registries live in [CarlaBEV/config/difficulty.py](../config/difficulty.py).
 
 Current shipped presets:
 
@@ -166,31 +166,31 @@ Current axis expansions:
 
 | Field | Type / Default | Effect |
 | --- | --- | --- |
-| `num_vehicles` | `int | None` | Direct override for total random-traffic count after preset/axis resolution. |
-| `num_vehicles_near_ego` | `int | None` | Direct override for the number of role-based vehicles the generator should prioritize around the ego route. |
-| `route_dist_range` | `tuple[int, int] | None` | Direct override for ego route-distance sampling band. |
-| `ego_target_speed` | `float | None` | Direct override for ego target speed in m/s. |
-| `vehicle_target_speed` | `float | None` | Direct override for random traffic vehicle cruise speed in m/s. |
+| `num_vehicles` | `int \| None` | Direct override for total random-traffic count after preset/axis resolution. |
+| `num_vehicles_near_ego` | `int \| None` | Direct override for the number of role-based vehicles the generator should prioritize around the ego route. |
+| `route_dist_range` | `tuple[int, int] \| None` | Direct override for ego route-distance sampling band. |
+| `ego_target_speed` | `float \| None` | Direct override for ego target speed in m/s. |
+| `vehicle_target_speed` | `float \| None` | Direct override for random traffic vehicle cruise speed in m/s. |
 | `ego_route_graph` | `str = "full_vehicle"` | Selects the planner alias used for ego route sampling. |
-| `traffic_role_profile` | `str | None` | Selects which nearby actor roles should be sampled around the ego route. Supports `lead`, `rear`, `cross_path`, `opposite_lane`, and `mix`. |
-| `guaranteed_candidate_role` | `str | None` | Requests at least one nearby vehicle with a specific role. Supports the same values as `traffic_role_profile`. |
-| `route_profile` | `str | None` | Optional route-profile filter such as `mostly_straight`, `single_left`, or `multi_turn`. |
-| `route_profile_mix` | `dict[str, float] | None` | Weighted sampling over route-profile labels before route generation. |
-| `min_turns` | `int | None` | Minimum semantic turn count for sampled routes. |
-| `max_turns` | `int | None` | Maximum semantic turn count for sampled routes. |
-| `intersection_required` | `bool | None` | Require or forbid intersection-like routes. |
-| `max_route_attempts` | `int | None` | Maximum ego route sampling retries before reset failure. |
+| `traffic_role_profile` | `str \| None` | Selects which nearby actor roles should be sampled around the ego route. Supports `lead`, `rear`, `cross_path`, `opposite_lane`, and `mix`. |
+| `guaranteed_candidate_role` | `str \| None` | Requests at least one nearby vehicle with a specific role. Supports the same values as `traffic_role_profile`. |
+| `route_profile` | `str \| None` | Optional route-profile filter such as `mostly_straight`, `single_left`, or `multi_turn`. |
+| `route_profile_mix` | `dict[str, float] \| None` | Weighted sampling over route-profile labels before route generation. |
+| `min_turns` | `int \| None` | Minimum semantic turn count for sampled routes. |
+| `max_turns` | `int \| None` | Maximum semantic turn count for sampled routes. |
+| `intersection_required` | `bool \| None` | Require or forbid intersection-like routes. |
+| `max_route_attempts` | `int \| None` | Maximum ego route sampling retries before reset failure. |
 
 ### Seed Controls
 
 | Field | Type / Default | Effect |
 | --- | --- | --- |
-| `scene_seed` | `int | None` | Master reset seed if supplied. |
-| `route_seed` | `int | None` | Explicit route sampler seed. |
-| `traffic_seed` | `int | None` | Explicit traffic sampler seed. |
-| `scenario_seed` | `int | None` | Explicit scenario sampler seed for non-random scenarios. |
+| `scene_seed` | `int \| None` | Master reset seed if supplied. |
+| `route_seed` | `int \| None` | Explicit route sampler seed. |
+| `traffic_seed` | `int \| None` | Explicit traffic sampler seed. |
+| `scenario_seed` | `int \| None` | Explicit scenario sampler seed for non-random scenarios. |
 
-If omitted, [CarlaBEV.reset()](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/carlabev.py:87) resolves missing seeds from the incoming `seed` argument and the config seed.
+If omitted, [CarlaBEV.reset()](../envs/carlabev.py) resolves missing seeds from the incoming `seed` argument and the config seed.
 
 ### Random Traffic Role Model
 
@@ -288,7 +288,7 @@ unless they opt into the same pattern.
 | --- | --- | --- |
 | `config_file` | `str` | Path to the authored scene JSON. |
 | `variation_enabled` | `bool = False` | Enables authored-scene parameter variation if supported by the scene config. |
-| `variation_seed` | `int | None` | Explicit variation seed for authored-scene sampling. |
+| `variation_seed` | `int \| None` | Explicit variation seed for authored-scene sampling. |
 
 ### `ScenarioConfigReset`
 
@@ -296,15 +296,15 @@ unless they opt into the same pattern.
 | --- | --- | --- |
 | `scenario_id` | `str` | Scenario family ID such as `jaywalk` or `lead_brake`. |
 | `level` | `int = 1` | Scenario difficulty/variant level passed into the scenario sampler. |
-| `anchor_x` | `int | None` | Optional authored anchor override. |
-| `anchor_y` | `int | None` | Optional authored anchor override. |
+| `anchor_x` | `int \| None` | Optional authored anchor override. |
+| `anchor_y` | `int \| None` | Optional authored anchor override. |
 | `parameters` | `dict[str, Any] = {}` | Scenario-specific parameter payload. |
 
 ## Action And Reward Presets
 
 ### Action Profiles
 
-Action profiles live in [CarlaBEV/config/action_profiles.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/config/action_profiles.py:1).
+Action profiles live in [CarlaBEV/config/action_profiles.py](../config/action_profiles.py).
 
 | `action_profile_id` | `action_mode` | Meaning |
 | --- | --- | --- |
@@ -314,7 +314,7 @@ Action profiles live in [CarlaBEV/config/action_profiles.py](/Users/danielmtz/Da
 
 ### Reward Profiles
 
-Reward profiles live in [CarlaBEV/config/reward_profiles.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/config/reward_profiles.py:1).
+Reward profiles live in [CarlaBEV/config/reward_profiles.py](../config/reward_profiles.py).
 
 | `reward_profile_id` | `reward_mode` | Meaning |
 | --- | --- | --- |
@@ -381,6 +381,9 @@ options = build_random_navigation_options(
 ```
 
 ## Known Gaps
+
+- Read-only scene-library mode is not filesystem read-only, does not enforce cache hits, and cannot guarantee an immutable prepared corpus. No public require-hit option is implemented.
+- Per-step hero/reward telemetry is internal. Public ongoing step info is empty; terminal info contains episode summaries. See [Public Integration API](downstream_integration_api.md).
 
 - `EnvConfig.max_actions` is accepted by the schema, but the current runtime does not automatically inject it into reward-function construction.
 - `EnvConfig.scenes_path` is accepted for compatibility, but the active runtime path does not read it.

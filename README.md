@@ -32,7 +32,7 @@ It is not a full dynamic clone of CARLA. The project is best understood as a fas
 The project currently supports:
 
 - Gymnasium vectorized environment usage
-- RGB or semantic-mask BEV observations
+- direct RGB/vector observations and wrapped grayscale or semantic-mask stacks
 - discrete or continuous ego actions
 - route-following ego dynamics with a kinematic bicycle update
 - explicit camera/FOV centering on the true ego start state
@@ -51,7 +51,7 @@ Recent simulator hardening work also introduced:
 - reset-time spawn validation for valid ego initialization
 - stronger steering authority for meaningful turns and avoidance
 - executable simulator validity checks
-- per-step comfort signal export for downstream evaluation
+- internal per-step comfort signals and public episode-level comfort summaries
 
 ## Key Features
 
@@ -76,9 +76,11 @@ Project documentation lives in `CarlaBEV/docs/`:
 - [Route Generation And Planning](CarlaBEV/docs/route_generation_and_planning.md)
 - [Debugging And Diagnostics](CarlaBEV/docs/debugging_and_diagnostics.md)
 - [Public Integration API](CarlaBEV/docs/downstream_integration_api.md)
-- [Town01 Canonical Graph Plan](CarlaBEV/docs/town01_canonical_graph_plan.md)
 
-These docs describe the simulator as it exists in the repository today.
+These pages describe the current implementation. Historical design context:
+
+- [Town01 Canonical Graph Migration Plan](CarlaBEV/docs/town01_canonical_graph_plan.md)
+- [Downstream API Proposal](CarlaBEV/docs/history/downstream_integration_api_proposal.md)
 
 ## Repository Layout
 
@@ -262,7 +264,10 @@ from CarlaBEV.config import (
 Common `EnvConfig` options include:
 
 - `map_name`
-- `obs_mode`: `bev_rgb`, `bev_semantic`, or `vector`
+- `obs_mode`: `bev_rgb`, `bev_semantic`, or direct-only `vector`
+  - direct image construction returns RGB
+  - `make_env()` converts RGB mode to grayscale stacks or semantic mode to mask stacks/fusion
+  - vector observations require direct `CarlaBEV(...)` construction
 - `action_profile_id`: action profile preset such as `discrete9_v1`, `discrete13_v1`, `continuous_gsb_v1`
 - `reward_profile_id`: reward profile preset such as `carl_base_v1`, `carl_safety_v1`, `shaping_base_v1`
 - `action_mode`: `discrete` or `continuous`
@@ -306,7 +311,14 @@ The intended downstream workflow is:
 
 - prebuild benchmark- or study-specific scene libraries ahead of training
 - point downstream study configs at those `.db` files
-- keep training/evaluation runs in read-only mode so execution never mutates the prepared corpus
+- point replay runs at the prepared library, with the current limitations below
+
+`scene_library_read_only=True` suppresses scene insertion/deletion, but schema
+initialization and cache usage counters can still write. Cache misses can still
+generate scenes; required-hit enforcement is not implemented. Immutable, strict
+corpus replay is an intended workflow rather than a current guarantee. Builders
+and callers must also agree on resolved options and seed schedules to obtain
+matching cache keys. See [Public Integration API](CarlaBEV/docs/downstream_integration_api.md).
 
 Common `RunConfig` options include:
 
@@ -334,8 +346,8 @@ are documented in:
 
 ## Comfort Signals
 
-Each environment step now exports a stable comfort snapshot through `info["hero"]`.
-Downstream evaluators can aggregate:
+The control path computes the following signals internally for reward and
+statistics processing:
 
 - `accel_long`
 - `accel_lat`
@@ -348,7 +360,8 @@ Downstream evaluators can aggregate:
 - `cmd_brake`
 - `applied_delta`
 
-Episode summaries additionally expose comfort-oriented aggregates such as:
+The public `step()` info is empty during ongoing episodes and exposes
+`episode_info` on termination. That summary includes comfort aggregates such as:
 
 - `mean_abs_accel_long`
 - `mean_abs_accel_lat`
@@ -359,7 +372,10 @@ Episode summaries additionally expose comfort-oriented aggregates such as:
 - `comfort_violation_rate`
 - `harsh_brake_rate`
 
-These are intended for study evaluation and leaderboard reporting in `carlabev-lab`, not as a claim of physically calibrated passenger comfort.
+Detailed per-step signals are retained in the unwrapped environment's internal
+`current_info`, but are not returned as public `info["hero"]` telemetry. Episode
+aggregates support downstream evaluation; they do not establish physically
+calibrated passenger comfort.
 
 ## Example Reset
 

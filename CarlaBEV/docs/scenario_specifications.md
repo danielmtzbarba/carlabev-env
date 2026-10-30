@@ -1,77 +1,87 @@
-# CarlaBEV Scenario Specifications
+# Scenario Specifications
 
-This document outlines the architecture, variables, and progressive complexity levels of the predefined driving scenarios within the `CarlaBEV` framework. These specifications dictate how the Scene Designer tool should parameterize its UI forms.
+The public scenario catalog is defined in
+[specs.py](../src/scenes/scenarios/specs.py). Discover families with
+`CarlaBEV.scenarios.list_scenario_ids()` and inspect their parameter metadata with
+`get_scenario_spec()`. The catalog supplies defaults for the Scene Designer and
+presets; direct procedural samplers can choose randomized fallbacks when values
+are omitted. These are different sources of defaults.
 
----
+Speeds are in meters/second, time values in seconds, and gaps/offsets in meters.
+The optional `anchor_x` and `anchor_y` overrides are map-specific surface
+coordinates, not metric positions. See [Geometry And Metric Frame](geometry_and_metric_frame.md).
 
-## 1. Jaywalk Scenario (`jaywalk.py`)
-**Description:** A pedestrian crosses the road ahead of the ego vehicle. The unpredictable behavior of the pedestrian creates an imminent collision risk if the ego vehicle fails to yield.
+## Jaywalk (`jaywalk`)
 
-### Global Parameters
-- **`ego_speed`**: (Float) Target speed of the ego vehicle (e.g., 40-70 m/s).
-- **`level`**: (Int) 1 to 4 scaling difficulty.
+Implemented in [jaywalk.py](../src/scenes/scenarios/jaywalk.py). A pedestrian
+crosses ahead of ego. Level 1 crosses, level 2 stops mid-road, level 3 stops and
+returns, and level 4 uses the return behavior and adds a rear vehicle.
 
-### Actors & Properties
-1. **Agent (Ego Vehicle)**
-   - Start Position: Approaching an unmarked crossing.
-   - Variables: `ego_speed`
+| Parameter | Catalog default | Meaning |
+| --- | --- | --- |
+| `ego_speed` | `12.0` | Ego target speed in m/s. The procedural sampler falls back to a uniform value in `[8, 14)` when omitted. |
+| `cross_delay` | `1.5` | Delay before the pedestrian starts crossing, in seconds. |
+| `pedestrian_speed` | `1.6` | Pedestrian target speed in m/s. This is the scenario option; `target_speed` is an actor-constructor argument. |
+| `cross_offset` | `0.0` | Lateral crossing offset in meters. |
+| `yield_duration` | `1.2` | Timing parameter for stop-and-return behavior, in seconds. |
+| `rear_gap` | `5.0` | Rear vehicle spacing in meters at level 4. |
+| `rear_speed` | `10.0` | Rear vehicle target speed in m/s at level 4. |
 
-2. **Pedestrian (Adversary)**
-   - Start Position: Right curb (or dynamically offset).
-   - Variables: `cross_delay` (time before stepping into road), `target_speed` (walking pace).
-   - Behavior by Level:
-     - **Level 1**: `CrossBehavior` (Walks linearly across).
-     - **Level 2**: `StopMidBehavior` (Crosses but freezes into the ego lane).
-     - **Level 3 & 4**: `StopReturnBehavior` (Crosses halfway, then turns around).
+## Lead brake (`lead_brake`)
 
-3. **Background Vehicle (Follower)** *(Triggered at Level 4)*
-   - Start Position: Right behind Ego.
-   - Variables: `rear_gap` (Distance behind ego), `rear_speed` (Matches or exceeds ego speed).
+Implemented in [lead_brake.py](../src/scenes/scenarios/lead_brake.py). Level 1
+introduces a braking lead vehicle, level 2 adds adjacent/oncoming traffic, and
+level 3 adds a rear vehicle with braking behavior.
 
----
+| Parameter | Catalog default | Meaning |
+| --- | --- | --- |
+| `ego_speed` | `12.0` | Ego target speed in m/s; the procedural fallback is uniform in `[8, 16)`. |
+| `lead_gap` | `7.5` | Initial lead gap in meters. |
+| `lead_speed` | `12.0` | Lead vehicle target speed in m/s. |
+| `brake_delay` | `2.5` | Time when the lead braking behavior activates, in seconds. |
+| `brake_strength` | `4.0` | Target-speed reduction rate in m/s². The controller realizes the resulting speed request; this is not a guaranteed physical deceleration. |
+| `left_speed` | `14.0` | Adjacent vehicle target speed in m/s at levels 2 and 3. |
+| `rear_gap` | `5.0` | Rear spacing in meters at level 3. |
+| `rear_speed` | `10.0` | Rear vehicle target speed in m/s at level 3. |
+| `rear_brake_delay` | `3.0` | Time when the rear braking behavior activates, in seconds. |
 
-## 2. Lead Brake Scenario (`lead_brake.py`)
-**Description:** The ego vehicle follows a leading vehicle that will suddenly execute an emergency or hard brake. Progressive levels add traffic to box the ego vehicle in.
+## Red-light runner (`red_light_runner`)
 
-### Global Parameters
-- **`ego_speed`**: (Float) Target speed of the ego vehicle.
-- **`level`**: (Int) 1 to 3 scaling difficulty.
+Implemented in [red_light_running.py](../src/scenes/scenarios/red_light_running.py).
+The catalog supports level 1. Ego has green while a perpendicular adversary
+approaches on red. The scenario selects map-specific intersection geometry and
+creates semantic traffic-light stop-line markers.
 
-### Actors & Properties
-1. **Agent (Ego Vehicle)**
-   - Variables: `ego_speed`
+| Parameter | Catalog default | Meaning |
+| --- | --- | --- |
+| `ego_speed` | `10.0` | Ego target speed in m/s. |
+| `adv_speed` | `16.0` | Adversary target speed in m/s. |
+| `intersection_index` | `11` | Requested index in the scenario's Town01 intersection catalog. Selection can fall back to a nearby valid candidate. |
 
-2. **Vehicle (Lead)**
-   - Start Position: In front of ego.
-   - Variables: `lead_gap` (Distance ahead of ego), `lead_speed` (Target velocity matches/exceeds ego), `brake_delay` (Time before slamming brakes), `brake_strength` (Deceleration Rate).
-   - Behavior: `LeadBrakeBehavior`
+## Reset and authoring interfaces
 
-3. **Vehicle (Left Lane Traffic)** *(Triggered at Level $\ge$ 2)*
-   - Start Position: Parallel lane moving in the same direction or oncoming.
-   - Variables: `left_speed`. (Denies lane-change escape).
+Use `ScenarioConfigReset` for a family and parameter overrides,
+`ScenarioPresetReset` for a named preset, or `AuthoredSceneReset` for a JSON file.
+`build_reset_options()` supports all three, as well as random navigation.
+For example, the following constructs options without starting a simulator:
 
-4. **Vehicle (Follower Traffic)** *(Triggered at Level 3)*
-   - Start Position: Behind Ego.
-   - Variables: `rear_gap`, `brake_delay`, `brake_strength`.
-   - Behavior: `LeadBrakeBehavior` (Tailgater).
+```python
+from CarlaBEV.config import ScenarioConfigReset, build_reset_options
 
----
+options = build_reset_options(ScenarioConfigReset(
+    scenario_id="jaywalk",
+    level=2,
+    parameters={"ego_speed": 12.0, "pedestrian_speed": 1.6, "cross_delay": 1.5},
+))
+assert options["scene"] == "jaywalk"
+assert options["pedestrian_speed"] == 1.6
+```
 
-## 3. Red Light Running Scenario (`red_light_running.py`)
-**Description:** The ego vehicle approaches a four-way intersection with a green light, while an adversarial vehicle blows through the intersection from a perpendicular angle at high speed.
-
-### Global Parameters
-- **`level`**: (Int) Difficulty mapping (Currently defaults).
-
-### Actors & Properties
-1. **Agent (Ego Vehicle)**
-   - Start Position: Approaching intersection (South $\rightarrow$ North).
-   - Variables: `ego_speed` (Moderate, matching green light right-of-way).
-
-2. **Vehicle (Adversary)**
-   - Start Position: Approaching intersection (West $\rightarrow$ East).
-   - Variables: `adv_speed` (Speeding aggressively).
-
-3. **Traffic Lights (Static/Target Markers)**
-   - `tl_ego`: Positioned for Ego (Green).
-   - `tl_adv`: Positioned for Adversary (Red).
+Authored scenario-config JSON and explicit actor-layout JSON are both supported.
+Discover packaged files with `CarlaBEV.scenarios.list_authored_scene_paths()`
+rather than assuming a working-directory-relative asset path. Schema acceptance
+does not validate every scenario-specific parameter combination; spawn
+validation may reject invalid geometry at reset. See
+[Public Integration API](downstream_integration_api.md) for reset and information
+payload contracts and [Debugging And Diagnostics](debugging_and_diagnostics.md)
+for interactive inspection.

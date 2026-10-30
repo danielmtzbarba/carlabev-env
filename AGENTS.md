@@ -103,7 +103,7 @@ uv run python -m compileall CarlaBEV
 uv run CarlaBEV/tools/debug_env.py
 ```
 
-The validation script passed cleanly during analysis.
+Run these checks for the checkout being evaluated; the validity script prints its current check count and results. Prefer the packaged `carlabev` CLI documented in `README.md`; legacy debug scripts delegate to it.
 
 ## Safe Modification Points
 
@@ -143,13 +143,13 @@ The validation script passed cleanly during analysis.
 
 ## Important Contracts
 
-- Surface coordinates are the main runtime coordinate system.
+- Dynamics integrate metric state (`x_m`, `y_m`, `yaw`, `v_mps`). Rendering and legacy state properties use surface coordinates.
 - Raw asset coordinates are converted to surface coordinates using an 8x scale reduction.
-- Speed parameters are expressed in meters/second at scenario/config level, then converted into surface units.
+- Scenario/config speeds are in meters/second. Compatibility state/route boundaries convert between surface and metric units explicitly.
 - The hero uses direct action-driven bicycle dynamics.
 - Non-hero actors use controller-followed routes plus optional simple behaviors.
 - `reset()` may retry scene construction until spawn validation passes.
-- Vector observations are a 7-element concatenation of hero state and current set point.
+- Direct vector observations concatenate metric hero state and the current metric set point into 7 values; `make_env()` rejects vector mode.
 
 ## Active And Secondary Paths
 

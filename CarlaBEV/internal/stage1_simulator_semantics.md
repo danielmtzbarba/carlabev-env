@@ -1,4 +1,11 @@
-# Stage 1: Simulator Semantics Hardening
+# Stage 1: Simulator Semantics Hardening (Historical)
+
+Status recorded on 2026-10-30: this is an earlier design proposal, not a current
+runtime diagnosis or API contract. Metric-state dynamics and explicit geometry
+conversions have since landed. Consult the current
+[kinematics](../docs/ego_kinematics.md), [geometry](../docs/geometry_and_metric_frame.md),
+and [integration API](../docs/downstream_integration_api.md) documentation for
+implemented behavior and remaining limitations.
 
 This document defines the proposed Stage 1 fixes for CarlaBEV before we refactor the simulator core. The goal is to make the simulator scientifically legible, numerically consistent, and testable enough for later publication-grade experiments.
 
@@ -261,11 +268,11 @@ This is still an intermediate state. The simulator runtime is structurally separ
 
 ## References
 
-[1] J. Snider, "Automatic Steering Methods for Autonomous Automobile Path Tracking," Carnegie Mellon University Robotics Institute, 2009.  
+[1] J. Snider, "Automatic Steering Methods for Autonomous Automobile Path Tracking," Carnegie Mellon University Robotics Institute, 2009.
 URL: https://www.ri.cmu.edu/pub_files/2009/2/Automatic_Steering_Methods_for_Autonomous_Automobile_Path_Tracking.pdf
 
-[2] S. Thrun et al., "Stanley: The Robot That Won the DARPA Grand Challenge," Journal of Field Robotics, 2006.  
+[2] S. Thrun et al., "Stanley: The Robot That Won the DARPA Grand Challenge," Journal of Field Robotics, 2006.
 URL: https://robots.stanford.edu/papers/thrun.stanley05.pdf
 
-[3] C. Schwarz, "On Computing Time-to-Collision for Automation Scenarios," Transportation Research Part F, 2014.  
+[3] C. Schwarz, "On Computing Time-to-Collision for Automation Scenarios," Transportation Research Part F, 2014.
 URL: https://doi.org/10.1016/j.trf.2014.06.015

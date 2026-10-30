@@ -23,15 +23,21 @@ This frame is not used directly by dynamics or rendering.
 
 Used by:
 
-- ego and actor state
+- legacy ego and actor state views (`state`, `x`, `y`, `v`)
 - camera following
 - route geometry
 - current collision rectangles
 - semantic tile queries
 
-At the current stage of the simulator, this is the main operational frame.
+This is the rendering and compatibility frame. Dynamics integration uses the metric frame below.
 
-### 3. FOV/Image Frame
+### 3. Metric Dynamics Frame
+
+Canonical actor dynamics use `x_m` and `y_m` in meters, `v_mps` in meters/second,
+and `yaw` in radians. `state_m` exposes this representation. Route points are
+converted from surface coordinates before controller calculations.
+
+### 4. FOV/Image Frame
 
 Used by:
 
@@ -43,7 +49,7 @@ The ego is rendered at the configured FOV anchor, and the cropped map content is
 
 ## Ego Anchor Rule
 
-The camera follows the ego world position through [camera.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/camera.py).
+The camera follows the ego world position through [camera.py](../envs/camera.py).
 
 The world-aligned crop remains centered on the ego pose before rotation. The final rotated image is then composed so the ego lands at the configured anchor in image space.
 
@@ -84,13 +90,13 @@ This lets the ego start on its route without spawn rejection while still allowin
 
 ## Notes
 
-- Runtime actor state is stored in the surface/world frame used by the simulator runtime.
+- Canonical dynamics state is metric; surface/world state properties are compatibility views used at rendering and geometry boundaries.
 - Actor footprints are rectangle approximations.
 - Some scenario anchors are map-specific rather than lane-semantic.
 
 ## Implementation References
 
-- [camera.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/camera.py)
-- [world.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/world.py)
-- [transforms.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/transforms.py)
-- [scene.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/scenes/scene.py)
+- [camera.py](../envs/camera.py)
+- [world.py](../envs/world.py)
+- [transforms.py](../envs/transforms.py)
+- [scene.py](../src/scenes/scene.py)

@@ -1,8 +1,16 @@
-# Town01 Canonical Graph Plan
+# Town01 Canonical Graph Migration Plan (Historical)
+
+Status recorded on 2026-10-30: the canonical graph builder, asset, planner
+integration, compatibility aliases, and route diagnostics are implemented.
+The pre-migration problems and proposed schema below are preserved as design
+history. They are not an inventory of outstanding work or a replacement for
+[Route Generation And Planning](route_generation_and_planning.md), which documents
+the current main planner. Some scenario-specific code still uses legacy assets;
+the migration should not be read as removing every older graph file.
 
 ## Purpose
 
-This document defines a concrete implementation plan for replacing the current
+This document defines a concrete implementation plan for replacing the previous
 set of Town01 vehicle graph assets with a single canonical directed vehicle
 graph.
 
@@ -17,7 +25,7 @@ already available in this repository:
 The longer-term goal is to make the graph enrichment-ready so future
 CARLA/OpenDRIVE metadata can be attached without changing planner APIs again.
 
-## Current Problems
+## Pre-migration Problems
 
 The current Town01 planning stack uses multiple pickle assets:
 
@@ -320,7 +328,7 @@ repo assets.
 ## PlannerManager changes
 
 Refactor `PlannerManager` in
-[scene_generator.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/managers/scene_generator.py:18)
+[scene_generator.py](../src/managers/scene_generator.py)
 to load the canonical graph once.
 
 Proposed shape:
@@ -343,7 +351,7 @@ as distinct asset identities.
 ## GraphPlanner changes
 
 Refactor
-[graph_planner.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/planning/graph_planner.py)
+[graph_planner.py](../src/planning/graph_planner.py)
 so it can:
 
 - route on a passed-in graph view
@@ -356,7 +364,7 @@ This avoids loading different pickle files to get different behavior.
 ## MapGraph changes
 
 Refactor
-[map_graph.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/planning/map_graph.py)
+[map_graph.py](../src/planning/map_graph.py)
 to stop inferring lane membership by string parsing alone.
 
 The indexing layer should instead expose groups such as:
@@ -374,7 +382,7 @@ runtime planner truth.
 ## Ego route sampling
 
 Update
-[find_route_in_range()](</Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/scenes/utils.py:125>)
+[find_route_in_range()](../src/scenes/utils.py)
 to sample start/end nodes from:
 
 - non-junction lane nodes
@@ -386,7 +394,7 @@ This should improve route variety while keeping route semantics meaningful.
 ## Traffic spawning
 
 Update random traffic generation in
-[scene_generator.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/managers/scene_generator.py:307)
+[scene_generator.py](../src/managers/scene_generator.py)
 to sample from corridor entry/exit nodes rather than arbitrary lane nodes.
 
 Proposed first version:

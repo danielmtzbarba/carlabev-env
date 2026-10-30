@@ -4,7 +4,7 @@ This document describes how agent actions are mapped into ego control commands.
 
 ## Action Spaces
 
-Defined in [spaces.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/spaces.py).
+Defined in [spaces.py](../envs/spaces.py).
 
 Supported modes:
 
@@ -15,7 +15,7 @@ Supported modes:
 
 Discrete actions map to `[gas, steer, brake]` triplets.
 
-Examples:
+Examples for the default `discrete9_v1` profile (other profiles have different indices):
 
 - `1 -> [1, 0, 0]` gas
 - `3 -> [1, 1, 0]` gas + steer left
@@ -32,7 +32,7 @@ Continuous actions use:
 
 ## Control Mapping
 
-The ego control logic lives in [hero.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/actors/hero.py).
+The ego control logic lives in [hero.py](../src/actors/hero.py).
 
 Each step:
 
@@ -56,7 +56,7 @@ The normalized steering action does not directly become yaw.
 
 Instead:
 
-`delta = steer_action * steer_deg(v)`
+`delta_rad = radians(steer_action * steer_deg(v))`
 
 where `steer_deg(v)` is a speed-dependent steering authority bounded by:
 
@@ -71,7 +71,7 @@ This is intentionally stronger than the older mapping because the previous turni
 
 ## Path Tracking
 
-The ego uses the Stanley controller for route-tracking support through [stanley_controller.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/control/stanley_controller.py).
+The ego uses the Stanley controller for route-tracking support through [stanley_controller.py](../src/control/stanley_controller.py).
 
 The standard steering law is:
 
@@ -90,9 +90,10 @@ Before the current fix, a full steer action produced only a very small heading c
 The current action mapping increases practical controllability without changing the underlying bicycle model.
 
 
-## Comfort-Related Exported Signals
+## Internal Comfort Signals And Public Episode Summaries
 
-The ego control path now exports both command-space and kinematic signals so downstream evaluators can compute comfort metrics without re-deriving them from observations:
+The ego control path computes command-space and kinematic signals for internal
+reward and statistics processing:
 
 - command-space
   - `cmd_gas`
@@ -107,7 +108,12 @@ The ego control path now exports both command-space and kinematic signals so dow
   - `yaw_rate`
   - `yaw_acc`
 
-These are attached to `info["hero"]` on every step and then summarized into episode-level comfort metrics by `CarlaBEV/src/deeprl/stats.py`.
+These are attached to the internal `info["hero"]` dictionary and summarized by
+`CarlaBEV/src/deeprl/stats.py`. The current public `step()` result does not return
+that internal dictionary: ongoing steps return empty info, and terminating steps
+return `episode_info` with comfort aggregates. The unwrapped environment retains
+detailed telemetry in `current_info`, an implementation detail rather than a
+stable external contract. See [Public Integration API](downstream_integration_api.md).
 
 ## Notes
 
@@ -119,6 +125,6 @@ These are attached to `info["hero"]` on every step and then summarized into epis
 
 ## Implementation References
 
-- [spaces.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/envs/spaces.py)
-- [hero.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/actors/hero.py)
-- [stanley_controller.py](/Users/danielmtz/Data/projects/driverless/carlabev-env/CarlaBEV/src/control/stanley_controller.py)
+- [spaces.py](../envs/spaces.py)
+- [hero.py](../src/actors/hero.py)
+- [stanley_controller.py](../src/control/stanley_controller.py)

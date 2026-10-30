@@ -169,8 +169,10 @@ uv run carlabev scene build-library --episodes 100
 
 This command is intended for ahead-of-time corpus preparation. A common
 downstream pattern is to build one library per benchmark, study, or protocol,
-then run training with the scene library enabled in read-only mode so the
-experiment only reuses prepared scenes.
+then point training at that library. Current read-only mode only suppresses
+scene insertion/deletion: cache usage counters and schema initialization can
+still write, and misses can generate uncached scenes. Strict prepared-only
+execution is not currently enforced.
 
 For study-driven corpus preparation, prefer the structured seed mode instead of
 the older flat `--seed-offset` convention. Example:
@@ -201,7 +203,14 @@ recommended pattern is:
 
 1. write per-seed or per-shard scene libraries with the same benchmark metadata
 2. merge those shard databases downstream into one canonical benchmark DB
-3. train in read-only / require-hit mode against that merged benchmark corpus
+3. replay against the merged database with matching resolved options and seeds
+
+Read-only/require-hit replay is the intended final contract, not an implemented
+guarantee. `scene_library_require_hit` is not a public configuration field. The
+cache key includes all resolved options except `reset_mask`, so added protocol
+metadata can change identity even when the seeds match. Callers must reproduce
+the builder's component-seed schedule as well as its options; otherwise a reset
+can miss and regenerate a scene. See [Public Integration API](downstream_integration_api.md).
 
 The key metadata fields that let downstream tools safely merge and analyze those
 corpora are:

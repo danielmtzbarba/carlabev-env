@@ -76,6 +76,7 @@ Project documentation lives in `CarlaBEV/docs/`:
 - [Route Generation And Planning](CarlaBEV/docs/route_generation_and_planning.md)
 - [Debugging And Diagnostics](CarlaBEV/docs/debugging_and_diagnostics.md)
 - [Public Integration API](CarlaBEV/docs/downstream_integration_api.md)
+- [Licensing and Attribution](CarlaBEV/docs/licensing.md)
 
 These pages describe the current implementation. Historical design context:
 
@@ -343,6 +344,7 @@ are documented in:
 
 - [Route Generation And Planning](CarlaBEV/docs/route_generation_and_planning.md)
 - [Public Integration API](CarlaBEV/docs/downstream_integration_api.md)
+- [Licensing and Attribution](CarlaBEV/docs/licensing.md)
 
 ## Comfort Signals
 
@@ -515,3 +517,14 @@ The environment wrapper path accepts:
 - `video_name_prefix`
 
 When `video_episode_indices` is omitted, the legacy `capture_every` cadence is still supported as a fallback.
+
+## License
+
+CarlaBEV's original software and documentation are licensed under the
+[Apache License 2.0](LICENSE.md). See [NOTICE](NOTICE) for retained third-party
+attribution and [Licensing and Attribution](CarlaBEV/docs/licensing.md) for scope.
+
+PythonRobotics-derived code retains its MIT notice. Town01 map assets are derived
+from CARLA and retain upstream CC-BY obligations; the exact source release and
+asset-license version still need to be recorded. They are not relicensed by the
+software license.

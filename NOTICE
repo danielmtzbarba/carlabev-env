@@ -1,0 +1,40 @@
+CarlaBEV
+Copyright 2024-2026 CarlaBEV contributors
+
+CarlaBEV's original software and documentation are provided under the
+Apache License, Version 2.0. See LICENSE.md.
+
+Third-party material retains its applicable upstream terms. This notice
+does not replace or amend those terms.
+
+PythonRobotics
+--------------
+This project contains planning and control code adapted from PythonRobotics,
+by Atsushi Sakai and other contributors:
+https://github.com/AtsushiSakai/PythonRobotics
+
+Upstream-attributed files include:
+  CarlaBEV/src/planning/cubic_spline_planner.py
+  CarlaBEV/src/planning/dijkstra.py
+  CarlaBEV/src/control/stanley_controller.py
+
+Related control utilities and state adaptations are covered by the same
+retained attribution to the extent they incorporate PythonRobotics code.
+CarlaBEV has modified the original algorithms and integration for its own
+scene, geometry, control, and metric-state contracts.
+
+The complete upstream MIT notice is in LICENSES/PythonRobotics-MIT.txt.
+Existing author credits in source files are retained.
+
+CARLA-derived Town01 assets
+--------------------------
+The maintainer created the bundled Town01 raster maps and graph files from
+CARLA's Town01 environment. These are derived assets, not original CARLA
+software source files. Their provenance and applicable upstream asset terms
+are documented in CarlaBEV/assets/Town01/NOTICE.
+
+Dependencies
+------------
+Installed dependencies retain their own licenses. This repository's Apache
+license does not replace dependency licenses or grant rights to third-party
+trademarks, content, or patents beyond the applicable upstream grants.

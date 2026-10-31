@@ -1,0 +1,15 @@
+digraph comp {
+  rankdir=LR; node [shape=record, style="filled", fontname="Helvetica", fontsize=10]; edge [fontname="Helvetica", fontsize=9];
+  label="Target component ownership (composition; arrows = owns / calls)"; labelloc=t; fontname="Helvetica"; fontsize=13;
+  Env [label="{CarlaBEV (gym.Env)|control_dt · action_repeat\nstep(): schedule → k × advance → observe → return}", fillcolor="#f3e8fb"];
+  Clock [label="{SimClock / TimeConfig|physics_dt · step_index · control_index\nt = step_index × dt}", fillcolor="#e8f1fb"];
+  Stepper [label="{Stepper (World)|advance(dt): hero.body, npc controllers,\nlifecycle, rules → WorldSnapshot}", fillcolor="#e8f1fb"];
+  Coll [label="{CollisionSystem|metric OBB/SAT · spatial hash\nTTC on shapes · events}", fillcolor="#e8f1fb"];
+  Snap [label="{WorldSnapshot|immutable: t, poses, velocities,\nbehaviour states, signal phases}", fillcolor="#e8f1fb"];
+  Acc [label="{RewardAccumulator|per sub-step reward(info) Σ\nlatched termination cause}", fillcolor="#f3e8fb"];
+  Obs [label="{Observer (BEV | vector)|observe(snapshot) → obs\nclass-id raster + palette}", fillcolor="#fdf1e3"];
+  Pres [label="{Presenter (optional)|present(snap_a, snap_b, α)\nwall-clock pacing · display fps}", fillcolor="#fdf1e3"];
+  Rec [label="{Recorder|source: observation | viewer\nfps from source rate}", fillcolor="#e9f7ec"];
+  Env -> Clock; Env -> Stepper; Env -> Acc; Env -> Obs; Env -> Pres [style=dashed]; Env -> Rec [style=dashed];
+  Stepper -> Coll; Stepper -> Snap [label=" emits"]; Coll -> Acc [label=" events"]; Snap -> Obs; Snap -> Pres [style=dashed]; Obs -> Rec [style=dashed]; Pres -> Rec [style=dashed];
+}

@@ -1,0 +1,14 @@
+flowchart LR
+    classDef sim fill:#e8f1fb,stroke:#1f6feb,color:#111
+    classDef rend fill:#fdf1e3,stroke:#ef6c00,color:#111
+    classDef out fill:#e9f7ec,stroke:#2e7d32,color:#111
+    A[agent action<br/>every env.step] --> T[SimClock.tick<br/>t += dt  = 0.1 s]:::sim
+    T --> H[hero physics<br/>bicycle, 1 dt]:::sim
+    H --> N[NPC physics<br/>behaviours + controllers, 1 dt]:::sim
+    N --> W[redraw world surface<br/>full map blit + sprites]:::rend
+    W --> F[draw FOV<br/>crop · rotate · compose]:::rend
+    F --> O[observation image<br/>= the rendered frame]:::out
+    N --> C[collision + reward]:::sim
+    C --> O
+    F --> V[human window blit<br/>clock.tick fps  = wall-clock cap]:::rend
+    O --> R[RecordVideo<br/>1 frame per step, render_fps = 1/dt]:::out

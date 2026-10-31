@@ -1,0 +1,36 @@
+flowchart TB
+    classDef sim fill:#e8f1fb,stroke:#1f6feb,color:#111
+    classDef ctl fill:#f3e8fb,stroke:#7b1fa2,color:#111
+    classDef rend fill:#fdf1e3,stroke:#ef6c00,color:#111
+    classDef out fill:#e9f7ec,stroke:#2e7d32,color:#111
+
+    subgraph CONTROL["Control rate  (agent)  control_dt = action_repeat × physics_dt   e.g. 10 Hz"]
+        direction TB
+        A[env.step action]:::ctl --> ZOH[ActionScheduler<br/>zero-order hold over k sub-steps]:::ctl
+        ACC[RewardAccumulator<br/>Σ sub-step rewards · latch termination]:::ctl --> RET[obs · reward · terminated · truncated · info]:::out
+    end
+
+    subgraph PHYSICS["Physics rate  physics_dt   e.g. 20–60 Hz   ·  deterministic, no rendering"]
+        direction LR
+        CLK[SimClock.tick]:::sim --> STEP[Stepper.advance dt<br/>hero body · NPC controllers · lifecycle]:::sim
+        STEP --> COL[CollisionSystem<br/>metric OBB · TTC]:::sim
+        COL --> SNAP[(WorldSnapshot ring<br/>poses · velocities · states · t)]:::sim
+    end
+
+    subgraph OBS["Observation  (once per control step, from the boundary snapshot)"]
+        direction LR
+        OBSR[Observer: BEV renderer<br/>class-id raster → channels / RGB]:::rend --> OUT[observation]:::out
+    end
+
+    subgraph PRESENT["Presentation  (wall-clock, optional, read-only)"]
+        direction LR
+        PRES[Presenter @ display Hz 30/60<br/>interpolate snapshots  α = (t_wall − t_a)/(t_b − t_a)]:::rend --> WIN[pygame window]:::out
+        PRES --> REC2[viewer video @ display fps]:::out
+    end
+
+    ZOH -->|k times| CLK
+    COL -->|per sub-step| ACC
+    SNAP -->|boundary state| OBSR
+    SNAP -.->|latest two snapshots| PRES
+    OUT --> RET
+    OUT -.-> REC1[observation video<br/>fps = 1/control_dt]:::out

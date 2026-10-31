@@ -10,7 +10,10 @@ The simulator now distinguishes three geometry layers:
 2. Surface/world runtime coordinates
 3. Metric coordinates in meters
 
-The conversion helpers live in [geometry.py](../envs/geometry.py).
+The conversion helpers live in [geometry.py](../envs/geometry.py). They are
+all derived from one declaration, `geometry.MetricFrame`, which is carried by
+the unit contract (`UnitContract.metric`, see
+[Simulation Clock And Unit Contract](simulation_clock_and_units.md)).
 
 ## Raw Asset Coordinates
 
@@ -39,12 +42,32 @@ and `v_mps`; yaw is in radians. `state_m` exposes those values, while `state`
 converts position and speed back to surface units for compatibility. Controllers
 convert surface route geometry into meters before computing motion.
 
-Constants:
+`MetricFrame` declaration (defaults):
 
-- `RAW_TO_SURFACE_SCALE = 8.0`
-- `VISIBLE_METERS_IN_BEV = 40.0`
-- `SURFACE_SIZE_REF = 128.0`
-- `SURFACE_METERS_PER_PIXEL = 40 / 128 = 0.3125`
+- `surface_size = 128` px (native raster the surface frame is defined on)
+- `raw_size = 1024` px (graph/anchor assets)
+- `visible_meters = 40.0` m (extent of `surface_size` pixels)
+
+Derived:
+
+- `RAW_TO_SURFACE_SCALE = raw_size / surface_size = 8.0`
+- `SURFACE_METERS_PER_PIXEL = visible_meters / surface_size = 0.3125`
+- Town01 at 128 px: `1024 x 1280 px = 320 x 400 m`
+
+`EnvConfig.size` selects the native raster among `64, 128, 256, 512, 1024`
+(assets must exist); `MetricFrame.for_size(size)` gives `40 / size` m/px and a
+raw→surface scale of `1024 / size`. Coordinate sources and their frames:
+
+| Source | Frame | Conversion |
+| --- | --- | --- |
+| graph assets (`*.pkl`, node `pos` / `pos_raw`) | raw 1024 px | `metric.raw_to_surface` at use |
+| procedural scenario anchors | raw 1024 px constants | `Scenario.resolve_anchor()` |
+| `anchor_x/anchor_y` reset options | surface px of `anchor_frame_size` (default 128) | rescaled to the active frame |
+| authored scenes / scenario configs (`assets/scenes/*.json`) | `"frame": {"kind": "surface", "size": N}`; untagged = 128 | rescaled on load |
+| scene-library payloads | tagged with their surface size; key includes it | rejected if foreign |
+
+The 128-px raster is the reference frame all legacy data are expressed in. The
+observation resolution can also be changed cheaply with `obs_size`.
 
 Derived conversions:
 
@@ -82,6 +105,14 @@ It checks consistency across:
 - raw coordinates
 - surface coordinates
 - metric coordinates
+
+## Footprints And Thresholds
+
+Actor footprints are declared in meters (`ActorFootprints`, `EgoPhysics`) and
+derived to pixels through the metric frame: ego and vehicles `1.25 m` (4 px),
+pedestrians `0.625 m` (2 px), checkpoints `0.625 m`, goal `1.25 m`. Scene
+thresholds are SI as well: `speed_limit_mps` (default `35/3.6`) and
+`proximity_radius_m` (default `10.9375`, the legacy 35 px).
 
 ## Notes
 

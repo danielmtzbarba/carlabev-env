@@ -10,6 +10,13 @@
 
 </div>
 
+
+> Upload snapshot: simulator source, tests, documentation, and required map assets
+> are included. Agent guidance, Git history, CI/pre-commit configuration, local
+> environments, and generated scene databases are omitted from this bundle.
+> Git clone, release automation, and hook-setup instructions below describe the
+> full development repository, not files included in this upload.
+
 ## Overview
 
 `CarlaBEV` is a lightweight BEV simulator for autonomous-driving research. It is designed for rapid iteration on:
@@ -52,6 +59,17 @@ Recent simulator hardening work also introduced:
 - stronger steering authority for meaningful turns and avoidance
 - executable simulator validity checks
 - internal per-step comfort signals and public episode-level comfort summaries
+- an explicit simulation clock (`EnvConfig.physics_dt`, default 0.1 s) shared by
+  ego and NPC integration, scenario timers, reward derivatives and video metadata
+- a unit contract (`UnitContract`) making every physical parameter SI and raster
+  independent, with rendering as a pure observer of the simulation
+- metric actor geometry (oriented 4.5 × 1.8 m cars and pedestrian circles by
+  default; SAT collisions, shape gaps and swept TTC), a class-id renderer with
+  dirty rects, a declarative behaviour framework and traffic rules (IDM car
+  following, traffic signals, junction right-of-way)
+- a multi-rate loop: `action_repeat` physics sub-steps per decision with
+  summed, step-normalised rewards, and an interpolated real-time viewer
+  (`display_fps`) that cannot influence the simulation
 
 ## Key Features
 
@@ -75,6 +93,13 @@ Project documentation lives in `CarlaBEV/docs/`:
 - [Configuration Reference](CarlaBEV/docs/config_reference.md)
 - [Route Generation And Planning](CarlaBEV/docs/route_generation_and_planning.md)
 - [Debugging And Diagnostics](CarlaBEV/docs/debugging_and_diagnostics.md)
+- [Simulation Clock And Unit Contract](CarlaBEV/docs/simulation_clock_and_units.md)
+- [Numerical Determinism And Reproducibility](CarlaBEV/docs/numerical_determinism.md)
+- [Benchmarking And Instrumentation](CarlaBEV/docs/benchmarking.md)
+- [Actor Geometry And Collision](CarlaBEV/docs/actor_geometry.md)
+- [Rendering Architecture](CarlaBEV/docs/rendering_architecture.md)
+- [Traffic Rules And Actor Behaviours](CarlaBEV/docs/traffic_rules_and_behaviors.md)
+- [Multi-Rate Architecture Proposal](CarlaBEV/docs/multi_rate_architecture.md) (design, not implemented)
 - [Public Integration API](CarlaBEV/docs/downstream_integration_api.md)
 - [Licensing and Attribution](CarlaBEV/docs/licensing.md)
 
@@ -143,6 +168,7 @@ uv run carlabev --help
 
 Phase-1 command groups:
 
+- `carlabev run sim`
 - `carlabev run interactive`
 - `carlabev scene design`
 - `carlabev scene build-library`
@@ -152,6 +178,7 @@ Phase-1 command groups:
 - `carlabev graph visualize-town01-canonical`
 - `carlabev graph validate-town01-joins`
 - `carlabev validate simulator-semantics`
+- `carlabev benchmark run|compare|baseline`
 - `carlabev viz semantic-channels`
 - `carlabev viz vehicle-temporal-fusion`
 
@@ -164,16 +191,42 @@ should prefer:
 - `--study-seed`
 - `--episode-index-start`
 
+### Running The Simulator
+
+`carlabev run sim` runs the simulator with explicit rendering, clock, scene and
+control options (use `--help` for the full list):
+
+```bash
+uv run carlabev run sim                                        # pygame window, keyboard control, random traffic, real time
+uv run carlabev run sim --fps 30                               # same, 3x fast-forward (simulation result unchanged)
+uv run carlabev run sim --control random --episodes 20         # headless random-action rollouts
+uv run carlabev run sim --control random --physics-dt 0.05 --episodes 5 --no-traffic
+uv run carlabev run sim --reset-mode scenario --scenario-id lead_brake --scenario-level 3
+uv run carlabev run sim --reset-mode authored --scene-file CarlaBEV/assets/scenes/jaywalk-01.01.json
+uv run carlabev run sim --control random --record-video runs/videos --episodes 2
+```
+
+- `--render human|rgb_array` (default: `human` for manual control, headless otherwise), `--fps` (wall-clock cap; default real time = `1/control_dt`), `--display-fps 30|60` (interpolated real-time viewer)
+- `--physics-dt`, `--action-repeat` (sub-steps per decision), `--size`, `--geometry-profile realistic|legacy`, `--max-episode-duration-s`, `--seed`
+- `--car-following idm|legacy`, `--no-signals`, `--no-right-of-way` (traffic-rule attribution switches)
+- `--control manual|random|idle|forward` (manual = arrow keys, `Q` quits)
+- `--reset-mode random|authored|scenario|scenario-preset` with `--difficulty-preset-id`, `--num-vehicles`, `--no-traffic`, `--scene-file`, `--scenario-id/--scenario-level`, `--preset-id`
+- `--record-video DIR` (observation frames at `1/control_dt` fps), `--log-dir` (`episodes.jsonl`), `--no-log`
+
+Episodes are logged one line each (cause, return, steps, traffic, role, route,
+target speed, progress) followed by a run summary.
+
 ### Debug Viewer
 
-The fastest way to inspect the simulator manually is:
+The legacy manual viewer is still available:
 
 ```bash
 uv run carlabev run interactive
 ```
 
 This launches a `pygame` window, drives the ego vehicle with keyboard control,
-and now resets through the random traffic generator.
+and resets through the random traffic generator. It is equivalent to
+`carlabev run sim --control manual`.
 
 You can switch the reset source without changing tools:
 
@@ -211,6 +264,20 @@ This checks core simulator contracts such as:
 - geometry conversion consistency
 - observation-shape correctness
 - valid scenario spawns
+- one physics step per `env.step()` for every actor
+- rendering FPS / render mode never changing the simulated outcome
+- the SI unit contract and dt-convergence of the dynamics
+
+The per-feature physics/time contract suite lives in `tests/physics_time`
+(`uv run pytest tests/physics_time`, documented in `tests/physics_time/README.md`).
+For explicit numbers (timer accuracy, convergence error, determinism, throughput
+and per-phase timing) and a comparison against the committed baseline:
+
+```bash
+uv run carlabev benchmark run
+```
+
+See [Benchmarking And Instrumentation](CarlaBEV/docs/benchmarking.md).
 
 ### Git Hooks
 

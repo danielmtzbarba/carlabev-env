@@ -1,0 +1,15 @@
+digraph asis {
+  rankdir=LR; node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11]; edge [fontname="Helvetica", fontsize=9];
+  label="AS-IS: one env.step = one physics step = one observation frame = one window frame"; labelloc=t; fontname="Helvetica"; fontsize=13;
+  A [label="agent action\n(every env.step)", fillcolor="#f3e8fb"];
+  T [label="SimClock.tick\nt += dt (0.1 s)", fillcolor="#e8f1fb"];
+  H [label="hero physics\nbicycle, 1 dt", fillcolor="#e8f1fb"];
+  N [label="NPC physics\nbehaviours + controllers, 1 dt", fillcolor="#e8f1fb"];
+  W [label="redraw world surface\nfull map blit (~2 ms) + sprites", fillcolor="#fdf1e3"];
+  F [label="draw FOV\ncrop · rotate · compose", fillcolor="#fdf1e3"];
+  C [label="collision (render-frame rects)\n+ reward", fillcolor="#e8f1fb"];
+  O [label="observation image\n= the rendered frame", fillcolor="#e9f7ec"];
+  V [label="human window blit\nclock.tick(fps) = wall-clock cap on stepping", fillcolor="#fdf1e3"];
+  R [label="RecordVideo\n1 frame/step, render_fps = 1/dt", fillcolor="#e9f7ec"];
+  A -> T -> H -> N -> W -> F -> O; N -> C -> O; F -> V; O -> R;
+}

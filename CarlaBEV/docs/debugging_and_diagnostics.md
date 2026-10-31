@@ -20,7 +20,8 @@ uv run carlabev --help
 
 Phase-1 command groups:
 
-- `carlabev run interactive`
+- `carlabev run sim` — run the simulator (render mode, fps, physics dt, `--action-repeat`, `--display-fps` interpolated real-time viewer, scene, control mode, episodes, video; traffic-rule switches `--car-following idm|legacy`, `--no-signals`, `--no-right-of-way` and `--geometry-profile legacy` for attribution)
+- `carlabev run interactive` — legacy manual viewer (= `run sim --control manual`)
 - `carlabev scene design`
 - `carlabev scene build-library`
 - `carlabev scene analyze-library`
@@ -29,6 +30,7 @@ Phase-1 command groups:
 - `carlabev graph visualize-town01-canonical`
 - `carlabev graph validate-town01-joins`
 - `carlabev validate simulator-semantics`
+- `carlabev benchmark run|compare|baseline`
 - `carlabev viz semantic-channels`
 - `carlabev viz vehicle-temporal-fusion`
 
@@ -105,6 +107,24 @@ This is the best broad validation script in the repository for:
 - observation behavior
 - reward semantics
 - graph sanity summaries
+- the simulation clock and unit contract (`sim_clock_contract`,
+  `render_fps_independence`, `unit_contract`, `dt_convergence`,
+  `known_clock_unit_inconsistencies`)
+
+The pytest counterpart with per-test documentation is
+`uv run pytest tests/physics_time` (see `tests/physics_time/README.md`).
+
+## Benchmark Report
+
+```bash
+uv run carlabev benchmark run --profile quick
+```
+
+Writes `runs/bench/<timestamp>-<host>/report.{json,html}` with clock, physics,
+rendering, replay and throughput numbers (including a per-phase timing
+breakdown from the built-in instrumentation) and compares them with the
+committed baseline for the platform. See
+[Benchmarking And Instrumentation](benchmarking.md).
 
 ## Town01 Canonical Graph Tooling
 

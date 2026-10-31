@@ -1,0 +1,35 @@
+gantt
+    title Rates on one simulated second (physics 30 Hz · control 10 Hz · display 60 Hz)
+    dateFormat  X
+    axisFormat  %L ms
+    section physics ticks (dt = 33 ms)
+    p1 :0, 33
+    p2 :33, 66
+    p3 :66, 100
+    p4 :100, 133
+    p5 :133, 166
+    p6 :166, 200
+    p7 :200, 233
+    p8 :233, 266
+    p9 :266, 300
+    section agent actions (control_dt = 100 ms, zero-order hold)
+    a1 :crit, 0, 100
+    a2 :crit, 100, 200
+    a3 :crit, 200, 300
+    section observations (boundary snapshot)
+    o1 :milestone, 100, 0
+    o2 :milestone, 200, 0
+    o3 :milestone, 300, 0
+    section display frames (60 Hz, interpolated between snapshots)
+    f :active, 0, 16
+    f :active, 16, 33
+    f :active, 33, 50
+    f :active, 50, 66
+    f :active, 66, 83
+    f :active, 83, 100
+    f :active, 100, 116
+    f :active, 116, 133
+    f :active, 133, 150
+    f :active, 150, 166
+    f :active, 166, 183
+    f :active, 183, 200

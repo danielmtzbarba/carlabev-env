@@ -57,8 +57,18 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 | Field | Type / Default | Consumed In | Effect |
 | --- | --- | --- | --- |
 | `seed` | `int = 0` | `CarlaBEV.reset()`, `wrap_env()` | Fallback episode seed when `reset(seed=...)` and `scene_seed` are omitted; also used to seed the wrapped action space. |
-| `fps` | `int = 15` | `Renderer` | Human-render frame rate cap. |
-| `size` | `int = 128` | `CarlaBEV`, `BaseMap`, `get_obs_space()` | Native simulator raster size and direct observation size before wrappers. |
+| `fps` | `int \| None = None` | `Renderer` | Wall-clock frame-rate cap for `render_mode="human"` only. `None` = real time (`1 / control_dt`); an explicit value gives `real_time_factor = fps * control_dt`. Never affects simulated state or recorded-video rate (see [Simulation Clock And Unit Contract](simulation_clock_and_units.md)). |
+| `physics_dt` | `float = 0.1` | `TimeConfig` → `Scene`/`SimClock`, `ActorManager`, hero and NPC `Controller`, reward functions | Physics integration step in simulated seconds (10 Hz default); one `env.step()` advances `action_repeat × physics_dt`. The single clock shared by ego/NPC integration, scenario timers, startup ramps and reward derivatives; per-step rewards are scaled by `physics_dt / 0.1`. |
+| `action_repeat` | `int = 1` | `TimeConfig.action_repeat` → `CarlaBEV.step` | Physics sub-steps per `env.step()`; the action is held for `control_dt = action_repeat × physics_dt`, sub-step rewards are summed, the first terminal sub-step ends the step, one observation is rendered. `1` = legacy behaviour. See [multi_rate_architecture.md](multi_rate_architecture.md). |
+| `display_fps` | `int \| None = None` | `Presenter` (human mode) | Interpolated real-time viewer at this wall-clock frame rate (frames between the sub-step snapshots); mutually exclusive with `fps`. Never affects the simulation. |
+| `size` | `int = 128` | `CarlaBEV`, `BaseMap`, `get_obs_space()`, `UnitContract.metric` | Native simulator raster size (`64, 128, 256, 512, 1024`; assets required) and direct observation size before wrappers. The field of view always spans 40 m, so the metric frame is `40 / size` m/px and the physical world is identical at every size; only rendering cost changes. Prefer `obs_size` to change observation resolution. |
+| `ego_accel_mps2` | `float = 4.5` | `UnitContract.ego` → hero | Full-throttle longitudinal acceleration (SI). |
+| `ego_brake_decel_mps2` | `float = 1.5` | `UnitContract.ego` → hero | Full-brake deceleration at speed (SI, raster independent). |
+| `speed_limit_mps` | `float = 35/3.6` | `UnitContract.scene` → `scene_info.speed_limit_mps` → CaRL reward | Speed limit in m/s. |
+| `proximity_radius_m` | `float = 10.9375` | `UnitContract.scene` → `Scene.collision_check()` | Centre-distance radius (m) within which dynamic actors are reported in `info["collision"]["actors_state"]` (each entry also carries the surface `gap_m`, shape `ttc_s`, bearing and classification). |
+| `geometry_profile` | `"legacy" \| "realistic" = "realistic"` | `UnitContract.footprints` → actors, `CollisionSystem`, renderer, traffic rules | `realistic` (default since Phase 6): rear-axle referenced oriented boxes (car 4.5 × 1.8 m; van, bus classes) and 0.3 m pedestrian circles. `legacy`: the historical 1.25 m axis-aligned squares (0.625 m pedestrians), kept for attribution. See [Actor Geometry And Collision](actor_geometry.md). |
+| `max_episode_duration_s` | `float \| None = None` | `UnitContract.horizon` → `CarlaBEV.step()` (truncation), `RewardFn.max_actions` | Episode horizon in simulated seconds, resolved to steps via `physics_dt`. `None` derives it from the legacy `max_actions` (5000 × 0.1 s = 500 s). Expiry returns `truncated=True`. |
+| `offroad_terminate_after_s` | `float = 4.0` | `UnitContract.horizon` → `RewardFn.offroad_terminate_after` | Continuous off-road time (s) after which the shaping reward terminates; resolved to steps via `physics_dt`. |
 | `map_name` | `str = "Town01"` | `EnvConfig` validation, `BaseMap`, `SceneGenerator` | Selects the map assets and route planners. Today the runtime effectively assumes `Town01`. |
 | `render_mode` | `"human" \| "rgb_array"` | `CarlaBEV.render()` | `human` opens a pygame viewer; `rgb_array` keeps rendering off-screen. |
 | `action_mode` | `"discrete" \| "continuous"` | `CarlaBEV`, `BaseMap`, action-profile validation | Selects the environment action-space family and hero actor class. |
@@ -66,6 +76,12 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 | `reward_mode` | `"shaping" \| "carl"` | `CarlaBEV.build_reward_fn()` | Selects which reward-function family gets instantiated. |
 | `reward_profile_id` | `str \| None` | `EnvConfig` validation, `CarlaBEV.build_reward_fn()` | Selects the concrete reward profile and parameters. |
 | `traffic_enabled` | `bool = True` | `SceneGenerator` defaults | Default switch for random-scene traffic when reset options do not override it. |
+| `traffic_lifecycle_enabled` | `bool = True` | `CarlaBEV.reset()` → `TrafficLifecycle` | Recycle generated background vehicles that finished their route onto a new route outside the ego field of view, keeping traffic density constant. Scenario and authored actors are never recycled. |
+| `traffic_respawn_margin_m` | `float = 10.0` | `TrafficLifecycle` | Extra distance beyond the FOV radius within which no respawn may occur. |
+| `car_following` | `"idm" \| "legacy" = "idm"` | `UnitContract.rules` → `Actor.step` | Background car-following model: IDM on bumper-to-bumper shape gaps (per speed class) or the pre-Phase-4 TTC lookup table (attribution only). See [traffic_rules_and_behaviors.md](traffic_rules_and_behaviors.md). |
+| `traffic_signals_enabled` | `bool = True` | `UnitContract.rules` | Vehicles stop at red/yellow stop lines that control their heading (`TrafficLight.controls_heading`); per-vehicle `obeys_signals=False` opts out (red-light runner). Never constrains the ego. |
+| `junction_right_of_way_enabled` | `bool = True` | `UnitContract.rules`, `Scene.junctions` | Vehicles yield at junction zones (canonical graph, ≥ 3 arms) to crossing traffic inside or arriving earlier; per-vehicle `yields_at_junctions=False` opts out. |
+| `junction_radius_m` | `float = 7.0` | `JunctionMap` | Radius of each circular right-of-way zone around the junction centre. |
 | `route_direction_metrics_enabled` | `bool = False` | `CarlaBEV.reset()` | When enabled, adds smoothed route left/right/straight fractions to scenario metadata after spawn. |
 | `scene_library_enabled` | `bool = True` | `CarlaBEV.reset()` | Enables the SQLite scene-library cache for random-scene replay and metadata lookup. |
 | `scene_library_path` | `str = "CarlaBEV/assets/scenes/scene_library.db"` | `SceneLibrary` | Filesystem path for the scene-library SQLite database. |
@@ -76,7 +92,7 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 
 | Field | Type / Default | Consumed In | Effect |
 | --- | --- | --- | --- |
-| `obs_mode` | `"bev_rgb" \| "bev_semantic" \| "vector"` default `"bev_semantic"` | `CarlaBEV`, `wrap_env()` | Chooses raw simulator observation family. |
+| `obs_mode` | `"bev_rgb" \| "bev_semantic" \| "bev_class" \| "vector"` default `"bev_semantic"` | `CarlaBEV`, `wrap_env()` | Chooses raw simulator observation family. `bev_class` returns the `(size, size)` uint8 class-id raster (direct `CarlaBEV(...)` use only). |
 | `obs_size` | `tuple[int, int] = (96, 96)` | `wrap_env()` | Resize target applied only when building through `make_env()`. No effect on direct `CarlaBEV(...)` observations. |
 | `semantic_mask_ch` | `"binary" \| "2-class" \| "4-class" \| "5-class" \| "6-class" \| "7-class"` default `"6-class"` | `wrap_env()`, semantic wrappers | Chooses semantic channel layout for semantic observations. |
 | `temporal_fusion_mode` | `"stack" \| "vehicle_temporal" \| "vehicle_weighted"` default `"stack"` | `wrap_env()` | Controls how stacked semantic frames are exposed after frame stacking. |
@@ -91,7 +107,7 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 | --- | --- | --- |
 | `env_id` | `str = "CarlaBEV-v0"` | Accepted and carried in config, but not used by the current runtime path. |
 | `scenes_path` | `str = "assets/scenes"` | Accepted and exposed for compatibility, but not currently used by `SceneGenerator` when resolving scenes. |
-| `max_actions` | `int = 5000` | Accepted and validated, but not automatically forwarded into reward-function construction. In practice the active episode limit comes from the instantiated reward profile parameters and their defaults. |
+| `max_actions` | `int = 5000` | Legacy horizon in steps at the configured `physics_dt`; used only when `max_episode_duration_s` is `None`. Now forwarded (as the resolved step count) to the environment horizon and the shaping reward. Prefer `max_episode_duration_s`. |
 
 ### Important Behavioral Notes
 
@@ -296,8 +312,9 @@ unless they opt into the same pattern.
 | --- | --- | --- |
 | `scenario_id` | `str` | Scenario family ID such as `jaywalk` or `lead_brake`. |
 | `level` | `int = 1` | Scenario difficulty/variant level passed into the scenario sampler. |
-| `anchor_x` | `int \| None` | Optional authored anchor override. |
-| `anchor_y` | `int \| None` | Optional authored anchor override. |
+| `anchor_x` | `int \| None` | Optional anchor override in surface px of `anchor_frame_size`. |
+| `anchor_y` | `int \| None` | Optional anchor override in surface px of `anchor_frame_size`. |
+| `anchor_frame_size` | `int = 128` | Surface raster size the anchor coordinates refer to; converted to the active `size` by the scenario. |
 | `parameters` | `dict[str, Any] = {}` | Scenario-specific parameter payload. |
 
 ## Action And Reward Presets
@@ -385,6 +402,5 @@ options = build_random_navigation_options(
 - Read-only scene-library mode is not filesystem read-only, does not enforce cache hits, and cannot guarantee an immutable prepared corpus. No public require-hit option is implemented.
 - Per-step hero/reward telemetry is internal. Public ongoing step info is empty; terminal info contains episode summaries. See [Public Integration API](downstream_integration_api.md).
 
-- `EnvConfig.max_actions` is accepted by the schema, but the current runtime does not automatically inject it into reward-function construction.
 - `EnvConfig.scenes_path` is accepted for compatibility, but the active runtime path does not read it.
 - `obs_size`, `frame_stack`, `semantic_mask_ch`, and `temporal_fusion_mode` only affect environments created through `make_env()` wrappers, not direct `CarlaBEV(...)` instances.

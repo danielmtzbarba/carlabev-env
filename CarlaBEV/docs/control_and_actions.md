@@ -44,11 +44,17 @@ Each step:
 6. The longitudinal command is low-pass filtered.
 7. The resulting controls are passed to the kinematic bicycle integrator.
 
-Current longitudinal tuning:
+Current longitudinal tuning (all from `UnitContract.ego`, see
+[Simulation Clock And Unit Contract](simulation_clock_and_units.md)):
 
 - full-throttle acceleration: `4.5 m/s^2`
-- acceleration filter: `alpha = 0.5`
+- full-brake deceleration: `1.5 m/s^2`, tapered below `5 m/s`
+- acceleration filter: first-order lag, `tau = 0.1 s`
+  (`alpha = dt / (tau + dt)`, i.e. `0.5` at the default `dt = 0.1 s`)
 - shared passive resistance: `0.05 + 0.002 v^2` in SI units
+
+Each `env.step()` applies the command for exactly one physics step
+(`EnvConfig.physics_dt`, default `0.1 s`). There is no action repeat.
 
 ## Steering Command
 
@@ -58,7 +64,8 @@ Instead:
 
 `delta_rad = radians(steer_action * steer_deg(v))`
 
-where `steer_deg(v)` is a speed-dependent steering authority bounded by:
+where `steer_deg(v) = clamp(18 / (1 + 0.10 |v|), 8, 18)` is a speed-dependent
+steering authority bounded by:
 
 - minimum: `8 deg`
 - maximum: `18 deg`
@@ -119,7 +126,10 @@ stable external contract. See [Public Integration API](downstream_integration_ap
 
 - Steering and longitudinal dynamics are heuristic rather than vehicle-calibrated.
 - Ego and controller-driven traffic now share the same passive resistance model.
-- Controller-driven traffic also uses a softer speed loop than ego command-space control, with `Kp = 0.5` and explicit `2.5 / 3.5 m/s^2` accel-decel clamps.
+- Controller-driven vehicles use a softer speed loop than ego command-space control, with `Kp = 0.5` and explicit `2.5 / 3.5 m/s^2` accel-decel clamps; pedestrians use a walker model (`wheelbase 0.5 m`, `Kp = 2.0`, `1.5 / 2.5 m/s^2`). Behaviour-driven target-speed ramps are fed forward (`a = Kp (v_t - v) + dv_t/dt`), so a scripted deceleration is realised up to the actor's limit.
+- Background vehicles perceive the ego as well as other traffic (lead following applies to the agent); finished background vehicles are recycled onto new out-of-view routes so traffic density is maintained.
+- Controller-driven actors brake to a physical stop at the end of their route (comfort stopping profile plus feed-forward braking) and report `v = 0` once at rest.
+- Scenario behaviour timers and startup ramps run on the scene clock with an end-of-step convention: during step `k` they observe `t = (k + 1) dt`.
 - There is no tire model or slip-angle model.
 - The control layer is designed for DRL research rather than high-fidelity vehicle dynamics studies.
 

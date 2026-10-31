@@ -1,0 +1,29 @@
+digraph target {
+  rankdir=TB; compound=true; node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11]; edge [fontname="Helvetica", fontsize=9];
+  label="TARGET: fixed-timestep physics · agent control rate · observation at control boundaries · wall-clock presenter"; labelloc=t; fontname="Helvetica"; fontsize=13;
+  subgraph cluster_ctl { label="CONTROL RATE — agent   control_dt = action_repeat × physics_dt (e.g. 10 Hz)"; style="rounded"; color="#7b1fa2"; fontname="Helvetica";
+    A [label="env.step(action)", fillcolor="#f3e8fb"];
+    ZOH [label="ActionScheduler\nzero-order hold over k sub-steps", fillcolor="#f3e8fb"];
+    ACC [label="RewardAccumulator\nΣ sub-step rewards · latch termination\n(stop early on collision)", fillcolor="#f3e8fb"];
+    RET [label="obs · reward · terminated · truncated · info", fillcolor="#e9f7ec"];
+  }
+  subgraph cluster_phy { label="PHYSICS RATE — physics_dt (e.g. 20–60 Hz) · deterministic · no rendering"; style="rounded"; color="#1f6feb"; fontname="Helvetica";
+    CLK [label="SimClock.tick", fillcolor="#e8f1fb"];
+    STEP [label="Stepper.advance(dt)\nhero body · NPC controllers · lifecycle", fillcolor="#e8f1fb"];
+    COL [label="CollisionSystem\nmetric OBB/SAT · shape TTC", fillcolor="#e8f1fb"];
+    SNAP [label="WorldSnapshot ring buffer\n(poses · velocities · states · t)", shape=cylinder, fillcolor="#e8f1fb"];
+  }
+  subgraph cluster_obs { label="OBSERVATION — once per control step, from the boundary snapshot"; style="rounded"; color="#ef6c00"; fontname="Helvetica";
+    OBSR [label="Observer = BEV renderer\nclass-id raster → channels / RGB palette", fillcolor="#fdf1e3"];
+    OUT [label="observation", fillcolor="#e9f7ec"];
+    REC1 [label="observation video\nfps = 1/control_dt", fillcolor="#e9f7ec"];
+  }
+  subgraph cluster_pres { label="PRESENTATION — wall clock · optional · read-only"; style="rounded,dashed"; color="#ef6c00"; fontname="Helvetica";
+    PRES [label="Presenter @ display Hz (30/60)\npose interpolation between snapshots\nα = (t_wall − t_a)/(t_b − t_a) · real_time_factor", fillcolor="#fdf1e3"];
+    WIN [label="pygame window", fillcolor="#e9f7ec"];
+    REC2 [label="viewer video @ display fps", fillcolor="#e9f7ec"];
+  }
+  A -> ZOH; ZOH -> CLK [label=" k times"]; CLK -> STEP -> COL -> SNAP; COL -> ACC [label=" per sub-step"]; ACC -> RET;
+  SNAP -> OBSR [label=" boundary state"]; OBSR -> OUT; OUT -> RET; OUT -> REC1 [style=dashed];
+  SNAP -> PRES [style=dashed, label=" latest two snapshots"]; PRES -> WIN; PRES -> REC2 [style=dashed];
+}

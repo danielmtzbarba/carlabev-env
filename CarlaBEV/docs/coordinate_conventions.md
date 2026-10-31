@@ -62,7 +62,11 @@ If the crop center and final image anchor are mixed together, the ego overlay ma
 
 ## Semantic Tile Convention
 
-The semantic tile under the ego is taken from the authoritative semantic map using ego world position, not from the center pixel of the rotated FOV.
+The world and the FOV are rendered as **class-id rasters** (8-bit palettized
+surfaces whose pixel values are `SemanticClass` ids; RGB is a palette lookup).
+The semantic tile under the ego is taken from the authoritative static
+class raster using the ego world position, not from the center pixel of the
+rotated FOV. See [Rendering Architecture](rendering_architecture.md).
 
 That sampled tile is also normalized into a shared semantic class id
 (`collision.tile_class`) before reward/off-road logic consumes it.

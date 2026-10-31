@@ -176,17 +176,38 @@ identity. See [scene-library workflows](debugging_and_diagnostics.md).
 ## Reset and step information
 
 Reset information can include `scenario`, `scene_descriptor`, `scene_cache`,
-and `spawn_validation`. Descriptors separate scene metadata from episode results.
+`spawn_validation` and `episode_horizon` (`max_episode_duration_s`,
+`max_episode_steps`, `offroad_terminate_after_s/steps`, `physics_dt_s`).
+Descriptors separate scene metadata from episode results.
+
+Termination semantics follow Gymnasium: physical outcomes (`collision`,
+`success`, `out_of_bounds`, `off_road`) return `terminated=True`; reaching the
+simulated-time horizon returns `truncated=True` with `terminated=False`
+(episode summary `termination == "max_actions"`), so value bootstrapping at
+truncation remains valid. Training loops should reset on `terminated or truncated`.
 
 The current public `step()` information is empty on ongoing steps and contains
 `episode_info` on termination. Episode summaries include outcomes, route and
-traffic metadata, and comfort aggregates such as `mean_abs_accel_long`,
-`mean_abs_jerk_lat`, `comfort_violation_rate`, and `harsh_brake_rate`.
+traffic metadata, the simulated duration (`episode_duration_s`, `physics_dt_s`,
+`length` in steps), and comfort aggregates such as `mean_abs_accel_long`,
+`mean_abs_jerk_lat`, `comfort_violation_rate`, and `harsh_brake_rate`, plus
+`red_light_violations` (number of red stop lines controlling the ego's heading
+that it crossed; observational only — traffic rules never constrain the agent,
+see [traffic_rules_and_behaviors.md](traffic_rules_and_behaviors.md)).
+The environment also exposes `physics_dt_s`, `action_repeat`, `control_dt_s`,
+`sim_time_s`, `speed_limit_mps` and `proximity_radius_m` as properties;
+`metadata["render_fps"]` equals `round(1 / control_dt)` so recorded videos play
+in simulated real time. With `action_repeat > 1` one `step()` holds the action
+over that many physics sub-steps, returns the summed reward and the boundary
+observation, and ends early at a terminal sub-step; episode summaries report
+`action_repeat`, `control_dt_s`, `physics_steps` and `decisions` (`length` =
+decisions).
 Vector environments collate these dictionaries using Gymnasium's vector-info
 convention.
 
-Per-step hero, reward, scene, and collision telemetry is computed internally and
-the unwrapped environment retains it in `current_info`. It is not returned as
+Per-step hero, reward, scene, signal (`current_info["signals"]`: controlling
+light state, gap to its stop line, violation count) and collision telemetry is
+computed internally and the unwrapped environment retains it in `current_info`. It is not returned as
 `info["hero"]` or `info["reward"]` by the current public step API. `current_info`
 is an implementation detail, not a stable downstream contract. See
 [Control And Actions](control_and_actions.md) for the internal comfort signals.
@@ -197,8 +218,9 @@ is an implementation detail, not a stable downstream contract. See
   schema initialization and cache usage counters can still write to SQLite.
 - A cache miss can generate a scene even in read-only mode. A required-hit option
   is not implemented in the public environment configuration.
-- `EnvConfig.max_actions` is not forwarded automatically to reward construction;
-  the reward profile's parameters determine the active episode limit.
+- `EnvConfig.max_actions` is a legacy step-count alias; prefer
+  `max_episode_duration_s`. The environment enforces the horizon for every
+  reward family; a reward profile may only shorten it.
 - `env_id` and `scenes_path` are compatibility fields with no active runtime use.
 - `obs_size`, frame stacking, semantic conversion, and temporal fusion require
   the wrapped construction path.

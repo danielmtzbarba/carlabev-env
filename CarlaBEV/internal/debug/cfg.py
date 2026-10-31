@@ -20,7 +20,7 @@ class LoggerConfig:
 @dataclass
 class EnvConfig:
     seed: int = 0
-    fps: int = 15
+    fps: int | None = None  # None = real-time pacing (1 / physics_dt)
     size: int = 128
     env_id: str = "CarlaBEV-v0"
     map_name: str = "Town01"

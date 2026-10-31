@@ -6,7 +6,6 @@ import numpy as np
 from CarlaBEV.src.scenes.scenarios import Scenario
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.actors.traffic_light import TrafficLight, TrafficLightState
-from CarlaBEV.envs.geometry import distance_meters_to_surface, raw_to_surface
 from CarlaBEV.envs.utils import asset_path
 from CarlaBEV.src.scenes.utils import compute_total_dist_m
 
@@ -15,11 +14,11 @@ class RedLightRunningScenario(Scenario):
     Scenario where another vehicle runs a red light at a legal 4-way intersection
     while ego has green.
     """
-    def __init__(self, map_size, map_name="Town01"):
-        super().__init__("red_light_runner", map_size)
+    def __init__(self, map_size=None, map_name="Town01", units=None):
+        super().__init__("red_light_runner", map_size, units=units)
         self.map_name = map_name
-        
-        # Intersection coordinates (y, x) provided by user
+
+        # Intersection coordinates (y, x) in the raw 1024-px asset frame.
         self.intersections = [
             (8642, 1564),
             (8654, 6755),
@@ -71,7 +70,7 @@ class RedLightRunningScenario(Scenario):
             counts[self._direction_key(delta)] += 1
         return counts
 
-    def _select_intersection(self, intersection_index=None, anchor_x=None, anchor_y=None):
+    def _select_intersection(self, intersection_index=None, anchor_x=None, anchor_y=None, anchor_frame_size=None):
         if intersection_index is not None:
             requested_idx = int(intersection_index)
             if not (0 <= requested_idx < len(self.intersections)):
@@ -85,7 +84,13 @@ class RedLightRunningScenario(Scenario):
                 dists.append((np.linalg.norm(center_raw - requested_center), idx))
             candidates = [idx for _, idx in sorted(dists)]
         elif anchor_x is not None and anchor_y is not None:
-            anchor_raw = np.array([anchor_x * 8.0, anchor_y * 8.0], dtype=float)
+            frame_size = int(anchor_frame_size or self.metric.LEGACY_SURFACE_SIZE)
+            anchor_raw = self.metric.surface_to_raw(
+                (
+                    self.metric.rescale_surface_from(float(anchor_x), frame_size),
+                    self.metric.rescale_surface_from(float(anchor_y), frame_size),
+                )
+            )
             dists = []
             for idx, intersection in enumerate(self.intersections):
                 center_raw = self._raw_xy(intersection)
@@ -152,7 +157,7 @@ class RedLightRunningScenario(Scenario):
                 rx = []
                 ry = []
                 for pos in coords:
-                    pos_surface = raw_to_surface(pos)
+                    pos_surface = self.metric.raw_to_surface(pos)
                     rx.append(float(pos_surface[0]))
                     ry.append(float(pos_surface[1]))
                 return rx, ry
@@ -160,10 +165,10 @@ class RedLightRunningScenario(Scenario):
             f"Unable to build a valid {start_dir}->{end_dir} route through the selected 4-way intersection."
         )
 
-    def _build_stop_line(self, center_surface, direction, signal_state):
-        strip_offset = distance_meters_to_surface(4.0)
-        strip_length = distance_meters_to_surface(8.0)
-        strip_width = distance_meters_to_surface(0.45) + 1.0
+    def _build_stop_line(self, center_surface, direction, signal_state, cycle=None):
+        strip_offset = self.m_to_px(4.0)
+        strip_length = self.m_to_px(8.0)
+        strip_width = self.m_to_px(0.45) + 1.0
 
         if direction == "south":
             pos_x = center_surface[0]
@@ -182,6 +187,9 @@ class RedLightRunningScenario(Scenario):
             pos_y = center_surface[1]
             orientation = "vertical"
 
+        # A strip on the <direction> side of the junction controls traffic
+        # travelling *towards* the centre, i.e. heading the opposite way.
+        controls = {"south": "north", "north": "south", "west": "east", "east": "west"}[direction]
         return TrafficLight(
             pos_x=pos_x,
             pos_y=pos_y,
@@ -190,6 +198,9 @@ class RedLightRunningScenario(Scenario):
             signal_state=signal_state,
             width=strip_width,
             length=strip_length,
+            units=self.units,
+            controls_heading=controls,
+            cycle=cycle,
         )
         
     def sample(self, level: int = 1, **kwargs):
@@ -204,14 +215,15 @@ class RedLightRunningScenario(Scenario):
             intersection_index=intersection_index,
             anchor_x=anchor_x,
             anchor_y=anchor_y,
+            anchor_frame_size=kwargs.get("anchor_frame_size"),
         )
-        center_surface = raw_to_surface(center_raw)
+        center_surface = self.metric.raw_to_surface(center_raw)
 
         ego_rx, ego_ry = self._sample_straight_route(
             center_raw, start_dir="south", end_dir="north"
         )
         ego_speed = kwargs.get("ego_speed", 10.0)
-        len_route = compute_total_dist_m(np.array([ego_rx, ego_ry]))
+        len_route = compute_total_dist_m(np.array([ego_rx, ego_ry]), metric=self.metric)
 
         adv_rx, adv_ry = self._sample_straight_route(
             center_raw, start_dir="west", end_dir="east"
@@ -222,8 +234,12 @@ class RedLightRunningScenario(Scenario):
              routeX=adv_rx,
              routeY=adv_ry,
              target_speed=adv_speed,
-             behavior=None # Just drives straight
+             behavior=None,  # Just drives straight
+             units=self.units,
         )
+        # The red-light runner ignores its (red) signal and junction priority.
+        adversary.obeys_signals = False
+        adversary.yields_at_junctions = False
 
         tl_ego = self._build_stop_line(
             center_surface=center_surface,

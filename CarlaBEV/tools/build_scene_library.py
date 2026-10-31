@@ -52,14 +52,17 @@ def build_scene_library(
     guaranteed_candidate_role: str | None = None,
     ego_route_graph: str = "canonical",
     render_mode: str = "rgb_array",
+    size: int = 128,
 ) -> dict:
+    # Scene payloads are cached at the surface scale of ``size`` (the library key
+    # includes it), so a library must be built for the size it will serve.
     env = CarlaBEV(
         EnvConfig(
             map_name="Town01",
             render_mode=render_mode,
             obs_mode="bev_rgb",
             action_mode="discrete",
-            size=128,
+            size=size,
             scene_library_enabled=True,
             scene_library_path=scene_library_path,
         )
@@ -204,6 +207,7 @@ def build_scene_library(
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Build the SQLite scene library without stepping episodes.")
     parser.add_argument("--episodes", type=int, default=100)
+    parser.add_argument("--size", type=int, default=128, help="Surface raster size the library is built for.")
     parser.add_argument("--scene-benchmark-id", default=None)
     parser.add_argument("--scene-profile-id", default=None)
     parser.add_argument("--scene-split", default=None)
@@ -261,6 +265,7 @@ def main() -> int:
         traffic_role_profile=args.traffic_role_profile,
         guaranteed_candidate_role=args.guaranteed_candidate_role,
         ego_route_graph=args.ego_route_graph,
+        size=args.size,
     )
     if args.as_json:
         print(json.dumps(summary, indent=2, sort_keys=True))

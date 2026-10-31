@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 
-from CarlaBEV.envs.geometry import SURFACE_METERS_PER_PIXEL
+from CarlaBEV.envs.geometry import DEFAULT_METRIC_FRAME
 from CarlaBEV.src.control.utils import smooth_and_compute
 
 
@@ -58,7 +58,9 @@ def compute_route_profile_metrics(
     *,
     turn_rate_thresh_rad_per_m: float = 0.12,
     min_turn_segment_m: float = 4.0,
+    metric=None,
 ) -> dict[str, Any]:
+    metric = metric if metric is not None else DEFAULT_METRIC_FRAME
     cx, cy, cyaw, _, _ = smooth_and_compute(ax, ay, window=11, poly=3)
 
     cx = np.asarray(cx, dtype=float)
@@ -79,7 +81,7 @@ def compute_route_profile_metrics(
 
     dx = np.diff(cx)
     dy = np.diff(cy)
-    ds_m = np.hypot(dx, dy) * SURFACE_METERS_PER_PIXEL
+    ds_m = np.hypot(dx, dy) * metric.meters_per_pixel
     valid = ds_m > 1e-6
 
     if not np.any(valid):

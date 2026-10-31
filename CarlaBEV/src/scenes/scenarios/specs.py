@@ -191,12 +191,17 @@ def coerce_parameters(scenario_id: str, raw_values: dict | None) -> dict:
     return params
 
 
+LEGACY_ANCHOR_FRAME_SIZE = 128
+"""Surface raster size anchors of untagged (v1/v2) files refer to."""
+
+
 def build_scenario_config(
     scene_id: str,
     scenario_id: str,
     level: int,
     anchor: dict | None,
     parameters: dict | None,
+    frame_size: int = LEGACY_ANCHOR_FRAME_SIZE,
 ) -> dict:
     anchor = anchor or {}
     return {
@@ -205,6 +210,8 @@ def build_scenario_config(
         "scene_id": scene_id,
         "scenario_id": scenario_id,
         "level": int(level),
+        # Surface raster the anchor coordinates are expressed in.
+        "frame": {"kind": "surface", "size": int(frame_size)},
         "anchor": {
             "x": None if anchor.get("x") is None else int(anchor.get("x")),
             "y": None if anchor.get("y") is None else int(anchor.get("y")),
@@ -214,6 +221,7 @@ def build_scenario_config(
 
 
 def normalize_scenario_config(data: dict) -> dict:
+    frame_size = int((data.get("frame") or {}).get("size", LEGACY_ANCHOR_FRAME_SIZE))
     if data.get("type") == "scenario_config" or "scenario_id" in data:
         scenario_id = data.get("scenario_id")
         level = int(data.get("level", 1))
@@ -238,6 +246,7 @@ def normalize_scenario_config(data: dict) -> dict:
         level=level,
         anchor=anchor,
         parameters=parameters,
+        frame_size=frame_size,
     )
 
 
@@ -261,6 +270,8 @@ def build_scenario_options_from_config(
         options["anchor_x"] = anchor["x"]
     if anchor.get("y") is not None:
         options["anchor_y"] = anchor["y"]
+    if anchor.get("x") is not None or anchor.get("y") is not None:
+        options["anchor_frame_size"] = int((config.get("frame") or {}).get("size", LEGACY_ANCHOR_FRAME_SIZE))
     options["level"] = int(config.get("level", 1))
     options["scene"] = config["scenario_id"]
 

@@ -38,6 +38,46 @@ def _round_scalar(value, digits=4):
     return round(float(value), digits)
 
 
+AUTHORED_SCENE_FRAME_KIND = "surface"
+
+
+def authored_frame_size(data: dict, default_size: int) -> int:
+    """Surface raster size the coordinates of an authored/scenario file refer to.
+
+    v3 files declare ``"frame": {"kind": "surface", "size": N}``; earlier files
+    (v1/v2) carry no tag and are expressed in the legacy 128-px frame.
+    """
+    frame = data.get("frame") or {}
+    kind = str(frame.get("kind", AUTHORED_SCENE_FRAME_KIND))
+    if kind != AUTHORED_SCENE_FRAME_KIND:
+        raise ValueError(f"Unsupported authored scene frame kind {kind!r}; expected 'surface'.")
+    size = frame.get("size")
+    return int(default_size if size is None else size)
+
+
+def rescale_authored_actor(actor: dict, factor: float) -> dict:
+    """Rescale every surface-px coordinate of an authored actor by ``factor``."""
+    if factor == 1.0:
+        return actor
+    scaled = deepcopy(actor)
+    for key in ("rx", "ry"):
+        if scaled.get(key):
+            scaled[key] = [float(v) * factor for v in scaled[key]]
+    if scaled.get("waypoints"):
+        scaled["waypoints"] = [[float(p[0]) * factor, float(p[1]) * factor] for p in scaled["waypoints"]]
+    for key in ("start", "goal"):
+        point = scaled.get(key)
+        if isinstance(point, dict) and "x" in point and "y" in point:
+            scaled[key] = {**point, "x": float(point["x"]) * factor, "y": float(point["y"]) * factor}
+    for key in ("length", "width"):
+        if scaled.get(key) is not None:
+            scaled[key] = float(scaled[key]) * factor
+    variation = scaled.get("variation")
+    if isinstance(variation, dict) and variation.get("waypoint_jitter_px") is not None:
+        variation["waypoint_jitter_px"] = float(variation["waypoint_jitter_px"]) * factor
+    return scaled
+
+
 def _sample_variation_value(spec, rng, fallback=None):
     if spec is None:
         return fallback
@@ -187,10 +227,40 @@ def _apply_actor_variation(actor_data, scene_variation, actor_index):
     return actor, realized
 
 class Scenario:
-    def __init__(self, name, map_size=128):
+    def __init__(self, name, map_size=128, units=None):
+        from CarlaBEV.src.units import DEFAULT_UNIT_CONTRACT
+
         self.name = name
-        self.map_size = map_size
+        # Unit contract: surface scale and all metric conversions used by the
+        # scenario geometry come from here (authored/legacy anchors are at the
+        # surface scale of the active metric frame).
+        self.units = units if units is not None else DEFAULT_UNIT_CONTRACT
+        self.metric = self.units.metric
+        self.map_size = map_size if map_size is not None else self.metric.surface_size
         self.last_loaded_context = {}
+
+    def m_to_px(self, meters):
+        """Meters to surface px through the active metric frame."""
+        return self.metric.distance_meters_to_surface(meters)
+
+    def resolve_anchor(self, kwargs, default_raw_xy):
+        """Return the scenario anchor ``(x, y)`` in the active surface frame.
+
+        ``anchor_x`` / ``anchor_y`` supplied through reset options are surface
+        coordinates of the raster declared by ``anchor_frame_size`` (default:
+        the legacy 128-px frame every authored asset is expressed in). When a
+        coordinate is omitted the raw-frame default is used.
+        """
+        frame_size = int(kwargs.get("anchor_frame_size", self.metric.LEGACY_SURFACE_SIZE))
+        default_surface = self.metric.raw_to_surface(default_raw_xy)
+        anchor = []
+        for key, default_value in (("anchor_x", default_surface[0]), ("anchor_y", default_surface[1])):
+            value = kwargs.get(key)
+            if value is None:
+                anchor.append(float(default_value))
+            else:
+                anchor.append(float(self.metric.rescale_surface_from(float(value), frame_size)))
+        return anchor[0], anchor[1]
 
     def sample(self, **kwargs):
         """
@@ -224,6 +294,21 @@ class Scenario:
             return self.sample(
                 **build_scenario_options_from_config(config, overrides=overrides)
             )
+
+        # Authored coordinates are surface px of the raster declared by the file's
+        # frame tag (legacy files: 128 px). Convert them into the active frame.
+        file_frame_size = authored_frame_size(data, self.metric.LEGACY_SURFACE_SIZE)
+        frame_factor = self.metric.surface_scale_from(file_frame_size)
+        self.last_loaded_context = {
+            "authored_frame_size": file_frame_size,
+            "active_frame_size": self.metric.surface_size,
+        }
+        if frame_factor != 1.0:
+            data = deepcopy(data)
+            data["actors"] = [rescale_authored_actor(actor, frame_factor) for actor in data["actors"]]
+            global_variation = (data.get("variation") or {}).get("global") or {}
+            if global_variation.get("waypoint_jitter_px") is not None:
+                global_variation["waypoint_jitter_px"] = float(global_variation["waypoint_jitter_px"]) * frame_factor
 
         scene_variation = _resolve_variation_settings(data, overrides)
         realized_variations = []
@@ -268,7 +353,11 @@ class Scenario:
                     routeY=ry,
                     target_speed=speed,
                     behavior=behavior,
+                    units=self.units,
                 )
+                # Rule-compliance flags (adversaries): {"obeys_signals": false, ...}
+                v.obeys_signals = bool(varied_actor.get("obeys_signals", True))
+                v.yields_at_junctions = bool(varied_actor.get("yields_at_junctions", True))
                 scene_dict["vehicle"].append(v)
 
             elif atype == "pedestrian":
@@ -280,6 +369,7 @@ class Scenario:
                     routeY=ry,
                     target_speed=speed,
                     behavior=behavior,
+                    units=self.units,
                 )
                 scene_dict["pedestrian"].append(p)
             elif atype == "traffic_light":
@@ -313,6 +403,9 @@ class Scenario:
                         signal_state=state_map.get(varied_actor.get("signal_state", "red"), TrafficLightState.RED),
                         length=varied_actor.get("length"),
                         width=varied_actor.get("width"),
+                        units=self.units,
+                        controls_heading=varied_actor.get("controls_heading"),
+                        cycle=varied_actor.get("cycle"),
                     )
                 )
 
@@ -320,13 +413,13 @@ class Scenario:
         if scene_dict.get("agent"):
             agent = scene_dict["agent"]
             rx, ry = agent[0], agent[1]
-            from CarlaBEV.src.scenes.utils import compute_total_dist_px
-
-            len_route = compute_total_dist_px([rx, ry])
+            # Route length is reported in meters everywhere (U-07).
+            len_route = self.metric.route_length_meters(rx, ry)
         else:
-            len_route = 0
+            len_route = 0.0
 
         self.last_loaded_context = {
+            **self.last_loaded_context,
             "scene_id": data.get("scene_id"),
             "authored_scene": True,
             "variation_enabled": scene_variation["enabled"],

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from CarlaBEV.envs.geometry import SURFACE_METERS_PER_PIXEL
+from CarlaBEV.envs.geometry import DEFAULT_METRIC_FRAME
 
 
 def compute_smoothed_route_direction_fractions(
@@ -11,9 +11,12 @@ def compute_smoothed_route_direction_fractions(
     cyaw,
     *,
     turn_rate_thresh_rad_per_m: float = 0.12,
+    metric=None,
 ) -> dict[str, float]:
     """
     Compute straight/left/right route fractions from a smoothed hero route.
+
+    ``metric`` is the MetricFrame used to convert surface px to meters.
 
     Fractions are measured by route arc length, not waypoint count.
     Positive heading-rate is treated as a left turn and negative as a right turn.
@@ -31,7 +34,8 @@ def compute_smoothed_route_direction_fractions(
 
     dx = np.diff(cx)
     dy = np.diff(cy)
-    ds_m = np.hypot(dx, dy) * SURFACE_METERS_PER_PIXEL
+    metric = metric if metric is not None else DEFAULT_METRIC_FRAME
+    ds_m = np.hypot(dx, dy) * metric.meters_per_pixel
 
     valid = ds_m > 1e-6
     if not np.any(valid):

@@ -45,6 +45,7 @@ dependencies = [
   "pydantic>=2",
   "plotly>=6.8.0",
   "loguru>=0.7.3",
+  "moviepy>=2.2.1",
 ]
 
 [project.scripts]

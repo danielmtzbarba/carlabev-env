@@ -12,23 +12,34 @@ Ref:
 
 import numpy as np
 
-from CarlaBEV.envs.geometry import (
-    SURFACE_METERS_PER_PIXEL,
-    distance_surface_to_meters,
-    speed_surface_to_mps,
-)
+from CarlaBEV.envs.geometry import MetricFrame
 from CarlaBEV.src.control.utils import angle_mod, smooth_and_compute
 from CarlaBEV.src.control.state import State
+from CarlaBEV.src.sim_time import DEFAULT_PHYSICS_DT_S
 
 
 class Controller(State):
     k = 2.0  # control gain
     Kp = 1.0  # speed proportional gain
-    dt = 0.1  # [s] time difference
     rolling_resistance_mps2 = 0.05
     aero_drag_coeff = 0.002
     route_offroad_point_tolerance = 1
     route_offroad_fraction_tolerance = 0.01
+    # Deceleration used to plan a physical stop at the end of the route when
+    # the owner did not supply an explicit max_decel_mps2.
+    default_stop_decel_mps2 = 3.5
+    # The stopping profile is planned at this fraction of the maximum
+    # deceleration (comfort braking); the remaining headroom absorbs the lag of
+    # the proportional speed loop via feed-forward braking.
+    stop_plan_decel_fraction = 0.6
+    # Minimum deceleration applied while stopping at the route end so a
+    # proportional speed loop does not creep asymptotically towards zero.
+    stop_min_decel_mps2 = 1.0
+    stop_speed_eps_mps = 0.01
+    # Route-start jitter applied by set_route(jitter_start=True): +/- one step of
+    # this size in x and y (metric, so it does not depend on the raster scale;
+    # equals the legacy +/-1 px at 128 px).
+    route_start_jitter_m = 0.3125
 
     def __init__(
         self,
@@ -37,21 +48,32 @@ class Controller(State):
         speed_kp=None,
         max_accel_mps2=None,
         max_decel_mps2=None,
+        dt=DEFAULT_PHYSICS_DT_S,
+        metric: MetricFrame | None = None,
     ) -> None:
-        super().__init__()
-        self.time = 0.0
+        super().__init__(metric=metric)
+        # Physics step [s]. Injected from the simulation clock; the same value
+        # drives State.update(), comfort derivatives and behaviour timers.
+        self.dt = float(dt)
+        if not self.dt > 0.0:
+            raise ValueError(f"Controller dt must be positive, got {dt!r}")
         self._target_speed = float(target_speed)
-        self._target_speed_mps = speed_surface_to_mps(target_speed)
+        self._target_speed_mps = self.metric.speed_surface_to_mps(target_speed)
         self._speed_limit_mps = self._target_speed_mps
+        # Feed-forward acceleration [m/s^2] for a target-speed *ramp* published by
+        # a behaviour (dv_target/dt). A P-only loop tracking a ramp has a
+        # steady-state lag of rate/Kp; the feed-forward removes it (finding S-01).
+        self._target_accel_ff_mps2 = 0.0
         self.max_steer = np.radians(30.0)  # [rad] max steering angle
         self.L = float(L)  # [m] Wheel base of vehicle
         self.speed_kp = self.Kp if speed_kp is None else float(speed_kp)
         self.max_accel_mps2 = None if max_accel_mps2 is None else float(max_accel_mps2)
         self.max_decel_mps2 = None if max_decel_mps2 is None else float(max_decel_mps2)
     
-    def set_target_speed(self, target_speed, *, update_speed_limit=True):
+    def set_target_speed(self, target_speed, *, update_speed_limit=True, target_accel_ff_mps2=0.0):
         self._target_speed = float(target_speed)
-        self._target_speed_mps = speed_surface_to_mps(target_speed)
+        self._target_speed_mps = self.metric.speed_surface_to_mps(target_speed)
+        self._target_accel_ff_mps2 = float(target_accel_ff_mps2)
         if update_speed_limit:
             self._speed_limit_mps = self._target_speed_mps
 
@@ -59,8 +81,9 @@ class Controller(State):
         """Stanley steering control on a cubic spline."""
         ax = np.asarray(ax, dtype=float)
         ay = np.asarray(ay, dtype=float)
-        ax_m = ax * SURFACE_METERS_PER_PIXEL
-        ay_m = ay * SURFACE_METERS_PER_PIXEL
+        mpp = self.metric.meters_per_pixel
+        ax_m = ax * mpp
+        ay_m = ay * mpp
         raw_route = self._build_raw_controller_path(ax_m, ay_m)
         smoothed_route = smooth_and_compute(ax_m, ay_m, window=11, poly=3)
         offroad_points, offroad_fraction = self._route_offroad_stats(smoothed_route, drivable_mask)
@@ -70,21 +93,22 @@ class Controller(State):
         else:
             cx_m, cy_m, cyaw, ck, s = smoothed_route
             self.route_smoothing_mode = "smoothed"
+        self.cs_m = np.asarray(s, dtype=float)
         self.route_offroad_points = int(offroad_points)
         self.route_offroad_fraction = float(offroad_fraction)
 
         if jitter_start:
             if np_rng is None:
                 np_rng = np.random.default_rng()
-            jitter_x_m = distance_surface_to_meters(int(np_rng.integers(-1, 2)))
-            jitter_y_m = distance_surface_to_meters(int(np_rng.integers(-1, 2)))
+            jitter_x_m = int(np_rng.integers(-1, 2)) * self.route_start_jitter_m
+            jitter_y_m = int(np_rng.integers(-1, 2)) * self.route_start_jitter_m
             self.x_m = cx_m[0] + jitter_x_m
             self.y_m = cy_m[0] + jitter_y_m
         else:
             self.x_m, self.y_m = cx_m[0], cy_m[0]
         self.cx_m, self.cy_m = cx_m, cy_m
-        self.cx = cx_m / SURFACE_METERS_PER_PIXEL
-        self.cy = cy_m / SURFACE_METERS_PER_PIXEL
+        self.cx = cx_m / mpp
+        self.cy = cy_m / mpp
         self.v = v0
         self.cyaw = cyaw
         self.target_idx, _ = self.calc_target_index()
@@ -118,9 +142,10 @@ class Controller(State):
         offroad_points = 0
         total_points = len(cx_m)
         height, width = drivable_mask.shape
+        mpp = self.metric.meters_per_pixel
         for x_m, y_m in zip(cx_m, cy_m):
-            x = x_m / SURFACE_METERS_PER_PIXEL
-            y = y_m / SURFACE_METERS_PER_PIXEL
+            x = x_m / mpp
+            y = y_m / mpp
             xi = int(round(float(x)))
             yi = int(round(float(y)))
             if not (0 <= xi < width and 0 <= yi < height) or not bool(drivable_mask[yi, xi]):
@@ -136,19 +161,77 @@ class Controller(State):
         )
 
     def control_step(self):
-        # Check if we're at or past the last waypoint
-        if self.target_idx >= len(self.cx) - 1:
-            self._target_speed = 0.0  # stop target
+        """Advance one physics step along the route.
+
+        Returns ``True`` once the actor has physically come to rest at the end
+        of its route. Motion is always integrated through :meth:`update` so the
+        reported velocity matches the realised displacement: approaching the
+        route end the speed request is capped by the stopping profile
+        ``v <= sqrt(2 a_dec s_remaining)`` and, past the last waypoint, the
+        actor decelerates to a stop instead of freezing mid-motion.
+        """
+        at_route_end = self.target_idx >= len(self.cx) - 1
+        if at_route_end:
+            # Stop target. The speed *limit* is left untouched: it is a cap on
+            # the speed request, while stopping is realised by the controller
+            # decelerating towards the zero target within max_decel.
+            self._target_speed = 0.0
             self._target_speed_mps = 0.0
-            self._speed_limit_mps = 0.0
-            if self.v_mps <= 0.01:        # fully stopped
-                return True           # signal finished
-        else:
+            self._target_accel_ff_mps2 = 0.0
+            if abs(self.v_mps) <= self.stop_speed_eps_mps:  # fully stopped
+                if self.v_mps != 0.0:
+                    self._v_1_mps = self._v_mps
+                    self._v_mps = 0.0
+                return True  # signal finished
             ai = self.pid_control()
+            if self.v_mps > 0.0:
+                ai = min(ai, -min(self.stop_min_decel_mps2, self.v_mps / self.dt))
+            di = 0.0
+        else:
+            ai = self.stop_aware_speed_control()
             di, self.target_idx = self.stanley_control()
-            self.update(ai - self.longitudinal_resistance_accel(), di)
-            self.time += self.dt
-            return False  # still running
+        self.update(ai - self.longitudinal_resistance_accel(), di)
+        return False  # still running
+
+    def stop_aware_speed_control(self) -> float:
+        """Speed control that guarantees a stop at the route end.
+
+        Below the comfort stopping profile the proportional loop tracks
+        ``min(target, cap)``. Above it, the required deceleration
+        ``v^2 / (2 s_remaining)`` is commanded directly (feed-forward), bounded
+        by the maximum deceleration, so the controller lag cannot cause an
+        overshoot of the route end.
+        """
+        remaining_m = self.remaining_route_m()
+        cap_mps = self.stop_profile_speed_cap_mps()
+        v = float(self.v_mps)
+        if np.isfinite(remaining_m) and v > cap_mps and v > 0.0:
+            if remaining_m <= 1e-6:
+                return -self._stop_decel_mps2()
+            required = v * v / (2.0 * remaining_m)
+            return -float(min(self._stop_decel_mps2(), required))
+        return self.pid_control(cap_mps)
+
+    def _stop_decel_mps2(self) -> float:
+        if self.max_decel_mps2 is not None and self.max_decel_mps2 > 0.0:
+            return float(self.max_decel_mps2)
+        return float(self.default_stop_decel_mps2)
+
+    def remaining_route_m(self) -> float:
+        """Arc length left between the current target index and the route end."""
+        cs_m = getattr(self, "cs_m", None)
+        if cs_m is None or len(cs_m) == 0:
+            return float("inf")
+        idx = int(np.clip(self.target_idx, 0, len(cs_m) - 1))
+        return float(max(0.0, cs_m[-1] - cs_m[idx]))
+
+    def stop_profile_speed_cap_mps(self) -> float:
+        """Maximum speed that still allows a comfort stop at the route end."""
+        remaining_m = self.remaining_route_m()
+        if not np.isfinite(remaining_m):
+            return float("inf")
+        plan_decel = self.stop_plan_decel_fraction * self._stop_decel_mps2()
+        return float(np.sqrt(2.0 * plan_decel * remaining_m))
 
     def stanley_control(self):
         """
@@ -177,14 +260,19 @@ class Controller(State):
 
         return delta, current_target_idx
 
-    def pid_control(self):
+    def pid_control(self, speed_cap_mps=None):
         """
         Proportional control for the speed.
 
-        :param target: (float)
-        :return: (float)
+        :param speed_cap_mps: optional upper bound applied to the speed request
+        :return: (float) commanded acceleration [m/s^2]
         """
-        accel_cmd = self.speed_kp * (self._target_speed_mps - self.v_mps)
+        target_mps = self._target_speed_mps
+        feed_forward = self._target_accel_ff_mps2
+        if speed_cap_mps is not None and float(speed_cap_mps) < target_mps:
+            target_mps = float(speed_cap_mps)
+            feed_forward = min(feed_forward, 0.0)  # never accelerate into a stopping cap
+        accel_cmd = self.speed_kp * (target_mps - self.v_mps) + feed_forward
         accel_upper = np.inf if self.max_accel_mps2 is None else self.max_accel_mps2
         decel_lower = -np.inf if self.max_decel_mps2 is None else -self.max_decel_mps2
         return float(np.clip(accel_cmd, decel_lower, accel_upper))

@@ -147,19 +147,22 @@ def _persist_episode_record(sim_logger, record):
         handle.write(f"{json.dumps(record)}\n")
 
 
-def _log_scene_cache(info):
+def _log_scene_cache(info, prefix="[interactive]"):
     cache_info = info.get("scene_cache") or {}
     if not cache_info.get("enabled", False):
         return
     status = "hit" if cache_info.get("hit", False) else "miss"
     logger.debug(
-        "[interactive] scene-cache {} key={}",
+        "{} scene-cache {} key={}",
+        prefix,
         status,
         cache_info.get("scene_key", "n/a"),
     )
 
 
-def _list_authored_scene_files(scene_dir: Path, *, scene_filter: str, scenario_filter: str) -> list[tuple[Path, dict]]:
+def _list_authored_scene_files(
+    scene_dir: Path, *, scene_filter: str, scenario_filter: str
+) -> list[tuple[Path, dict]]:
     if not scene_dir.exists():
         raise FileNotFoundError(f"Authored scene directory not found: {scene_dir}")
 
@@ -286,9 +289,13 @@ def _build_scenario_preset_options(args, *, reset_mask):
     }
 
 
-def _build_reset_payload(args, *, cfg, reset_mask, reset_index, rng, scene_pool, scene_index):
+def _build_reset_payload(
+    args, *, cfg, reset_mask, reset_index, rng, scene_pool, scene_index
+):
     if args.reset_mode == "random":
-        return _build_random_options(args, cfg=cfg, reset_mask=reset_mask, reset_index=reset_index)
+        return _build_random_options(
+            args, cfg=cfg, reset_mask=reset_mask, reset_index=reset_index
+        )
     if args.reset_mode == "authored":
         return _build_authored_options(
             args,
@@ -304,8 +311,8 @@ def _build_reset_payload(args, *, cfg, reset_mask, reset_index, rng, scene_pool,
     raise ValueError(f"Unsupported reset mode: {args.reset_mode}")
 
 
-def _log_reset_meta(meta):
-    logger.info("[interactive] reset {}", meta)
+def _log_reset_meta(meta, prefix="[interactive]"):
+    logger.info("{} reset {}", prefix, meta)
 
 
 def _discrete_to_action(action_idx, *, continuous):
@@ -389,16 +396,22 @@ def main(argv: list[str] | None = None) -> int:
     while running:
         running = process_events(keys_held)
         action_idx = get_action_from_keys(keys_held)
-        action = _discrete_to_action(action_idx, continuous=(cfg.env.action_space == "continuous"))
+        action = _discrete_to_action(
+            action_idx, continuous=(cfg.env.action_space == "continuous")
+        )
         observation, reward, terminated, trunks, info = envs.step([action])
-        for i, ended in enumerate(terminated):
+        for i, ended in enumerate(np.logical_or(terminated, trunks)):
             if not ended:
                 continue
             record = _extract_indexed_record(sim_logger, info["episode_info"], i)
             _log_episode_end(record)
             _persist_episode_record(sim_logger, record)
             reset_index += 1
-            if args.reset_mode == "authored" and args.authored_mode == "eval" and not args.scene_file:
+            if (
+                args.reset_mode == "authored"
+                and args.authored_mode == "eval"
+                and not args.scene_file
+            ):
                 scene_index += 1
             options, meta = _build_reset_payload(
                 args,
@@ -414,7 +427,9 @@ def main(argv: list[str] | None = None) -> int:
             _log_scene_cache(info)
             spawn_info = info.get("spawn_validation", {})
             if spawn_info and not spawn_info.get("valid", False):
-                raise RuntimeError(f"Invalid ego spawn during interactive reset: {spawn_info}")
+                raise RuntimeError(
+                    f"Invalid ego spawn during interactive reset: {spawn_info}"
+                )
 
     envs.close()
     return 0

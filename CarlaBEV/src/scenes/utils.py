@@ -1,10 +1,7 @@
 import pygame
 import numpy as np
 
-from CarlaBEV.envs.geometry import (
-    route_length_meters,
-    surface_to_raw,
-)
+from CarlaBEV.envs.geometry import DEFAULT_METRIC_FRAME
 from CarlaBEV.src.control.route_profile import (
     compute_route_profile_metrics,
     matches_route_profile,
@@ -58,10 +55,11 @@ def select_node(event, planner, lane, actor):
 
     planner_id = "pedestrian" if actor.lower() == "pedestrian" else "vehicle"
     planner = planner[planner_id]
-    node = planner.get_closest_node(click_pos * 8, None)
+    metric = getattr(planner, "metric", DEFAULT_METRIC_FRAME)
+    node = planner.get_closest_node(metric.surface_to_raw(click_pos), None)
 
     node_pos = np.array(planner.G.nodes[node]["pos"])
-    dist = np.linalg.norm(surface_to_raw(click_pos) - node_pos)
+    dist = np.linalg.norm(metric.surface_to_raw(click_pos) - node_pos)
 
     if dist < min_dist:
         min_dist = dist
@@ -111,13 +109,19 @@ def scale_route(coords, factor, reverse=False):
     return scaled
 
 
-def set_targets(actors_dict, rx, ry):
+def set_targets(actors_dict, rx, ry, units=None):
+    """Create checkpoint/goal targets along the route; sizes come from the unit contract."""
+    from CarlaBEV.src.units import DEFAULT_UNIT_CONTRACT
+
+    units = units if units is not None else DEFAULT_UNIT_CONTRACT
     n = len(rx) - 1
+    checkpoint_px = units.px_int(units.footprints.checkpoint_size_m)
+    goal_px = units.px_int(units.footprints.goal_size_m)
     for i, (x, y) in enumerate(zip(rx, ry)):
         if i < n:
-            id, size = i, 2
+            id, size = i, checkpoint_px
         else:
-            id, size = "goal", 4
+            id, size = "goal", goal_px
         actors_dict["target"].append(Target(id=id, target_pos=(x, y), size=size))
     return actors_dict
 
@@ -202,14 +206,14 @@ def find_route_in_range(
             rx.append(px2)
             ry.append(py2)
 
-        total_dist_meters = route_length_meters(rx, ry)
+        total_dist_meters = lane_planner.metric.route_length_meters(rx, ry)
 
         # Check if route is within the range
         if min_dist_meters <= total_dist_meters <= max_dist_meters:
             if use_semantic_turn_metrics:
                 route_metrics = lane_planner.compute_path_route_metrics(raw_path)
             else:
-                route_metrics = compute_route_profile_metrics(rx, ry)
+                route_metrics = compute_route_profile_metrics(rx, ry, metric=lane_planner.metric)
             if not matches_route_profile(
                 route_metrics,
                 route_profile=route_profile,
@@ -219,7 +223,7 @@ def find_route_in_range(
             ):
                 continue
             # Assign route to actor
-            actor = Vehicle(start_node=start_node, end_node=end_node, map_size=128)
+            actor = Vehicle(start_node=start_node, end_node=end_node, map_size=lane_planner.metric.surface_size)
             return actor, (rx, ry), total_dist_meters, route_metrics
 
     # Fallback: no route within range
@@ -237,5 +241,54 @@ def compute_total_dist_px(path, scale=1):
     return total_dist_px
 
 
-def compute_total_dist_m(path, scale=1):
-    return route_length_meters(path[0], path[1])
+def compute_total_dist_m(path, scale=1, metric=None):
+    metric = metric if metric is not None else DEFAULT_METRIC_FRAME
+    return metric.route_length_meters(path[0], path[1])
+
+
+# ---------------------------------------------------------------------------
+# Scripted-NPC route sizing
+# ---------------------------------------------------------------------------
+SCRIPTED_NPC_HORIZON_S = 12.0
+"""Minimum simulated time a scripted scenario NPC must be able to keep driving.
+
+Scenario behaviours (timed braking, crossings) are specified in seconds, so the
+route handed to a scripted actor must be long enough for the behaviour to play
+out kinematically instead of the actor running out of route and stopping early.
+"""
+
+SCRIPTED_NPC_ROUTE_MARGIN_M = 10.0
+
+
+def scripted_route_length_m(
+    speed_mps: float,
+    *,
+    horizon_s: float = SCRIPTED_NPC_HORIZON_S,
+    brake_delay_s: float | None = None,
+    brake_decel_mps2: float | None = None,
+    margin_m: float = SCRIPTED_NPC_ROUTE_MARGIN_M,
+) -> float:
+    """Route length [m] that covers ``horizon_s`` of cruising plus any scripted braking."""
+    speed_mps = max(0.0, float(speed_mps))
+    length_m = speed_mps * float(horizon_s)
+    if brake_delay_s is not None and brake_decel_mps2:
+        brake_m = speed_mps * max(0.0, float(brake_delay_s)) + speed_mps**2 / (2.0 * abs(float(brake_decel_mps2)))
+        length_m = max(length_m, brake_m)
+    return length_m + float(margin_m)
+
+
+def straight_route_surface(
+    x_surface, y_start_surface, *, length_m: float, step_m: float, direction: int, metric=None
+):
+    """Axis-aligned straight route in surface px along +/-y.
+
+    ``direction=-1`` decreases y (northbound on the raster), ``+1`` increases it.
+    The first point is the start; points are spaced ``step_m`` apart and the route
+    is at least ``length_m`` long. ``metric`` converts meters to surface px.
+    """
+    metric = metric if metric is not None else DEFAULT_METRIC_FRAME
+    step_px = max(1.0, metric.distance_meters_to_surface(step_m))
+    num_points = max(2, int(np.ceil(metric.distance_meters_to_surface(length_m) / step_px)) + 1)
+    rx = [float(x_surface)] * num_points
+    ry = [float(y_start_surface) + direction * i * step_px for i in range(num_points)]
+    return rx, ry

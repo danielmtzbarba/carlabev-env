@@ -69,6 +69,8 @@ class ScenarioConfigReset(BaseModel):
     level: int = 1
     anchor_x: int | None = None
     anchor_y: int | None = None
+    anchor_frame_size: int = 128
+    """Surface raster size ``anchor_x``/``anchor_y`` are expressed in (legacy assets: 128 px)."""
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -290,6 +292,8 @@ def build_scenario_config_options(
         options["anchor_x"] = int(request.anchor_x)
     if request.anchor_y is not None:
         options["anchor_y"] = int(request.anchor_y)
+    if request.anchor_x is not None or request.anchor_y is not None:
+        options["anchor_frame_size"] = int(request.anchor_frame_size)
     return _attach_reset_mask(options, reset_mask)
 
 

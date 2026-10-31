@@ -57,5 +57,8 @@ def get_obs_space(cfg):
         return spaces.Box(
             low=0, high=255, shape=(cfg.size, cfg.size, 3), dtype=np.uint8
         )
+    elif obs_mode == "bev_class":
+        # Class-id raster (SemanticClass values; VOID_ID = 255 outside the crop).
+        return spaces.Box(low=0, high=255, shape=(cfg.size, cfg.size), dtype=np.uint8)
     elif obs_mode == "vector":
         return spaces.Box(low=-np.inf, high=np.inf, shape=(7,), dtype=np.float32)

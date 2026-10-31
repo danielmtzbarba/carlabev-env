@@ -1,57 +1,26 @@
-import pygame
+"""Policy-driven ego vehicle.
+
+``BaseAgent`` is a :class:`Controller` (bicycle kinematics + route tracking)
+with command-space longitudinal/steering authority from the unit contract and a
+metric footprint. It carries no rendering state: the renderer draws its body
+in the world layer and the FOV renderer draws the ego overlay.
+"""
+
 import math
 import numpy as np
 
 from CarlaBEV.src.control.stanley_controller import Controller
-from CarlaBEV.envs.geometry import SURFACE_METERS_PER_PIXEL, speed_surface_to_mps
 from CarlaBEV.semantics import SemanticClass, semantic_color_tuple
 from CarlaBEV.src.deeprl.comfort import compute_comfort_kinematics
+from CarlaBEV.src.units import DEFAULT_UNIT_CONTRACT, UnitContract
+from CarlaBEV.src.geometry.body import Body
+from CarlaBEV.src.geometry.rects import body_surface_rect
 
 
-class Hero(pygame.sprite.Sprite):
-    def __init__(self, window_size, color=None, car_size=32):
-        pygame.sprite.Sprite.__init__(self)
-        self.window_center = int(window_size / 2)
-        self.scale = int(1024 / window_size)
-        self.color = color if color is not None else semantic_color_tuple(SemanticClass.EGO)
-        #
-        self.w = int(car_size / self.scale)
-        self.l = self.w
+class BaseAgent(Controller):
+    """Policy-driven ego. Every physical parameter comes from ``UnitContract.ego``."""
 
-    def _setup(self):
-        center = self.window_center
-        self.fov_rect = pygame.Rect(0, 0, self.w, self.l)
-        self.set_fov_anchor((center, center))
-        self.rect = pygame.Rect(0, 0, self.w, self.l)
-
-    def draw(self, display_fov, display):
-        pygame.draw.rect(display_fov, self.color, self.fov_rect)
-        #pygame.draw.rect(display, self.color, self.rect)
-
-    def set_fov_anchor(self, anchor):
-        ax, ay = anchor
-        self.fov_rect.center = (int(round(ax)), int(round(ay)))
-
-    def sync_rect(self, frame):
-        self.rect = frame.rect_from_world_center((self.x, self.y), (self.w, self.l))
-
-    @property
-    def position(self):
-        return pygame.math.Vector2(self.x, self.y)
-
-    @property
-    def pose(self):
-        return pygame.math.Vector3(self.x, self.y, self.yaw)
-
-
-class BaseAgent(Controller, Hero):
-    dt = 0.1
-    min_action_steer_deg = 8.0
-    max_action_steer_deg = 18.0
-    # Reach minimum steering authority around 12.5 m/s instead of at ~1 m/s.
-    steer_speed_scale_mps = 0.10
-    accel_response_alpha = 0.5
-    accel_gain_mps2 = 4.5
+    semantic_class = SemanticClass.EGO
 
     def __init__(
         self,
@@ -60,18 +29,43 @@ class BaseAgent(Controller, Hero):
         target_speed=0.0,
         initial_speed=0.0,
         color=None,
-        car_size=32,
         np_rng=None,
         drivable_mask=None,
+        units: UnitContract | None = None,
+        dt=None,
     ):
-        Controller.__init__(self, target_speed=target_speed)
-        Hero.__init__(self, window_size, color, car_size)
+        units = units if units is not None else DEFAULT_UNIT_CONTRACT
+        ego = units.ego
+        # ``dt`` defaults to the contract's clock; an explicit value overrides it.
+        dt = units.time.physics_dt_s if dt is None else float(dt)
+        Controller.__init__(self, target_speed=target_speed, L=ego.wheelbase_m, dt=dt, metric=units.metric)
+        self.units = units
+        self.window_size = int(window_size)
+        self.color = color if color is not None else semantic_color_tuple(SemanticClass.EGO)
+        # Footprint is defined in meters by the unit contract and derived to px.
+        self.footprint = units.footprints.ego
+        self.length_m = self.footprint.length_m
+        self.width_m = self.footprint.width_m
+        self.w, self.l = units.ego_footprint_px
 
         xs, ys = route[0], route[1]
         self.acc = 0.0
-        self.meters_per_pixel = SURFACE_METERS_PER_PIXEL
-        self.max_accel_mps2 = self.accel_gain_mps2
-        self.max_brake_mps2 = 0.6 * self.scale * self.meters_per_pixel
+        self.meters_per_pixel = units.metric.meters_per_pixel
+        # --- Longitudinal authority (SI, raster independent) ---
+        self.max_accel_mps2 = ego.accel_mps2
+        self.max_brake_mps2 = ego.brake_decel_mps2
+        self.brake_speed_ref_mps = ego.brake_speed_ref_mps
+        self.brake_low_speed_floor = ego.brake_low_speed_floor
+        self.accel_response_tau_s = ego.accel_response_tau_s
+        self.accel_response_alpha = ego.accel_response_alpha(dt)
+        self.rolling_resistance_mps2 = ego.rolling_resistance_mps2
+        self.aero_drag_coeff = ego.aero_drag_coeff
+        self.stop_speed_eps_mps = ego.stop_speed_eps_mps
+        # --- Steering authority ---
+        self.min_action_steer_deg = ego.steer_min_deg
+        self.max_action_steer_deg = ego.steer_max_deg
+        self.steer_speed_scale_mps = ego.steer_speed_scale_per_mps
+        self.max_steer = math.radians(ego.max_steer_deg)
         self._prev_comfort_accel_long = None
         self._prev_comfort_accel_lat = None
         self._prev_comfort_yaw_rate = None
@@ -93,7 +87,6 @@ class BaseAgent(Controller, Hero):
             "yaw_acc": 0.0,
         }
         self.drivable_mask = drivable_mask
-        self._setup()
 
         self.set_route(xs, ys, initial_speed, np_rng=np_rng, drivable_mask=self.drivable_mask)
         
@@ -122,7 +115,7 @@ class BaseAgent(Controller, Hero):
         # Controller (state.py) uses bicycle model:
         # yaw += v / L * tan(delta) * dt
         self.update(self.acc, delta)
-        if abs(self.v_mps) < 0.05:
+        if abs(self.v_mps) < self.stop_speed_eps_mps:
             self.v_mps = 0.0
 
         self.last_control = {
@@ -158,7 +151,7 @@ class BaseAgent(Controller, Hero):
 
     @property
     def speed_mps(self) -> float:
-        return float(speed_surface_to_mps(self.v))
+        return float(self.v_mps)
     
     def steering(self, steer_action):
         """Map normalized steering actions to a meaningful wheel angle."""
@@ -180,7 +173,10 @@ class BaseAgent(Controller, Hero):
         return delta
 
     def brake(self, amount):
-        speed_factor = np.clip(abs(self.speed_mps) / 5.0, 0.3, 1.0)
+        """Brake deceleration [m/s^2]; authority tapers below brake_speed_ref_mps."""
+        speed_factor = np.clip(
+            abs(self.speed_mps) / self.brake_speed_ref_mps, self.brake_low_speed_floor, 1.0
+        )
         return max(0.0, amount) * self.max_brake_mps2 * speed_factor
 
 
@@ -207,3 +203,35 @@ class ContinuousAgent(BaseAgent):
         brake = np.clip(action[2], 0.0, 1.0)
         
         self.physics_step(gas, steer, brake)
+
+
+# ---------------------------------------------------------------------------
+# Geometry / rendering interface shared by all ego classes
+# ---------------------------------------------------------------------------
+def _kind(self) -> str:
+    return "agent"
+
+
+def _body(self) -> Body:
+    return Body(self.footprint, self.x_m, self.y_m, self.yaw, self.v_mps)
+
+
+def _surface_rect(self):
+    """Axis-aligned surface-px rect enclosing the ego body (route-target triggers)."""
+    return body_surface_rect(self.body(), self.units.metric)
+
+
+def _position(self):
+    """Ego reference point in surface px."""
+    return np.array([self.x, self.y], dtype=float)
+
+
+def _pose(self):
+    return np.array([self.x, self.y, self.yaw], dtype=float)
+
+
+BaseAgent.kind = property(_kind)
+BaseAgent.body = _body
+BaseAgent.surface_rect = _surface_rect
+BaseAgent.position = property(_position)
+BaseAgent.pose = property(_pose)

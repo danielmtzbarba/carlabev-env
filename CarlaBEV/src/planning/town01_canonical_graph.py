@@ -9,7 +9,7 @@ import re
 import networkx as nx
 import numpy as np
 
-from CarlaBEV.envs.geometry import RAW_METERS_PER_PIXEL, raw_to_surface
+from CarlaBEV.envs.geometry import DEFAULT_METRIC_FRAME
 from CarlaBEV.envs.utils import asset_path
 
 
@@ -1120,7 +1120,7 @@ def _apply_manual_connector_additions(graph: nx.DiGraph) -> None:
             continue
         src_pos = np.array(graph.nodes[src]["pos_raw"], dtype=float)
         dst_pos = np.array(graph.nodes[dst]["pos_raw"], dtype=float)
-        length_m = float(np.linalg.norm(dst_pos - src_pos) * RAW_METERS_PER_PIXEL)
+        length_m = float(np.linalg.norm(dst_pos - src_pos) * DEFAULT_METRIC_FRAME.raw_meters_per_pixel)
         turn_delta = _angle_delta(
             graph.nodes[dst].get("heading_rad"),
             graph.nodes[src].get("heading_rad"),
@@ -1140,7 +1140,16 @@ def build_town01_canonical_vehicle_graph(
     junction_radius_raw: float = 240.0,
     lane_change_radius_raw: float = 96.0,
     add_lane_change_edges: bool = False,
+    metric=None,
 ) -> nx.DiGraph:
+    """Build the canonical vehicle graph.
+
+    ``pos_raw`` (raw 1024-px asset frame) is the authoritative node position and
+    is what the runtime planner reads. ``pos_surface`` is a derived convenience
+    baked for the ``metric`` frame given here (default 128 px) for tools and
+    visualisation; it must not be used for simulation.
+    """
+    metric = metric if metric is not None else DEFAULT_METRIC_FRAME
     asset_dir = _town_asset_dir(town_name)
     backbone = _load_graph(asset_dir / LEGACY_BACKBONE_NAME)
     if not isinstance(backbone, nx.DiGraph):
@@ -1161,7 +1170,7 @@ def build_town01_canonical_vehicle_graph(
             else original_lane
         )
         pos_raw = _as_xy(data["pos"])
-        pos_surface = raw_to_surface(pos_raw)
+        pos_surface = metric.raw_to_surface(pos_raw)
         junction_id = _nearest_junction_id(pos_raw, anchors, radius_raw=junction_radius_raw)
         indegree = sum(1 for pred in backbone.predecessors(node_id) if backbone.nodes[pred].get("lane") in {"L", "R"})
         outdegree = sum(1 for succ in backbone.successors(node_id) if backbone.nodes[succ].get("lane") in {"L", "R"})
@@ -1172,6 +1181,7 @@ def build_town01_canonical_vehicle_graph(
             node_id=str(node_id),
             pos_raw=(float(pos_raw[0]), float(pos_raw[1])),
             pos_surface=(float(pos_surface[0]), float(pos_surface[1])),
+            pos_surface_size=int(metric.surface_size),
             heading_rad=heading,
             flow_group=_flow_group_from_lane(flow_lane),
             corridor_id=corridor_id,
@@ -1192,7 +1202,7 @@ def build_town01_canonical_vehicle_graph(
         src_pos = _as_xy(backbone.nodes[src]["pos"])
         dst_pos = _as_xy(backbone.nodes[dst]["pos"])
         dist_raw = float(np.linalg.norm(dst_pos - src_pos))
-        length_m = dist_raw * RAW_METERS_PER_PIXEL
+        length_m = dist_raw * DEFAULT_METRIC_FRAME.raw_meters_per_pixel
         src_corridor = canonical.nodes[src]["corridor_id"]
         dst_corridor = canonical.nodes[dst]["corridor_id"]
         src_junction = canonical.nodes[src]["junction_id"]
@@ -1298,7 +1308,7 @@ def _add_lane_change_edges(canonical: nx.DiGraph, *, lane_change_radius_raw: flo
             lateral = float(np.linalg.norm(dst_pos - src_pos))
             if lateral > lane_change_radius_raw:
                 continue
-            length_m = lateral * RAW_METERS_PER_PIXEL
+            length_m = lateral * DEFAULT_METRIC_FRAME.raw_meters_per_pixel
             turn_class = _turn_class_from_delta(_angle_delta(dst_heading, src_heading))
             for a, b in ((src, dst), (dst, src)):
                 if canonical.has_edge(a, b):

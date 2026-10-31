@@ -20,6 +20,7 @@ from CarlaBEV.config.reward_profiles import (
     get_reward_profile_spec,
     list_reward_profile_ids,
 )
+from CarlaBEV.envs.geometry import MetricFrame
 from CarlaBEV.envs.utils import asset_path
 from CarlaBEV.src.scenes.scenarios.specs import (
     list_scenario_ids,
@@ -27,7 +28,7 @@ from CarlaBEV.src.scenes.scenarios.specs import (
 )
 
 
-ObsMode = Literal["bev_rgb", "bev_semantic", "vector"]
+ObsMode = Literal["bev_rgb", "bev_semantic", "bev_class", "vector"]
 SemanticMaskCh = Literal["binary", "2-class", "4-class", "5-class", "6-class", "7-class"]
 TemporalFusionMode = Literal["stack", "vehicle_temporal", "vehicle_weighted"]
 ActionMode = Literal["discrete", "continuous"]
@@ -53,8 +54,21 @@ class EnvConfig(BaseModel):
     )
 
     seed: int = 0
-    fps: int = 15
+    # Wall-clock frame cap for render_mode="human". None = real time (1 / physics_dt).
+    fps: int | None = None
+    physics_dt: float = 0.1
+    action_repeat: int = 1
+    """Physics sub-steps per ``env.step()``: the action is held for ``action_repeat * physics_dt`` seconds, rewards are summed, termination latches at the first terminal sub-step and one observation is rendered at the boundary."""
+    display_fps: int | None = None
+    """Human viewer only: present interpolated frames at this wall-clock rate in real time (e.g. 30/60) instead of one frame per control step. Mutually exclusive with ``fps``."""
     size: int = 128
+    # --- Unit contract (SI). Defaults preserve the legacy runtime behaviour at size=128.
+    ego_accel_mps2: float = 4.5
+    ego_brake_decel_mps2: float = 1.5
+    speed_limit_mps: float = 35.0 / 3.6
+    proximity_radius_m: float = 35.0 * (40.0 / 128.0)
+    geometry_profile: Literal["legacy", "realistic"] = "realistic"
+    """Actor footprints: realistic oriented boxes (car 4.5 x 1.8 m, rear-axle referenced) and 0.3 m pedestrian circles (default since Phase 6), or the legacy 1.25 m axis-aligned squares."""
     env_id: str = "CarlaBEV-v0"
     map_name: str = "Town01"
     obs_size: tuple[int, int] = (96, 96)
@@ -69,12 +83,29 @@ class EnvConfig(BaseModel):
     action_mode: ActionMode = "discrete"
     action_profile_id: str | None = None
     render_mode: RenderMode = "human"
+    # --- Episode horizon. Defined in simulated seconds; resolved to steps through physics_dt.
+    max_episode_duration_s: float | None = None
+    """None = derive from the legacy ``max_actions`` step count at ``physics_dt`` (5000 x 0.1 s = 500 s)."""
+    offroad_terminate_after_s: float = 4.0
     max_actions: int = 5000
+    """Legacy horizon in steps; used only when ``max_episode_duration_s`` is None."""
     scenes_path: str = "assets/scenes"
     reward_mode: RewardMode = "carl"
     reward_profile_id: str | None = None
 
     traffic_enabled: bool = True
+    traffic_lifecycle_enabled: bool = True
+    """Recycle finished background vehicles onto new out-of-view routes to keep traffic density."""
+    traffic_respawn_margin_m: float = 10.0
+    # --- Traffic rules (Phase 4). Each switch is independent for attribution.
+    car_following: Literal["idm", "legacy"] = "idm"
+    """Background car-following: IDM on bumper-to-bumper gaps (default) or the legacy TTC table."""
+    traffic_signals_enabled: bool = True
+    """Vehicles stop at red/yellow stop lines controlling their heading (adversaries may opt out)."""
+    junction_right_of_way_enabled: bool = True
+    """Vehicles yield at junction zones to traffic inside or arriving earlier from another approach."""
+    junction_radius_m: float = 7.0
+    """Radius of the circular right-of-way zone around each canonical junction centre."""
     route_direction_metrics_enabled: bool = False
     scene_library_enabled: bool = True
     scene_library_path: str = "CarlaBEV/assets/scenes/scene_library.db"
@@ -135,6 +166,28 @@ class EnvConfig(BaseModel):
                 )
         if self.obs_size[0] < 1 or self.obs_size[1] < 1:
             raise ValueError("obs_size dimensions must be >= 1")
+        if not (0.0 < self.physics_dt <= 1.0):
+            raise ValueError("physics_dt must be a positive number of seconds <= 1.0")
+        for name in ("ego_accel_mps2", "ego_brake_decel_mps2", "speed_limit_mps", "proximity_radius_m"):
+            if not getattr(self, name) > 0.0:
+                raise ValueError(f"{name} must be > 0")
+        if self.max_episode_duration_s is not None and not self.max_episode_duration_s > 0.0:
+            raise ValueError("max_episode_duration_s must be > 0 seconds")
+        if not self.offroad_terminate_after_s > 0.0:
+            raise ValueError("offroad_terminate_after_s must be > 0 seconds")
+        if self.max_actions < 1:
+            raise ValueError("max_actions must be >= 1")
+        # The metric frame (map assets, routes, anchors) is defined for one surface scale.
+        MetricFrame.require_size(self.size)
+        if self.fps is not None and self.fps < 1:
+            raise ValueError("fps must be >= 1 or None for real-time pacing")
+        if self.action_repeat < 1:
+            raise ValueError("action_repeat must be >= 1")
+        if self.display_fps is not None:
+            if self.display_fps < 1:
+                raise ValueError("display_fps must be >= 1 or None")
+            if self.fps is not None:
+                raise ValueError("display_fps (interpolated real-time viewer) and fps (frame cap) are mutually exclusive")
         if not 0.0 <= self.ego_anchor_x_frac <= 1.0:
             raise ValueError("ego_anchor_x_frac must be within [0.0, 1.0]")
         if not 0.0 <= self.ego_anchor_y_frac <= 1.0:
@@ -240,7 +293,17 @@ def _to_env_mapping(value: Any):
     env = {key: val for key, val in raw.items() if key in {
         "seed",
         "fps",
+        "physics_dt",
+        "action_repeat",
+        "display_fps",
         "size",
+        "ego_accel_mps2",
+        "ego_brake_decel_mps2",
+        "speed_limit_mps",
+        "proximity_radius_m",
+        "max_episode_duration_s",
+        "offroad_terminate_after_s",
+        "geometry_profile",
         "env_id",
         "map_name",
         "obs_size",
@@ -254,6 +317,12 @@ def _to_env_mapping(value: Any):
         "max_actions",
         "scenes_path",
         "traffic_enabled",
+        "traffic_lifecycle_enabled",
+        "traffic_respawn_margin_m",
+        "car_following",
+        "traffic_signals_enabled",
+        "junction_right_of_way_enabled",
+        "junction_radius_m",
         "route_direction_metrics_enabled",
         "scene_library_enabled",
         "scene_library_path",
@@ -318,10 +387,10 @@ def validate_env_config(cfg: EnvConfig | dict[str, Any]) -> EnvConfig:
 
 def validate_run_config(cfg: RunConfig | dict[str, Any]) -> RunConfig:
     run_cfg = cfg if isinstance(cfg, RunConfig) else RunConfig.model_validate(_to_run_mapping(cfg))
-    if run_cfg.env.obs_mode == "vector":
+    if run_cfg.env.obs_mode in {"vector", "bev_class"}:
         raise ValueError(
-            "obs_mode='vector' is not supported through make_env()/wrap_env() yet. "
-            "Use CarlaBEV() directly if you need vector observations."
+            f"obs_mode={run_cfg.env.obs_mode!r} is not supported through make_env()/wrap_env() yet. "
+            "Use CarlaBEV() directly for vector or class-id observations."
         )
     return run_cfg
 

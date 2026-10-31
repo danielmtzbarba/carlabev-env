@@ -177,3 +177,6 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
 .codex
+
+# benchmark run outputs (committed baselines live under CarlaBEV/assets/benchmarks)
+runs/bench/

@@ -5,8 +5,8 @@ import networkx as nx
 from CarlaBEV.src.planning.map_graph import MapGraph 
 
 class GraphPlanner(MapGraph):
-    def __init__(self, graph_path) -> None:
-        MapGraph.__init__(self, graph=graph_path)
+    def __init__(self, graph_path, metric=None) -> None:
+        MapGraph.__init__(self, graph=graph_path, metric=metric)
 
     @staticmethod
     def _edge_weight(_src, _dst, attrs):

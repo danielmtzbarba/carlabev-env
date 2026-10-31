@@ -1,6 +1,6 @@
 import numpy as np
 
-from CarlaBEV.envs.geometry import distance_surface_to_meters
+from CarlaBEV.envs.geometry import DEFAULT_METRIC_FRAME, MetricFrame
 from CarlaBEV.src.control.utils import lateral_error
 from CarlaBEV.src.deeprl.reward_signals import compute_ttc
 from CarlaBEV.semantics import (
@@ -9,6 +9,16 @@ from CarlaBEV.semantics import (
     SemanticClass,
     semantic_class_from_rgb,
 )
+
+
+REWARD_REFERENCE_DT_S = 0.1
+"""Physics step the per-step reward magnitudes were tuned for.
+
+Non-terminal per-step rewards are scaled by ``dt / REWARD_REFERENCE_DT_S`` so
+that the reward accumulated per simulated second (and per control step when
+sub-steps are summed) does not depend on the physics step. Terminal rewards
+are paid once and are not scaled. At ``dt = 0.1`` the factor is exactly 1.
+"""
 
 
 class RewardFn(object):
@@ -34,14 +44,30 @@ class RewardFn(object):
         k_steer_jerk: float = 0.01,  # was 0.015 (less harsh oscillation penalty)
         # ---- route deviation shaping ----
         k_route_dev: float = 0.006,  # new: penalty based on dist2wp when far
-        route_dev_start: float = 8.0,  # start penalizing when far from route
-        # ---- limits ----
-        max_speed_for_flow: float = 6.0,
-        lat_clip: float = 4.0,
-        yaw_small: float = 0.12,
-        lat_small: float = 0.8,
+        # ---- limits (SI) ----
+        max_speed_for_flow: float = 6.0,  # m/s
+        yaw_small: float = 0.12,  # rad
+        route_dev_start_m: float = 2.5,
+        lat_clip_m: float = 1.25,
+        lat_small_m: float = 0.25,
+        out_of_bounds_m: float = 18.75,
+        # ---- legacy pixel-unit aliases (converted through the metric frame) ----
+        route_dev_start: float | None = None,
+        lat_clip: float | None = None,
+        lat_small: float | None = None,
+        metric: MetricFrame | None = None,
+        dt: float = REWARD_REFERENCE_DT_S,
     ) -> None:
         self.max_actions = max_actions
+        self.metric = metric if metric is not None else DEFAULT_METRIC_FRAME
+        self.dt = float(dt)
+        self.step_scale = self.dt / REWARD_REFERENCE_DT_S
+        if route_dev_start is not None:
+            route_dev_start_m = self.metric.distance_surface_to_meters(route_dev_start)
+        if lat_clip is not None:
+            lat_clip_m = self.metric.distance_surface_to_meters(lat_clip)
+        if lat_small is not None:
+            lat_small_m = self.metric.distance_surface_to_meters(lat_small)
 
         # store params
         self.sidewalk_step_penalty = sidewalk_step_penalty
@@ -61,16 +87,13 @@ class RewardFn(object):
         self.k_steer_jerk = k_steer_jerk
         self.k_steer_smooth = k_steer_smooth
         self.k_route_dev = k_route_dev
-        self.route_dev_start = route_dev_start
 
         self.max_speed_for_flow = max_speed_for_flow
-        self.lat_clip = lat_clip
-        self.lat_clip_m = distance_surface_to_meters(lat_clip)
         self.yaw_small = yaw_small
-        self.lat_small = lat_small
-        self.lat_small_m = distance_surface_to_meters(lat_small)
-        self.route_dev_start_m = distance_surface_to_meters(route_dev_start)
-        self.out_of_bounds_threshold_m = distance_surface_to_meters(60.0)
+        self.lat_clip_m = float(lat_clip_m)
+        self.lat_small_m = float(lat_small_m)
+        self.route_dev_start_m = float(route_dev_start_m)
+        self.out_of_bounds_threshold_m = float(out_of_bounds_m)
 
         # internal counters
         self._k = 0
@@ -118,9 +141,11 @@ class RewardFn(object):
 
             if on_sidewalk:
                 self._consecutive_offroad += 1
+                # Growth expressed in reference steps so the penalty ramp is a
+                # function of off-road *time*, not of the physics step.
                 reward += (
                     self.sidewalk_step_penalty
-                    + self.sidewalk_penalty_scale * self._consecutive_offroad
+                    + self.sidewalk_penalty_scale * self._consecutive_offroad * self.step_scale
                 )
                 offroad_mask = True
             else:
@@ -135,7 +160,7 @@ class RewardFn(object):
                 self.offroad_terminate_after
                 and self._consecutive_offroad >= self.offroad_terminate_after
             ):
-                reward -= 0.7  # slightly harsher terminal hit
+                reward = reward * self.step_scale - 0.7  # slightly harsher terminal hit
                 terminated = True
                 cause = "off_road"
             else:
@@ -143,9 +168,8 @@ class RewardFn(object):
                 shaping, shaping_details = self.non_terminal(info, offroad_mask)
                 reward += shaping
                 reward_details.update(shaping_details)
-
-            # final clip
-            reward = float(np.clip(reward, -1.0, 1.0))
+                # final clip, then scale the per-step reward to the physics step
+                reward = float(np.clip(reward, -1.0, 1.0)) * self.step_scale
 
         # finalize dict
         reward_details.update(

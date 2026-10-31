@@ -3,7 +3,6 @@ import numpy as np
 import pygame
 
 from CarlaBEV.config.reward_profiles import get_reward_profile_spec
-from CarlaBEV.envs.geometry import route_length_meters
 from CarlaBEV.envs.world import BaseMap
 from CarlaBEV.envs.spaces import decode_action, get_obs_space, get_action_space
 from CarlaBEV.envs.renderer import Renderer
@@ -17,26 +16,45 @@ from CarlaBEV.src.control.route_metrics import (
 
 
 from CarlaBEV.src.managers.scene_generator import SceneGenerator
+from CarlaBEV.src.managers.traffic_lifecycle import TrafficLifecycle
 from CarlaBEV.src.managers.scene_library import (
     SceneLibrary,
     deserialize_scene_payload,
     serialize_scene_payload,
 )
 from CarlaBEV.src.randomness import build_rng_bundle
+from CarlaBEV.src.diagnostics import profiling
+from CarlaBEV.src.sim_time import TimeConfig
+from CarlaBEV.src.units import UnitContract
 
 
-def build_reward_fn(cfg):
+def build_reward_fn(cfg, units: UnitContract | TimeConfig | None = None):
+    """Instantiate the reward function.
+
+    Time-dependent reward parameters (``dt`` and the step-resolved horizons) come
+    from the unit contract; explicit reward-profile parameters still win.
+    """
+    if isinstance(units, TimeConfig):
+        units = UnitContract(time=units)
+    units = units if units is not None else UnitContract.from_env_config(cfg)
     reward_profile_id = getattr(cfg, "reward_profile_id", None)
     reward_mode = getattr(cfg, "reward_mode", getattr(cfg, "reward_type", "shaping"))
+    carl_defaults = {"dt": units.time.physics_dt_s, "metric": units.metric}
+    shaping_defaults = {
+        "max_actions": units.max_episode_steps,
+        "offroad_terminate_after": units.offroad_terminate_after_steps,
+        "metric": units.metric,
+        "dt": units.time.physics_dt_s,
+    }
     if reward_profile_id is None:
         if reward_mode == "carl":
-            return CaRLRewardFn()
-        return RewardFn()
+            return CaRLRewardFn(**carl_defaults)
+        return RewardFn(**shaping_defaults)
 
     spec = get_reward_profile_spec(reward_profile_id)
     if spec.family == "carl":
-        return CaRLRewardFn(**spec.parameters)
-    return RewardFn(**spec.parameters)
+        return CaRLRewardFn(**{**carl_defaults, **spec.parameters})
+    return RewardFn(**{**shaping_defaults, **spec.parameters})
 
 
 class CarlaBEV(gym.Env):
@@ -44,7 +62,8 @@ class CarlaBEV(gym.Env):
         "action_space": ["discrete", "continuous"],
         "observation_space": ["bev", "vector"],
         "render_modes": ["human", "rgb_array"],
-        "render_fps": 60,
+        # Class-level default; every instance overrides this from its TimeConfig.
+        "render_fps": TimeConfig().render_fps,
     }
     termination_causes = [
         "max_actions",
@@ -57,7 +76,55 @@ class CarlaBEV(gym.Env):
     def __init__(self, config):
         self.cfg = config
         self.size = self.cfg.size
+        # Unit contract: metric frame, physics clock, ego physics, footprints, thresholds.
+        self.units = UnitContract.from_env_config(self.cfg)
+        self.time_config = self.units.time
+        # Video/recording frame rate is derived from the physics clock so that
+        # one frame per env.step() plays back in simulated real time.
+        self.metadata = {**self.metadata, "render_fps": self.time_config.render_fps}
         self._setup()
+
+    @property
+    def physics_dt_s(self) -> float:
+        """Physics integration step in simulated seconds."""
+        return self.time_config.physics_dt_s
+
+    @property
+    def action_repeat(self) -> int:
+        """Physics sub-steps per env.step()."""
+        return self.time_config.action_repeat
+
+    @property
+    def control_dt_s(self) -> float:
+        """Simulated seconds advanced by one env.step() (= action_repeat * physics_dt_s)."""
+        return self.time_config.control_dt_s
+
+    @property
+    def sim_time_s(self) -> float:
+        """Simulated time elapsed since the last reset."""
+        return self.map.clock.t_s
+
+    @property
+    def max_episode_steps(self) -> int:
+        """Horizon in steps, resolved from ``max_episode_duration_s`` through the clock."""
+        return self.units.max_episode_steps
+
+    @property
+    def max_episode_duration_s(self) -> float:
+        return self.units.horizon.max_episode_duration_s
+
+    @property
+    def episode_horizon(self) -> dict:
+        return self.units.horizon.describe(self.time_config)
+
+    @property
+    def proximity_radius_m(self) -> float:
+        """Radius within which dynamic actors are reported in info['collision']['actors_state']."""
+        return self.units.scene.proximity_radius_m
+
+    @property
+    def speed_limit_mps(self) -> float:
+        return self.units.scene.speed_limit_mps
 
     def _setup(self):
         self.obs_mode = getattr(self.cfg, "obs_mode", getattr(self.cfg, "obs_space", "bev"))
@@ -65,16 +132,27 @@ class CarlaBEV(gym.Env):
         self.reward_mode = getattr(self.cfg, "reward_mode", getattr(self.cfg, "reward_type", "shaping"))
         assert self.cfg.render_mode in self.metadata["render_modes"]
         self.render_mode = self.cfg.render_mode
-        self.renderer = Renderer(self.cfg.size, fps=self.cfg.fps)
-        assert self.obs_mode in {"bev", "bev_rgb", "bev_semantic", "vector"}
+        self.renderer = Renderer(
+            self.cfg.size,
+            fps=getattr(self.cfg, "fps", None),
+            frame_dt_s=self.time_config.control_dt_s,
+        )
+        # Optional interpolated real-time viewer (human mode only).
+        self.presenter = None
+        display_fps = getattr(self.cfg, "display_fps", None)
+        if self.render_mode == "human" and display_fps is not None:
+            from CarlaBEV.envs.presenter import Presenter
+
+            self.presenter = Presenter(display_fps=int(display_fps), control_dt_s=self.time_config.control_dt_s)
+        assert self.obs_mode in {"bev", "bev_rgb", "bev_semantic", "bev_class", "vector"}
         self.observation_space = get_obs_space(self.cfg)
         assert self.action_mode in self.metadata["action_space"]
         self.action_space, self.action_to_direction = get_action_space(self.cfg)
         self.stats = Stats()
-        self.reward_fn = build_reward_fn(self.cfg)
+        self.reward_fn = build_reward_fn(self.cfg, self.units)
 
-        self.map = BaseMap(self.cfg)
-        self.scene_generator = SceneGenerator(self.cfg)
+        self.map = BaseMap(self.cfg, units=self.units)
+        self.scene_generator = SceneGenerator(self.cfg, units=self.units)
         self.scene_library = self._build_scene_library()
         self.options = None
 
@@ -91,7 +169,7 @@ class CarlaBEV(gym.Env):
         return self.render()
 
     def _get_info(self):
-        info = {}
+        info = {"episode_horizon": self.episode_horizon}
         if hasattr(self, "_scenario_context") and self._scenario_context:
             info["scenario"] = dict(self._scenario_context)
         if hasattr(self, "_scene_descriptor") and self._scene_descriptor:
@@ -114,6 +192,10 @@ class CarlaBEV(gym.Env):
         return scene_seed, bundle
 
     def reset(self, seed=0, options=None):
+        with profiling.phase("env.reset"):
+            return self._reset(seed=seed, options=options)
+
+    def _reset(self, seed=0, options=None):
         options = {} if options is None else dict(options)
         scene_seed, rng_bundle = self._resolve_rng_bundle(seed, options)
         super().reset(seed=scene_seed)
@@ -164,10 +246,11 @@ class CarlaBEV(gym.Env):
                 "scene_key": scene_key,
             }
             for _ in range(max_reset_attempts):
-                actors, len_route = self.scene_generator.build_scene(
-                    options,
-                    rng_bundle=rng_bundle,
-                )
+                with profiling.phase("reset.scene_generation"):
+                    actors, len_route = self.scene_generator.build_scene(
+                        options,
+                        rng_bundle=rng_bundle,
+                    )
                 self._scenario_context = self._extract_scenario_context(options)
                 self._scenario_context.update(getattr(self.scene_generator, "last_scene_context", {}) or {})
                 self._scene_descriptor = self._build_scene_descriptor()
@@ -182,6 +265,7 @@ class CarlaBEV(gym.Env):
 
         self.len_ego_route = len_route
         self.num_vehicles = len(actors["vehicle"])
+        self._configure_traffic_lifecycle(options, rng_bundle)
 
         if actors and actors.get("agent") is not None:
             rx, ry = self.map.route
@@ -200,7 +284,28 @@ class CarlaBEV(gym.Env):
             info["spawn_validation"] = last_spawn_info
         return self._get_obs(), info
 
+    def _configure_traffic_lifecycle(self, options, rng_bundle):
+        """Recycle finished background traffic onto new out-of-view routes (random navigation)."""
+        enabled = bool(getattr(self.cfg, "traffic_lifecycle_enabled", True))
+        recyclable = any(getattr(v, "recyclable", False) for v in self.map.actor_manager.actors.get("vehicle", []))
+        if not enabled or not recyclable or self.map.hero is None:
+            self.map.traffic_lifecycle = None
+            return
+        fov_radius_m = self.units.metric.distance_surface_to_meters(self.map.fov_renderer.crop_size / 2.0)
+        self.map.traffic_lifecycle = TrafficLifecycle(
+            self.scene_generator.planners.all,
+            self.units,
+            seed=int(rng_bundle.traffic_seed),
+            fov_radius_m=fov_radius_m,
+            margin_m=float(getattr(self.cfg, "traffic_respawn_margin_m", 10.0)),
+            startup_sampler=self.scene_generator._sample_vehicle_startup,
+        )
+
     def _reset_map_and_validate(self, actors, rng_bundle):
+        with profiling.phase("reset.map_reset"):
+            return self._reset_map_and_validate_impl(actors, rng_bundle)
+
+    def _reset_map_and_validate_impl(self, actors, rng_bundle):
         self.map.reset(actors, hero_np_rng=rng_bundle.route_np_rng)
         if actors and actors.get("agent") is not None:
             self._maybe_attach_route_direction_metrics()
@@ -216,7 +321,7 @@ class CarlaBEV(gym.Env):
             "traffic_seed": options.get("traffic_seed", rng_bundle.traffic_seed),
             "scenario_seed": options.get("scenario_seed", rng_bundle.scenario_seed),
         }
-        return self.scene_library.build_scene_key(options, seeds)
+        return self.scene_library.build_scene_key(options, seeds, surface_size=self.units.metric.surface_size)
 
     def _load_cached_scene(self, scene_key):
         if self.scene_library is None or scene_key is None:
@@ -226,7 +331,7 @@ class CarlaBEV(gym.Env):
             return None
         self.scene_library.touch_scene(scene_key)
         return {
-            "actors": deserialize_scene_payload(record["actors_payload"], map_size=self.size),
+            "actors": deserialize_scene_payload(record["actors_payload"], map_size=self.size, units=self.units),
             "scene_descriptor": record["scene_descriptor"],
             "scenario_context": record["scenario_context"],
         }
@@ -240,18 +345,17 @@ class CarlaBEV(gym.Env):
             scene_key=scene_key,
             scene_descriptor=self._scene_descriptor,
             scenario_context=self._scenario_context,
-            actors_payload=serialize_scene_payload(actors),
+            actors_payload=serialize_scene_payload(actors, surface_size=self.units.metric.surface_size),
             spawn_validation=spawn_validation,
             resolved_options=options,
         )
 
-    @staticmethod
-    def _route_length_from_cached_actors(actors):
+    def _route_length_from_cached_actors(self, actors):
         agent = actors.get("agent")
         if agent is None:
             return 0.0
         route_x, route_y, _, _ = agent
-        return route_length_meters(route_x, route_y)
+        return self.units.metric.route_length_meters(route_x, route_y)
 
     def _maybe_attach_route_direction_metrics(self):
         if not getattr(self.cfg, "route_direction_metrics_enabled", False):
@@ -265,6 +369,7 @@ class CarlaBEV(gym.Env):
             hero.cx,
             hero.cy,
             hero.cyaw,
+            metric=self.units.metric,
         )
         self._scenario_context.update(metrics)
 
@@ -272,24 +377,43 @@ class CarlaBEV(gym.Env):
         return decode_action(self.cfg, action)
 
     def _simulate(self, action):
-        action = self._preprocess_action(action)
-        self.map.step(action)
+        """One physics sub-step with an already decoded action (no drawing)."""
+        with profiling.phase("env.simulate"):
+            self.map.advance(action)
 
     def _compute_outcome(self):
-        info = self.map.collision_check(min_dist=35)
-        reward, terminated, cause, info = self.reward_fn.step(info)
+        with profiling.phase("env.outcome"):
+            with profiling.phase("scene.collision_check"):
+                info = self.map.collision_check()
+            with profiling.phase("reward.step"):
+                reward, terminated, cause, info = self.reward_fn.step(info)
         return reward, cause, info
 
     def _check_termination(self, cause):
         if cause in self.termination_causes:
             episode_summary = self.stats.terminated()
+            episode_summary["physics_dt_s"] = self.physics_dt_s
+            episode_summary["action_repeat"] = self.action_repeat
+            episode_summary["control_dt_s"] = self.control_dt_s
+            episode_summary["physics_steps"] = int(self.map.clock.step_index)
+            episode_summary["decisions"] = int(self.map.clock.control_index)
+            episode_summary["length"] = int(self.map.clock.control_index)
+            episode_summary["episode_duration_s"] = self.sim_time_s
+            episode_summary["max_episode_duration_s"] = self.max_episode_duration_s
+            episode_summary["max_episode_steps"] = self.max_episode_steps
+            lifecycle = getattr(self.map, "traffic_lifecycle", None)
+            episode_summary["traffic_lifecycle"] = lifecycle.stats.to_dict() if lifecycle is not None else None
             episode_summary["num_vehicles"] = self.num_vehicles
+            episode_summary["red_light_violations"] = int(getattr(self.map, "red_light_violations", 0))
             episode_summary["len_ego_route"] = self.len_ego_route
             if getattr(self, "_scenario_context", None):
                 episode_summary.update(self._scenario_context)
             if getattr(self, "_scene_descriptor", None):
                 episode_summary["scene_descriptor"] = dict(self._scene_descriptor)
-            return True, (cause == "max_actions"), {"episode_info": episode_summary}
+            # Gymnasium semantics: a horizon expiry is a truncation (the state is not
+            # terminal and value bootstrapping remains valid); physical outcomes terminate.
+            truncated = cause == "max_actions"
+            return (not truncated), truncated, {"episode_info": episode_summary}
         return False, False, {}
 
     def _extract_scenario_context(self, options):
@@ -376,20 +500,61 @@ class CarlaBEV(gym.Env):
                 descriptor[target_key] = context[source_key]
         return descriptor
 
+    def _apply_episode_horizon(self, cause):
+        """Truncate once the simulated-time horizon is reached (authoritative for every reward)."""
+        if cause in self.termination_causes:
+            return cause
+        if self.map.step_index >= self.max_episode_steps:
+            return "max_actions"
+        return cause
+
     def step(self, action):
-        self._simulate(action)
-        reward, cause, info = self._compute_outcome()
-        self.stats.step(info)
-        terminated, truncated, info_out = self._check_termination(cause)
-        self.current_info = info
-        info["episode_info"] = {} if not terminated else info_out["episode_info"]
-        self._current_step += 1
-        return self._get_obs(), reward, terminated, truncated, info_out
+        """One control step: hold the action over ``action_repeat`` physics sub-steps.
+
+        Rewards are summed over the sub-steps, the first terminal cause ends
+        the control step early, and one observation is rendered from the
+        boundary state. With ``action_repeat = 1`` this is exactly one physics
+        step (legacy behaviour, bit-identical).
+        """
+        with profiling.phase("env.step"):
+            decoded = self._preprocess_action(action)
+            self.map.clock.begin_control_step()
+            total_reward = 0.0
+            sub_rewards = []
+            cause, info = None, {}
+            snapshots = [self.map.snapshot()] if self.presenter is not None else None
+            for _ in range(self.action_repeat):
+                self._simulate(decoded)
+                if snapshots is not None:
+                    snapshots.append(self.map.snapshot())
+                reward, cause, info = self._compute_outcome()
+                cause = self._apply_episode_horizon(cause)
+                info.setdefault("reward", {})["cause"] = cause
+                total_reward += float(reward)
+                sub_rewards.append(float(reward))
+                with profiling.phase("env.stats"):
+                    self.stats.step(info)
+                if cause in self.termination_causes:
+                    break
+            info["reward"]["control_reward"] = total_reward
+            info["reward"]["substep_rewards"] = sub_rewards
+            terminated, truncated, info_out = self._check_termination(cause)
+            self.current_info = info
+            info["episode_info"] = info_out["episode_info"] if (terminated or truncated) else {}
+            self._current_step += 1
+            with profiling.phase("env.render"):
+                self.map.render_world()
+                obs = self._get_obs()
+            if self.presenter is not None:
+                with profiling.phase("renderer.human"):
+                    self.presenter.present(self.map, snapshots)
+        return obs, total_reward, terminated, truncated, info_out
 
     def render(self):
-        self._observation = np.transpose(
-            np.array(pygame.surfarray.pixels3d(self.map.canvas)), axes=(1, 0, 2)
-        )
+        if self.obs_mode == "bev_class":
+            self._observation = self.map.observation_ids()
+        else:
+            self._observation = self.map.observation_rgb()
         if self.obs_mode == "vector":
             if self.map.hero is not None:
                 hero = self.map.hero.state_m
@@ -399,13 +564,20 @@ class CarlaBEV(gym.Env):
             else:
                 self._observation = np.zeros(7, dtype=np.float32)
 
-        if self.render_mode == "human":
-            self.renderer.render(self.map.canvas)
+        if self.render_mode == "human" and self.presenter is None:
+            with profiling.phase("renderer.human"):
+                self.renderer.render(self.map.canvas)
 
         return self._observation
 
+    @property
+    def semantic_ids(self) -> np.ndarray:
+        """(size, size) uint8 class ids of the current observation (authoritative semantics)."""
+        return self.map.observation_ids()
+
     def close(self):
-        if self.renderer.window is not None:
+        presenter_open = self.presenter is not None and self.presenter.renderer.window is not None
+        if self.renderer.window is not None or presenter_open:
             pygame.display.quit()
             pygame.quit()
 

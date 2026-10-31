@@ -18,10 +18,26 @@ def _extract_actor_metric_state(actor):
     return actor["pos"], actor["vel"]
 
 
+def _shape_ttc(actors_state):
+    """Minimum shape-based TTC reported by the collision system, or None if unavailable."""
+    values = [a["ttc_s"] for a in actors_state if isinstance(a, dict) and a.get("ttc_s") is not None]
+    if not values:
+        return None
+    return min(values)
+
+
 def compute_ttc(hero_state, actors_state, ttc_threshold=8.0):
     """
     Compute minimum Time-To-Collision across all actors.
+
+    Uses the collision system's shape TTC (time until footprints overlap) when
+    present in ``actors_state``; falls back to the point-mass line-of-sight TTC.
     """
+    shape_ttc = _shape_ttc(actors_state)
+    if shape_ttc is not None:
+        if np.isfinite(shape_ttc):
+            return -np.exp(-shape_ttc / ttc_threshold)
+        return 0.0
     hx, hy, hyaw, hv = hero_state
     hvx = hv * np.cos(hyaw)
     hvy = hv * np.sin(hyaw)
@@ -48,11 +64,18 @@ def compute_ttc(hero_state, actors_state, ttc_threshold=8.0):
 
 
 # CaRL
-def compute_ttc_raw(hero_state, actors_state, dt=0.1):
+def compute_ttc_raw(hero_state, actors_state):
     """
     Raw Time-To-Collision (TTC) in seconds using CaRL logic.
     No shaping. Returns min TTC across all actors.
+
+    Prefers the collision system's shape TTC (footprint overlap under constant
+    velocity) when present; otherwise a point-mass line-of-sight projection.
+    TTC is independent of the physics step, so no ``dt`` is involved.
     """
+    shape_ttc = _shape_ttc(actors_state)
+    if shape_ttc is not None:
+        return shape_ttc
 
     hx_m, hy_m, hyaw, hv_m = hero_state
     hvx_m = hv_m * np.cos(hyaw)
@@ -83,13 +106,13 @@ def compute_ttc_raw(hero_state, actors_state, dt=0.1):
     return min_ttc
 
 
-def carl_ttc_penalty(hero_state, actors_state, threshold=1.0, dt=0.1):
+def carl_ttc_penalty(hero_state, actors_state, threshold=1.0):
     """
     CaRL soft TTC penalty:
         p_ttc = 1.0 (safe)
         p_ttc = 0.5 (TTC < threshold)
     """
-    ttc = compute_ttc_raw(hero_state, actors_state, dt=dt)
+    ttc = compute_ttc_raw(hero_state, actors_state)
 
     if ttc < threshold:
         return 0.5, ttc  # TTC violation

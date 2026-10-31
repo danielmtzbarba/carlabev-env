@@ -1,5 +1,6 @@
 from CarlaBEV.src.actors.actor import Actor
-from CarlaBEV.semantics import SemanticClass, semantic_color_tuple
+from CarlaBEV.semantics import SemanticClass
+from CarlaBEV.src.units import DEFAULT_UNIT_CONTRACT
 
 
 class Vehicle(Actor):
@@ -15,19 +16,36 @@ class Vehicle(Actor):
         behavior=None,
         target_speed=12.0,
         np_rng=None,
+        units=None,
+        vehicle_class="car",
     ):
+        units = units if units is not None else DEFAULT_UNIT_CONTRACT
+        self.vehicle_class = str(vehicle_class)
         self._map_size = map_size
-        self._color = semantic_color_tuple(SemanticClass.VEHICLE)
-        self._scale = int(1024 / self._map_size)
         super().__init__(
             start_node,
             end_node,
             id=0,
-            actor_size=int(32 / self._scale),
+            actor_size=units.px_int(units.footprints.vehicle_length_m),
             routeX=routeX,
             routeY=routeY,
             behavior=behavior,
             np_rng=np_rng,
         )
+        self.set_units(units)
         self.set_cruise_speed_mps(target_speed)
         self.traffic_role = "unassigned"
+
+    @property
+    def semantic_class(self) -> SemanticClass:
+        return SemanticClass.VEHICLE
+
+    @property
+    def kind(self) -> str:
+        return "vehicle"
+
+    def _apply_footprint(self):
+        self.footprint = self.units.footprints.vehicle_footprint(getattr(self, "vehicle_class", "car"))
+        self.length_m = self.footprint.length_m
+        self.width_m = self.footprint.width_m
+        self.size = self.units.px_int(self.length_m)

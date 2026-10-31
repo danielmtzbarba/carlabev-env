@@ -87,6 +87,9 @@ def configure_logging():
     )
 
 
+# Authored-scene fields of the Phase 4 traffic rules (see docs/traffic_rules_and_behaviors.md).
+RULE_FIELDS = ("controls_heading", "cycle", "obeys_signals", "yields_at_junctions")
+
 class SceneDesigner(GUI):
     ACTOR_DEFAULT_SPEEDS = {
         "agent": 12.0,
@@ -588,6 +591,8 @@ class SceneDesigner(GUI):
                         } if isinstance(actor_data.get("behavior"), str) else actor_data.get("behavior"),
                     ),
                     "variation": actor_data.get("variation"),
+                    # Phase 4 traffic-rule fields pass through untouched.
+                    **{k: actor_data[k] for k in RULE_FIELDS if k in actor_data},
                 })
             )
         self.designed_actors = actors
@@ -802,6 +807,7 @@ class SceneDesigner(GUI):
                             "variation",
                             self._default_actor_variation(actor["type"], actor.get("behavior")),
                         ),
+                        **{k: actor[k] for k in RULE_FIELDS if k in actor},
                     }
                 )
             config = {
@@ -947,11 +953,11 @@ def main():
                 action = randint(0, 8)
 
                 # Step through the environment
-                observation, reward, terminated, _, info = env.step(action)
+                observation, reward, terminated, truncated, info = env.step(action)
                 total_reward += reward
 
                 # Reset if episode ends
-                if terminated:
+                if terminated or truncated:
                     episode_info = info.get("episode_info", {})
                     ret = episode_info.get("return", total_reward)
                     length = episode_info.get("length", 0)

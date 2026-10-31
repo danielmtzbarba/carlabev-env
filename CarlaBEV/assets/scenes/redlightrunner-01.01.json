@@ -157,7 +157,8 @@
             "variation": {
                 "enabled": false,
                 "seed_offset": 300
-            }
+            },
+            "controls_heading": "east"
         },
         {
             "type": "traffic_light",
@@ -201,7 +202,8 @@
             "variation": {
                 "enabled": false,
                 "seed_offset": 300
-            }
+            },
+            "controls_heading": "north"
         },
         {
             "type": "vehicle",
@@ -364,7 +366,9 @@
                 "constraints": {
                     "lock_endpoints": true
                 }
-            }
+            },
+            "obeys_signals": false,
+            "yields_at_junctions": false
         }
     ],
     "variation": {

@@ -252,6 +252,15 @@ def smooth_and_compute(ax, ay, window=9, poly=3):
     dx_ds = np.gradient(cx, s)
     dy_ds = np.gradient(cy, s)
 
+    # The unit-tangent components are O(1); residues far below that are
+    # Savitzky-Golay / BLAS rounding noise whose *sign* is platform dependent
+    # (e.g. +-1e-13 on an axis-aligned route). Snap them to +0.0 so that the
+    # heading of a straight route is deterministic (arctan2(+0.0, -1) = +pi)
+    # instead of flipping between +pi and -pi across machines.
+    tangent_eps = 1e-9
+    dx_ds = np.where(np.abs(dx_ds) < tangent_eps, 0.0, dx_ds)
+    dy_ds = np.where(np.abs(dy_ds) < tangent_eps, 0.0, dy_ds)
+
     # yaw is tangent direction
     cyaw = np.unwrap(np.arctan2(dy_ds, dx_ds))
 

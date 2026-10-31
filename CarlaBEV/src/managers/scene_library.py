@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,8 +42,10 @@ def _normalize_jsonable(value: Any) -> Any:
     return value
 
 
-def serialize_scene_payload(actors: dict[str, Any]) -> dict[str, Any]:
+def serialize_scene_payload(actors: dict[str, Any], *, surface_size: int | None = None) -> dict[str, Any]:
+    """Serialize scene actors. Coordinates are surface px of ``surface_size`` (recorded in the payload)."""
     payload: dict[str, Any] = {
+        "frame": {"kind": "surface", "size": int(surface_size) if surface_size is not None else 128},
         "agent": None,
         "vehicle": [],
         "pedestrian": [],
@@ -75,13 +76,25 @@ def serialize_scene_payload(actors: dict[str, Any]) -> dict[str, Any]:
                     "initial_speed_mps": float(getattr(actor, "initial_speed_mps", 0.0) or 0.0),
                     "cruise_speed_mps": float(getattr(actor, "cruise_speed_mps", 0.0) or 0.0),
                     "startup_ramp_duration_s": float(getattr(actor, "startup_ramp_duration_s", 0.0) or 0.0),
+                    "recyclable": bool(getattr(actor, "recyclable", False)),
+                    "lane": getattr(actor, "lane", None),
                 }
             )
         payload[key] = serialized
     return payload
 
 
-def deserialize_scene_payload(payload: dict[str, Any], *, map_size: int) -> dict[str, Any]:
+def deserialize_scene_payload(payload: dict[str, Any], *, map_size: int, units=None) -> dict[str, Any]:
+    """Rebuild scene actors from a payload expressed at ``map_size`` surface px.
+
+    A payload recorded at a different surface scale is a contract violation
+    (the cache key includes the surface size), so it is rejected explicitly.
+    """
+    payload_size = int((payload.get("frame") or {}).get("size", 128))
+    if payload_size != int(map_size):
+        raise ValueError(
+            f"Scene payload recorded at surface size {payload_size} cannot be loaded at size {map_size}."
+        )
     actors = {
         "agent": None,
         "vehicle": [],
@@ -105,6 +118,7 @@ def deserialize_scene_payload(payload: dict[str, Any], *, map_size: int) -> dict
                 routeX=[float(x) for x in actor_payload["route_x"]],
                 routeY=[float(y) for y in actor_payload["route_y"]],
                 target_speed=float(actor_payload.get("cruise_speed_mps", 0.0)),
+                units=units,
             )
             actor.traffic_role = str(actor_payload.get("traffic_role", "unassigned"))
             actor.speed_class = str(actor_payload.get("speed_class", "medium"))
@@ -112,6 +126,8 @@ def deserialize_scene_payload(payload: dict[str, Any], *, map_size: int) -> dict
             actor.speed_jitter = float(actor_payload.get("speed_jitter", 1.0))
             actor.set_initial_speed_mps(float(actor_payload.get("initial_speed_mps", 0.0)))
             actor.set_startup_ramp_duration(float(actor_payload.get("startup_ramp_duration_s", 0.0)))
+            actor.recyclable = bool(actor_payload.get("recyclable", actor.traffic_role not in {"unassigned"}))
+            actor.lane = actor_payload.get("lane")
             actors[key].append(actor)
     return actors
 
@@ -208,9 +224,13 @@ class SceneLibrary:
                 "CREATE INDEX IF NOT EXISTS idx_scenes_role_route ON scenes(main_actor_role, route_profile)"
             )
 
-    def build_scene_key(self, resolved_options: dict[str, Any], seeds: dict[str, Any]) -> str:
+    def build_scene_key(
+        self, resolved_options: dict[str, Any], seeds: dict[str, Any], *, surface_size: int | None = None
+    ) -> str:
         payload = {
             "generator_version": self.generator_version,
+            # Cached coordinates are surface px: scenes are only valid at their own scale.
+            "surface_size": int(surface_size) if surface_size is not None else 128,
             "options": _normalize_jsonable(
                 {
                     key: value

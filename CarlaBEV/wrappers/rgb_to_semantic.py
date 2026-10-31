@@ -1,7 +1,7 @@
 import gymnasium as gym
 import numpy as np
 
-from CarlaBEV.semantics import SemanticClass, semantic_color_array
+from CarlaBEV.semantics import ids_to_rgb, SemanticClass, semantic_color_array
 
 SEMANTIC_MASK_CHANNELS = {
     "binary": ("drivable",),
@@ -62,12 +62,20 @@ def vehicle_channel_index(mode: str) -> int:
         ) from exc
 
 
+def ids_to_semantic_mask(ids, mode="6-class"):
+    """Build the semantic channel layout directly from an (H, W) class-id raster."""
+    return rgb_to_semantic_mask(ids_to_rgb(ids), mode=mode)
+
+
 def rgb_to_semantic_mask(rgb_image, mode="6-class"):
     """
     Convert an RGB frame into one of the supported semantic channel layouts.
 
+    Accepts an (H, W, 3) RGB image or an (H, W) class-id raster (converted
+    through the palette).
+
     Args:
-        rgb_image (np.ndarray): (H, W, 3) RGB image.
+        rgb_image (np.ndarray): (H, W, 3) RGB image or (H, W) class ids.
         mode (str): semantic channel layout to emit.
 
     Returns:
@@ -75,7 +83,10 @@ def rgb_to_semantic_mask(rgb_image, mode="6-class"):
     """
     semantic_mask_channels(mode)
 
-    rgb = rgb_image.astype(np.uint8)
+    rgb = np.asarray(rgb_image)
+    if rgb.ndim == 2:
+        rgb = ids_to_rgb(rgb)
+    rgb = rgb.astype(np.uint8)
     h, w, _ = rgb.shape
 
     white = semantic_color_array(SemanticClass.DRIVABLE)

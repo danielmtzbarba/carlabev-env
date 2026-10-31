@@ -5,7 +5,7 @@ import math
 
 import numpy as np
 
-from CarlaBEV.envs.geometry import distance_surface_to_meters
+from CarlaBEV.src.units import DEFAULT_UNIT_CONTRACT
 from CarlaBEV.src.scenes.utils import Node, get_random_node, find_route, find_route_in_range
 from CarlaBEV.src.actors.vehicle import Vehicle
 from CarlaBEV.src.planning.graph_planner import GraphPlanner
@@ -23,16 +23,19 @@ from CarlaBEV.src.scenes.scenarios.specs import (
 class PlannerManager:
     """Centralized manager for map-specific route planners."""
 
-    def __init__(self, town_name: str = "Town01"):
+    def __init__(self, town_name: str = "Town01", metric=None):
         self.town_name = town_name
+        # Graph assets are stored in the raw frame; ``metric`` maps them to the
+        # active surface scale.
+        self.metric = metric if metric is not None else DEFAULT_UNIT_CONTRACT.metric
         base_path = os.path.join(asset_path, town_name)
         planner_prefix = town_name.lower()
         canonical_vehicle_path = os.path.join(base_path, f"{planner_prefix}-canonical-vehicle.pkl")
-        canonical_vehicle_planner = GraphPlanner(canonical_vehicle_path)
+        canonical_vehicle_planner = GraphPlanner(canonical_vehicle_path, metric=self.metric)
 
         # --- Load all graph planners ---
         self.graphs = {
-            "pedestrian": GraphPlanner(os.path.join(base_path, f"{planner_prefix}.pkl")),
+            "pedestrian": GraphPlanner(os.path.join(base_path, f"{planner_prefix}.pkl"), metric=self.metric),
             "vehicle-full": canonical_vehicle_planner,
             "vehicle": canonical_vehicle_planner,
             "vehicle-R": canonical_vehicle_planner,
@@ -69,21 +72,24 @@ class SceneGenerator:
     }
     NEAR_EGO_ROLE_NAMES = {"lead", "rear", "cross_path", "opposite_lane"}
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, units=None):
         if hasattr(config, "model_dump"):
             self.cfg = config.model_dump(mode="python")
         else:
             self.cfg = getattr(config, "__dict__", {}) or {}
-        self.size = self.cfg.get("map_size", 128)
+        # Unit contract: the surface scale (and every conversion) comes from here.
+        self.units = units if units is not None else DEFAULT_UNIT_CONTRACT
+        self.metric = self.units.metric
+        self.size = self.metric.surface_size
         self.map_name = self.cfg.get("map_name", "Town01")
         self.traffic_enabled = self.cfg.get("traffic_enabled", True)
-        self.planners = PlannerManager(self.map_name)
-    
+        self.planners = PlannerManager(self.map_name, metric=self.metric)
+
         self.scenarios = {
-            "lead_brake": LeadBrakeScenario(map_size=128),
-            "jaywalk": JaywalkScenario(map_size=128),
+            "lead_brake": LeadBrakeScenario(map_size=self.size, units=self.units),
+            "jaywalk": JaywalkScenario(map_size=self.size, units=self.units),
             "red_light_runner": RedLightRunningScenario(
-                map_size=128, map_name=self.map_name
+                map_size=self.size, map_name=self.map_name, units=self.units
             ),
         }
         self.last_scene_context = {}
@@ -130,8 +136,7 @@ class SceneGenerator:
         tangent = points[next_idx] - points[prev_idx]
         return cls._normalize(tangent)
 
-    @classmethod
-    def _project_point_to_route(cls, point, route_points):
+    def _project_point_to_route(self, point, route_points):
         if len(route_points) < 2:
             return None
         best = None
@@ -150,22 +155,21 @@ class SceneGenerator:
             if best is None or dist_surface < best["dist_surface"]:
                 best = {
                     "dist_surface": dist_surface,
-                    "dist_m": distance_surface_to_meters(dist_surface),
+                    "dist_m": self.metric.distance_surface_to_meters(dist_surface),
                     "progress_surface": progress_surface,
-                    "progress_m": distance_surface_to_meters(progress_surface),
+                    "progress_m": self.metric.distance_surface_to_meters(progress_surface),
                     "tangent": tangent,
                     "projection": proj,
                 }
             cumulative_surface += seg_len
         return best
 
-    @classmethod
-    def _summarize_candidate_route(cls, ego_points, candidate_points):
+    def _summarize_candidate_route(self, ego_points, candidate_points):
         if len(ego_points) < 2 or len(candidate_points) < 2:
             return None
 
         ego_start = ego_points[0]
-        ego_heading = cls._route_tangent_at(ego_points, 0)
+        ego_heading = self._route_tangent_at(ego_points, 0)
         if ego_heading is None:
             return None
 
@@ -175,21 +179,21 @@ class SceneGenerator:
         opposite_progress_m = None
         cross_progress_m = None
         rear_longitudinal_m = float(np.dot(candidate_points[0] - ego_start, ego_heading))
-        start_proj = cls._project_point_to_route(candidate_points[0], ego_points)
+        start_proj = self._project_point_to_route(candidate_points[0], ego_points)
         start_dot = None
         if start_proj is not None:
-            candidate_heading = cls._route_tangent_at(candidate_points, 0)
+            candidate_heading = self._route_tangent_at(candidate_points, 0)
             if candidate_heading is not None:
                 start_dot = float(np.dot(candidate_heading, start_proj["tangent"]))
 
         for idx, point in enumerate(candidate_points):
-            projection = cls._project_point_to_route(point, ego_points)
+            projection = self._project_point_to_route(point, ego_points)
             if projection is None:
                 continue
             min_dist_m = min(min_dist_m, projection["dist_m"])
             if projection["dist_m"] <= min_dist_m + 1e-9:
                 min_dist_progress_m = projection["progress_m"]
-            candidate_tangent = cls._route_tangent_at(candidate_points, idx)
+            candidate_tangent = self._route_tangent_at(candidate_points, idx)
             if candidate_tangent is None:
                 continue
             heading_dot = float(np.dot(candidate_tangent, projection["tangent"]))
@@ -218,9 +222,8 @@ class SceneGenerator:
             "start_dot": start_dot,
         }
 
-    @classmethod
-    def _route_matches_role(cls, role, ego_points, candidate_points):
-        features = cls._summarize_candidate_route(ego_points, candidate_points)
+    def _route_matches_role(self, role, ego_points, candidate_points):
+        features = self._summarize_candidate_route(ego_points, candidate_points)
         if features is None:
             return False
         if role == "lead":
@@ -278,7 +281,7 @@ class SceneGenerator:
                 if lane in {"L", "R"} and dist_m <= 6.0 and 8.0 <= progress_m <= 35.0:
                     node_ids.append(node_id)
             elif role == "rear":
-                longitudinal_m = distance_surface_to_meters(
+                longitudinal_m = self.metric.distance_surface_to_meters(
                     float(np.dot(planner.get_node_pos_surface(node_id) - ego_points[0], self._route_tangent_at(ego_points, 0)))
                 )
                 if lane in {"L", "R"} and dist_m <= 6.0 and -25.0 <= longitudinal_m <= -5.0:
@@ -309,9 +312,10 @@ class SceneGenerator:
             veh = Vehicle(
                 start_node=start_node,
                 end_node=end_node,
-                map_size=128,
+                map_size=self.size,
                 target_speed=target_speed_mps,
                 np_rng=np_rng,
+                units=self.units,
             )
             veh.speed_class = str(speed_profile.get("speed_class", "medium"))
             veh.speed_multiplier = float(speed_profile.get("speed_multiplier", 1.0))
@@ -387,6 +391,8 @@ class SceneGenerator:
             candidate_points = self._route_points(veh.rx, veh.ry)
             if self._route_matches_role(role, ego_points, candidate_points):
                 veh.traffic_role = role
+                veh.recyclable = True
+                veh.lane = lane
                 return veh, path, speed_profile
         return None, None, None
 
@@ -746,9 +752,12 @@ class SceneGenerator:
                     speed_profile=speed_profile,
                     rng=traffic_rng,
                     np_rng=traffic_np_rng,
+                    units=self.units,
                 )
                 if veh is not None:
                     veh.traffic_role = "background"
+                    veh.recyclable = True
+                    veh.lane = lane
                     actors["vehicle"].append(veh)
                     sampled_vehicle_speeds.append(float(veh.cruise_speed_mps))
                     sampled_vehicle_speed_classes[veh.speed_class] += 1
@@ -823,16 +832,19 @@ def get_actor(
     speed_profile=None,
     rng=None,
     np_rng=None,
+    units=None,
 ):
+    units = units if units is not None else DEFAULT_UNIT_CONTRACT
     try:
         n1 = get_random_node(planners, actor_type, lane, rng=rng)
         n2 = get_random_node(planners, actor_type, lane, rng=rng)
         veh = Vehicle(
             start_node=n1,
             end_node=n2,
-            map_size=128,
+            map_size=units.metric.surface_size,
             target_speed=target_speed_mps,
             np_rng=np_rng,
+            units=units,
         )
         if speed_profile:
             veh.speed_class = str(speed_profile.get("speed_class", "medium"))

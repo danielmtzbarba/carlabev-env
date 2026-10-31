@@ -5,6 +5,8 @@ import math
 
 import pygame
 
+from CarlaBEV.semantics import VOID_ID, SemanticClass
+
 
 @dataclass(frozen=True)
 class FovRenderSpec:
@@ -16,7 +18,12 @@ class FovRenderSpec:
 
 
 class FovRenderer:
-    """Build the BEV observation image from a world-aligned scene surface."""
+    """Build the BEV observation (class-id raster) from the world-aligned id surface.
+
+    The pipeline is crop → rotate (nearest neighbour, VOID fill) → compose →
+    mask → ego overlay. All surfaces are 8-bit palettized class ids; RGB is a
+    palette lookup performed by the consumer.
+    """
 
     def __init__(self, spec: FovRenderSpec):
         self.spec = spec
@@ -25,7 +32,9 @@ class FovRenderer:
         self.anchor_px = self._compute_anchor_px()
         self.crop_size = self._compute_crop_size()
         self.crop_resolution = (self.crop_size, self.crop_size)
-        self._mask_surface = self._build_mask_surface() if spec.mask_fov else None
+        self._mask_polygons = self._build_mask_polygons() if spec.mask_fov else None
+        self.ego_overlay_rect: pygame.Rect | None = None
+        self._output: pygame.Surface | None = None  # preallocated class-id output surface
 
     def _compute_anchor_px(self) -> tuple[int, int]:
         max_idx = self.output_size - 1
@@ -43,29 +52,15 @@ class FovRenderer:
         crop_size = int(math.ceil(2.0 * radius))
         return max(self.output_size, crop_size)
 
-    def _build_mask_surface(self) -> pygame.Surface:
-        surface = pygame.Surface(self.output_resolution)
-        surface.fill((0, 0, 0))
+    def _build_mask_polygons(self):
         m = int(self.output_size * self.spec.mask_frac)
-        transparent = (0, 0, 0, 0)
-        opaque = (0, 0, 0, 255)
-
-        mask = pygame.Surface(self.output_resolution, flags=pygame.SRCALPHA)
-        mask.fill(transparent)
-
-        cutouts = (
+        n = self.output_size
+        return (
             [(0, 0), (m, 0), (0, m)],
-            [(self.output_size, 0), (self.output_size - m, 0), (self.output_size, m)],
-            [(0, self.output_size), (0, self.output_size - m), (m, self.output_size)],
-            [
-                (self.output_size, self.output_size),
-                (self.output_size - m, self.output_size),
-                (self.output_size, self.output_size - m),
-            ],
+            [(n, 0), (n - m, 0), (n, m)],
+            [(0, n), (0, n - m), (m, n)],
+            [(n, n), (n - m, n), (n, n - m)],
         )
-        for points in cutouts:
-            pygame.draw.polygon(mask, opaque, points)
-        return mask
 
     def compute_crop_rect(self, crop_center: tuple[float, float], scene_size: tuple[int, int]) -> pygame.Rect:
         center_x = int(round(crop_center[0]))
@@ -79,7 +74,11 @@ class FovRenderer:
         return pygame.Rect(xmin, ymin, self.crop_size, self.crop_size)
 
     def extract_crop(self, scene_surface: pygame.Surface, crop_rect: pygame.Rect) -> pygame.Surface:
-        return scene_surface.subsurface(crop_rect)
+        crop = scene_surface.subsurface(crop_rect)
+        # rotate() fills the uncovered corners with the colorkey: make that VOID.
+        # (The colorkey lives on the subsurface object; the parent is unaffected.)
+        crop.set_colorkey(VOID_ID)
+        return crop
 
     def rotate_crop(self, crop_surface: pygame.Surface, yaw_rad: float) -> tuple[pygame.Surface, pygame.Rect]:
         angle = math.degrees(yaw_rad) + 90
@@ -88,13 +87,27 @@ class FovRenderer:
         return rotated, rect
 
     def compose_output(self, rotated_surface: pygame.Surface, rotated_rect: pygame.Rect) -> pygame.Surface:
-        output = pygame.Surface(self.output_resolution)
-        output.fill((0, 0, 0))
+        if self._output is None:
+            from CarlaBEV.envs.world_renderer import new_id_surface
+
+            self._output = new_id_surface(self.output_resolution, VOID_ID)
+        output = self._output
+        output.fill(VOID_ID)
+        rotated_surface.set_colorkey(None)
         output.blit(rotated_surface, rotated_rect)
         return output
 
     def apply_mask(self, output_surface: pygame.Surface) -> pygame.Surface:
-        if self._mask_surface is not None:
-            output_surface.blit(self._mask_surface, (0, 0))
+        if self._mask_polygons is not None:
+            for points in self._mask_polygons:
+                pygame.draw.polygon(output_surface, VOID_ID, points)
         return output_surface
+
+    def draw_ego_overlay(self, output_surface: pygame.Surface, *, width_px: int, length_px: int, center_offset_px: float = 0.0) -> pygame.Rect:
+        """Draw the ego footprint upright at the anchor (reference point on the anchor, body extending up)."""
+        rect = pygame.Rect(0, 0, max(1, int(width_px)), max(1, int(length_px)))
+        ax, ay = self.anchor_px
+        rect.center = (int(round(ax)), int(round(ay - center_offset_px)))
+        self.ego_overlay_rect = pygame.draw.rect(output_surface, int(SemanticClass.EGO), rect)
+        return self.ego_overlay_rect
 

@@ -2,16 +2,20 @@ import numpy as np
 import networkx as nx
 import pickle
 
-from CarlaBEV.envs.geometry import raw_to_meters, raw_to_surface
+from CarlaBEV.envs.geometry import DEFAULT_METRIC_FRAME, MetricFrame
 
 
 class MapGraph(object):
-    def __init__(self, graph):
+    def __init__(self, graph, metric: MetricFrame | None = None):
+        # Node positions are stored in the raw (1024 px) asset frame; the metric
+        # frame converts them to the active surface scale and to meters.
+        self.metric = metric if metric is not None else DEFAULT_METRIC_FRAME
         self._load_graph(graph)
         self.get_lane_nodes()
 
     @staticmethod
     def _node_pos(data):
+        """Raw-frame node position. ``pos_surface`` (if present) is a baked convenience and is ignored."""
         if "pos_raw" in data:
             return np.array(data["pos_raw"], dtype=np.float32)
         return np.array(data["pos"], dtype=np.float32)
@@ -76,10 +80,10 @@ class MapGraph(object):
         return self._node_pos(self._G.nodes[node_id])
 
     def get_node_pos_surface(self, node_id):
-        return raw_to_surface(self.get_node_pos(node_id))
+        return self.metric.raw_to_surface(self.get_node_pos(node_id))
 
     def get_node_pos_meters(self, node_id):
-        return raw_to_meters(self.get_node_pos(node_id))
+        return self.metric.raw_to_meters(self.get_node_pos(node_id))
 
     def get_closest_node(self, position, lane_type=None):
         """

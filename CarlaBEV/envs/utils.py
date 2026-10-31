@@ -3,6 +3,7 @@ import pygame
 import numpy as np
 from PIL import Image
 
+from CarlaBEV.envs.geometry import DEFAULT_METRIC_FRAME
 from CarlaBEV.semantics import MAP_LABEL_TO_CLASS, semantic_color_array
 
 # Dynamically resolve asset path relative to this file's location (CarlaBEV/envs/utils.py -> CarlaBEV/assets)
@@ -46,10 +47,16 @@ def map_to_rgb(image):
     return rgb_image
 
 
-def load_map(map_name, size):
+def load_map(map_name, size, metric=None, *, return_labels=False):
+    """Load the semantic/rgb rasters at ``size`` and the planning raster at the surface scale.
+
+    Returns ``(semantic_rgb, rgb_surface, planning_map)`` and, with
+    ``return_labels=True``, additionally the raw semantic label array (0/127/255).
+    """
+    metric = metric if metric is not None else DEFAULT_METRIC_FRAME
     map_path = os.path.join(asset_path, map_name, f"{map_name}-{size}-sem.png")
-    arr = np.array(Image.open(map_path))
-    arr = map_to_rgb(arr)
+    labels = np.array(Image.open(map_path))
+    arr = map_to_rgb(labels)
     #    rgb_surface = pygame.surfarray.make_surface(arr)
     map_path = os.path.join(asset_path, map_name, f"{map_name}-{size}-rgb.png")
     map_img = pygame.image.load(map_path)
@@ -58,7 +65,10 @@ def load_map(map_name, size):
     map_path = os.path.join(asset_path, map_name, f"{map_name}-1024-sem.png")
     planning_map = Image.open(map_path)
     x, y = planning_map.size
-    pmap = np.array(planning_map.resize((int(x / 8), int(y / 8))), dtype=np.uint8)
+    scale = metric.raw_to_surface_scale
+    pmap = np.array(planning_map.resize((int(x / scale), int(y / scale))), dtype=np.uint8)
+    if return_labels:
+        return arr, map_img, pmap, labels
     return arr, map_img, pmap
 
 

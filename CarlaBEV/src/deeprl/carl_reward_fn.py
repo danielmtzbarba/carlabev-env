@@ -1,8 +1,9 @@
 import numpy as np
 
-from CarlaBEV.envs.geometry import SURFACE_METERS_PER_PIXEL, distance_surface_to_meters
+from CarlaBEV.envs.geometry import DEFAULT_METRIC_FRAME, MetricFrame
 from CarlaBEV.src.control.utils import lateral_error
 from CarlaBEV.src.deeprl.reward_signals import carl_ttc_penalty
+from CarlaBEV.src.deeprl.reward import REWARD_REFERENCE_DT_S
 from CarlaBEV.src.deeprl.comfort import DEFAULT_COMFORT_BOUNDS, count_comfort_violations
 from CarlaBEV.semantics import (
     BLOCKING_CLASSES,
@@ -12,7 +13,6 @@ from CarlaBEV.semantics import (
 )
 
 
-meters_per_pixel = SURFACE_METERS_PER_PIXEL
 lane_half_width_m = 3.0
 
 
@@ -84,8 +84,15 @@ class CaRLRewardFn:
         ttc_penalty_floor=0.1,
         reward_scale=1.0,
         comfort_penalty_floor=0.2,
+        out_of_bounds_m=15.625,
+        metric: MetricFrame | None = None,
     ):
-        self.dt = dt
+        self.metric = metric if metric is not None else DEFAULT_METRIC_FRAME
+        self.dt = float(dt)
+        # Per-step reward magnitudes are defined at the reference step (0.1 s);
+        # finer physics steps receive proportionally smaller per-step rewards so
+        # the reward per simulated second is step-invariant (terminal rewards excluded).
+        self.step_scale = self.dt / REWARD_REFERENCE_DT_S
         self.debug = debug
         self.debug_every = debug_every
         self._step_count = 0
@@ -107,19 +114,17 @@ class CaRLRewardFn:
         self.prev_yaw_rate = None
         self.prev_dist2goal = None
 
-        # lateral distance clipping (for lane-center penalty)
-        self.lat_e_clip = 10.0
-
         # Hard penalties
         self.terminal_penalty = -1.0
-        self.out_of_bounds_threshold_m = distance_surface_to_meters(50.0)
+        self.out_of_bounds_threshold_m = float(out_of_bounds_m)
 
         # Comfort thresholds from CaRL (CARLA table)
         self.comfort_bounds = dict(DEFAULT_COMFORT_BOUNDS)
 
     # =====================================================
     def reset(self, rx, ry):
-        self._route = [(x * meters_per_pixel, y * meters_per_pixel) for x, y in zip(rx, ry)]
+        mpp = self.metric.meters_per_pixel
+        self._route = [(x * mpp, y * mpp) for x, y in zip(rx, ry)]
         self._route_lengths = cumulative_lengths(self._route)
         self._route_total_m = self._route_lengths[-1]
         #
@@ -132,7 +137,15 @@ class CaRLRewardFn:
         self._step_count = 0
         self._s_prev = None
 
-    def _speed_limit_to_mps(self, speed_limit_value):
+    @staticmethod
+    def _scene_speed_limit_mps(scene_info):
+        """Prefer the explicit SI key; fall back to the legacy unit-less value."""
+        if "speed_limit_mps" in scene_info:
+            return float(scene_info["speed_limit_mps"])
+        return CaRLRewardFn._speed_limit_to_mps(scene_info.get("speed_limit", 35.0))
+
+    @staticmethod
+    def _speed_limit_to_mps(speed_limit_value):
         # Preserve compatibility with existing configs where the scene speed
         # limit is commonly stored in km/h-like values such as 35.
         speed_limit_value = float(speed_limit_value)
@@ -223,7 +236,9 @@ class CaRLRewardFn:
         else:
             RC_t = 0.0
 
-        RC_t = float(np.clip(RC_t * 100, 0.0, 1.0))
+        # Progress per *reference* step (0.1 s) so the saturation point does not
+        # move with the physics step; the final reward is rescaled to ``dt``.
+        RC_t = float(np.clip(RC_t * 100 / self.step_scale, 0.0, 1.0))
         # -------------------------
         # 3. Soft penalty factors
         # -------------------------
@@ -247,8 +262,7 @@ class CaRLRewardFn:
         p_factors["off_lane"] = self.off_lane_penalty if off_lane else 1.0
 
         # 3.3 speeding
-        speed_limit = info["scene"]["speed_limit"]
-        speed_limit_mps = self._speed_limit_to_mps(speed_limit)
+        speed_limit_mps = self._scene_speed_limit_mps(info["scene"])
         overspeed_mps = max(speed_mps - speed_limit_mps, 0.0)
 
         if overspeed_mps <= 0.0:
@@ -287,7 +301,7 @@ class CaRLRewardFn:
         # 5. Final reward
         # -------------------------
         reward = RC_t * P_t
-        reward = float(np.clip(reward, 0.0, 1.0))
+        reward = float(np.clip(reward, 0.0, 1.0)) * self.step_scale
 
         # For CaRL: normal transitions have no explicit "cause"
         terminated = False

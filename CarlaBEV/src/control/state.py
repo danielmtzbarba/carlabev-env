@@ -1,9 +1,6 @@
 import numpy as np
 
-from CarlaBEV.envs.geometry import (
-    distance_meters_to_surface,
-    distance_surface_to_meters,
-)
+from CarlaBEV.envs.geometry import DEFAULT_METRIC_FRAME, MetricFrame
 from CarlaBEV.src.control.utils import angle_mod
 
 
@@ -11,18 +8,24 @@ class State:
     """
     Class representing the state of a vehicle.
 
-    :param x: (float) x-coordinate
-    :param y: (float) y-coordinate
-    :param yaw: (float) yaw angle
-    :param v: (float) speed
+    Canonical state is metric (``x_m``, ``y_m``, ``yaw``, ``v_mps``). Surface-frame
+    views (``x``, ``y``, ``v``) are converted through the injected
+    :class:`MetricFrame` so the state never depends on a module-level scale.
+
+    :param x: (float) x-coordinate [surface px]
+    :param y: (float) y-coordinate [surface px]
+    :param yaw: (float) yaw angle [rad]
+    :param v: (float) speed [surface px/s]
+    :param metric: (MetricFrame) surface <-> metric conversion
     """
 
-    def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0):
+    def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0, metric: MetricFrame | None = None):
         """Instantiate the object."""
-        self._x_m = distance_surface_to_meters(x)
-        self._y_m = distance_surface_to_meters(y)
+        self.metric = metric if metric is not None else DEFAULT_METRIC_FRAME
+        self._x_m = self.metric.distance_surface_to_meters(x)
+        self._y_m = self.metric.distance_surface_to_meters(y)
         self.yaw = yaw
-        self._v_mps = distance_surface_to_meters(v)
+        self._v_mps = self.metric.distance_surface_to_meters(v)
         #
         self._x_1_m = self._x_m
         self._y_1_m = self._y_m
@@ -57,51 +60,51 @@ class State:
 
     @property
     def x(self):
-        return distance_meters_to_surface(self._x_m)
+        return self.metric.distance_meters_to_surface(self._x_m)
 
     @x.setter
     def x(self, value):
-        self._x_m = distance_surface_to_meters(value)
+        self._x_m = self.metric.distance_surface_to_meters(value)
 
     @property
     def y(self):
-        return distance_meters_to_surface(self._y_m)
+        return self.metric.distance_meters_to_surface(self._y_m)
 
     @y.setter
     def y(self, value):
-        self._y_m = distance_surface_to_meters(value)
+        self._y_m = self.metric.distance_surface_to_meters(value)
 
     @property
     def v(self):
-        return distance_meters_to_surface(self._v_mps)
+        return self.metric.distance_meters_to_surface(self._v_mps)
 
     @v.setter
     def v(self, value):
-        self._v_mps = distance_surface_to_meters(value)
+        self._v_mps = self.metric.distance_surface_to_meters(value)
 
     @property
     def x_1(self):
-        return distance_meters_to_surface(self._x_1_m)
+        return self.metric.distance_meters_to_surface(self._x_1_m)
 
     @x_1.setter
     def x_1(self, value):
-        self._x_1_m = distance_surface_to_meters(value)
+        self._x_1_m = self.metric.distance_surface_to_meters(value)
 
     @property
     def y_1(self):
-        return distance_meters_to_surface(self._y_1_m)
+        return self.metric.distance_meters_to_surface(self._y_1_m)
 
     @y_1.setter
     def y_1(self, value):
-        self._y_1_m = distance_surface_to_meters(value)
+        self._y_1_m = self.metric.distance_surface_to_meters(value)
 
     @property
     def v_1(self):
-        return distance_meters_to_surface(self._v_1_mps)
+        return self.metric.distance_meters_to_surface(self._v_1_mps)
 
     @v_1.setter
     def v_1(self, value):
-        self._v_1_mps = distance_surface_to_meters(value)
+        self._v_1_mps = self.metric.distance_surface_to_meters(value)
 
     @property
     def x_m(self):

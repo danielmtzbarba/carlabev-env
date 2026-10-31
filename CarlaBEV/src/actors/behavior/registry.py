@@ -7,6 +7,7 @@ from CarlaBEV.src.actors.behavior.jaywalk import (
     StopMidBehavior,
     StopReturnBehavior,
 )
+from CarlaBEV.src.actors.behavior.framework import Behavior
 from CarlaBEV.src.actors.behavior.lead_brake import LeadBrakeBehavior
 
 
@@ -49,12 +50,18 @@ BEHAVIOR_LIBRARY = {
         "cross": BehaviorSpec(
             "cross",
             "Cross",
-            fields=(BehaviorField("start_delay", "Start Delay (s)", 0.0),),
+            fields=(
+                BehaviorField("start_delay", "Start Delay (s)", 0.0),
+                BehaviorField("gap_accept_s", "Gap Acceptance TTC (s, 0 = off)", 0.0),
+            ),
         ),
         "stop_mid": BehaviorSpec(
             "stop_mid",
             "Stop Mid",
-            fields=(BehaviorField("start_delay", "Start Delay (s)", 0.0),),
+            fields=(
+                BehaviorField("start_delay", "Start Delay (s)", 0.0),
+                BehaviorField("gap_accept_s", "Gap Acceptance TTC (s, 0 = off)", 0.0),
+            ),
         ),
         "yield_return": BehaviorSpec(
             "yield_return",
@@ -62,10 +69,14 @@ BEHAVIOR_LIBRARY = {
             fields=(
                 BehaviorField("start_delay", "Start Delay (s)", 0.0),
                 BehaviorField("yield_duration", "Yield Duration (s)", 1.0),
+                BehaviorField("gap_accept_s", "Gap Acceptance TTC (s, 0 = off)", 0.0),
             ),
         ),
     },
 }
+
+# Declarative finite-state behaviours authored inline: {"type": "fsm", "initial": ..., "states": {...}}
+FSM_SPEC_TYPE = "fsm"
 
 LEGACY_BEHAVIOR_NAMES = {
     "Normal": "constant_speed",
@@ -77,7 +88,9 @@ LEGACY_BEHAVIOR_NAMES = {
 
 
 def behavior_options_for_actor(actor_type: str) -> list[str]:
-    return list(BEHAVIOR_LIBRARY.get(actor_type, {"none": BehaviorSpec("none", "None")}).keys())
+    return list(
+        BEHAVIOR_LIBRARY.get(actor_type, {"none": BehaviorSpec("none", "None")}).keys()
+    )
 
 
 def behavior_label_map_for_actor(actor_type: str) -> dict[str, str]:
@@ -112,10 +125,19 @@ def normalize_behavior_spec(actor_type: str, behavior):
         spec = get_behavior_spec(actor_type, behavior_id)
         return {"type": spec.behavior_id, "params": {}}
 
-    behavior_id = LEGACY_BEHAVIOR_NAMES.get(behavior.get("type", ""), behavior.get("type", ""))
+    if behavior.get("type") == FSM_SPEC_TYPE:
+        # Inline state machine: validated by constructing it.
+        Behavior.from_spec(behavior)
+        return {"type": FSM_SPEC_TYPE, "params": {}, "spec": dict(behavior)}
+
+    behavior_id = LEGACY_BEHAVIOR_NAMES.get(
+        behavior.get("type", ""), behavior.get("type", "")
+    )
     spec = get_behavior_spec(actor_type, behavior_id)
     raw_params = behavior.get("params", {}) or behavior.get("behavior_kwargs", {}) or {}
-    params = {field.key: field.parse(raw_params.get(field.key)) for field in spec.fields}
+    params = {
+        field.key: field.parse(raw_params.get(field.key)) for field in spec.fields
+    }
     return {"type": spec.behavior_id, "params": params}
 
 
@@ -126,14 +148,18 @@ def build_behavior(actor_type: str, behavior):
 
     if behavior_id in {"none", "constant_speed"}:
         return None, normalized
+    if behavior_id == FSM_SPEC_TYPE:
+        return Behavior.from_spec(normalized["spec"]), normalized
+    gap_accept_s = params.get("gap_accept_s", 0.0) or None  # 0 = disabled
     if behavior_id == "cross":
-        return CrossBehavior(start_delay=params.get("start_delay", 0.0)), normalized
+        return CrossBehavior(start_delay=params.get("start_delay", 0.0), gap_accept_s=gap_accept_s), normalized
     if behavior_id == "stop_mid":
-        return StopMidBehavior(start_delay=params.get("start_delay", 0.0)), normalized
+        return StopMidBehavior(start_delay=params.get("start_delay", 0.0), gap_accept_s=gap_accept_s), normalized
     if behavior_id == "yield_return":
         return StopReturnBehavior(
             start_delay=params.get("start_delay", 0.0),
             yield_duration=params.get("yield_duration", 1.0),
+            gap_accept_s=gap_accept_s,
         ), normalized
     if behavior_id == "timed_brake":
         return LeadBrakeBehavior(

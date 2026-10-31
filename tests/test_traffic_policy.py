@@ -60,5 +60,9 @@ def test_traffic_safe_target_does_not_change_controller_speed_limit():
     actor.step(t=0.1, dt=0.1, other_actors=[lead_actor])
 
     assert actor.last_traffic_policy["traffic_braking_active"] is True
-    assert actor._controller._target_speed_mps < actor.cruise_speed_mps
+    # IDM commands the braking as feed-forward acceleration (target = current speed);
+    # the speed *limit* (cruise cap) is never touched by the traffic policy.
+    assert actor.last_traffic_policy["constraint"] == "lead"
+    assert actor._controller._target_accel_ff_mps2 < 0.0
+    assert actor._controller.v_mps < 8.0
     assert math.isclose(actor._controller._speed_limit_mps, actor.cruise_speed_mps, rel_tol=1e-6)

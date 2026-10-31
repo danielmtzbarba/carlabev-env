@@ -1,0 +1,2243 @@
+{
+ "provenance": {
+  "schema_version": "1.0",
+  "timestamp_utc": "2026-10-31T18:13:04+00:00",
+  "host": "vm",
+  "platform": "Linux-6.18.44-fc-v165-x86_64-with-glibc2.39",
+  "machine": "x86_64",
+  "processor": "x86_64",
+  "python": "3.12.3",
+  "numpy": "2.3.5",
+  "scipy": "1.16.3",
+  "pygame": "2.6.1",
+  "blas": "scipy-openblas",
+  "git_sha": "4dde3ae",
+  "config": {
+   "profile": "standard",
+   "physics_dt": 0.1,
+   "convergence_dts": [
+    0.1,
+    0.05
+   ],
+   "convergence_reference": true,
+   "rendering_steps": 60,
+   "render_configs": [
+    [
+     60,
+     "rgb_array"
+    ],
+    [
+     1,
+     "rgb_array"
+    ],
+    [
+     5,
+     "human"
+    ],
+    [
+     60,
+     "human"
+    ]
+   ],
+   "footprint_sizes": [
+    64,
+    128,
+    256
+   ],
+   "replay_steps": 40,
+   "replay_sizes": [
+    64,
+    128,
+    256
+   ],
+   "throughput_steps": 400,
+   "throughput_sizes": [
+    64,
+    128,
+    256
+   ],
+   "throughput_modes": [
+    "rgb_array",
+    "human"
+   ],
+   "suites": [
+    "clock",
+    "physics",
+    "rendering",
+    "replay",
+    "throughput"
+   ]
+  }
+ },
+ "verdict": "PASS",
+ "sections": [
+  {
+   "suite": "clock",
+   "title": "Clock: dt realisation, exactness, timers, horizon",
+   "verdict": "PASS",
+   "wall_time_s": 7.506835819000116,
+   "metrics": [
+    {
+     "name": "ego_displacement_error_per_update",
+     "value": 0.0,
+     "unit": "m",
+     "tolerance": 1e-09,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "|\u0394s \u2212 v\u00b7dt| for one State.update at 10 m/s"
+    },
+    {
+     "name": "npc_displacement_error_per_step",
+     "value": 0.0,
+     "unit": "m",
+     "tolerance": 1e-09,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "|\u0394s \u2212 v\u00b7dt| for one NPC control step at cruise"
+    },
+    {
+     "name": "ego_and_npc_share_dt",
+     "value": true,
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "ego dt=0.1, npc dt=0.1"
+    },
+    {
+     "name": "scene_time_error_after_3s",
+     "value": 0.0,
+     "unit": "s",
+     "tolerance": 1e-12,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "t after 30 steps vs 30\u00b7dt (multiplicative clock)"
+    },
+    {
+     "name": "render_fps",
+     "value": 10,
+     "unit": "Hz",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": "metadata used by RecordVideo; must equal 1/dt"
+    },
+    {
+     "name": "render_fps_vs_physics_rate_error",
+     "value": 0,
+     "unit": "Hz",
+     "tolerance": 0.5,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "timer_max_error_steps",
+     "value": 0,
+     "unit": "steps",
+     "tolerance": 0.0,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "max |fired \u2212 expected| over scenario timers and ramps (0 = exact)"
+    },
+    {
+     "name": "horizon_steps_scale_with_dt",
+     "value": true,
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "1.5 s \u2192 15 steps at dt=0.1, 30 at dt=0.05"
+    },
+    {
+     "name": "horizon_truncation_time_error",
+     "value": 0.0,
+     "unit": "s",
+     "tolerance": 1e-09,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "truncated=True terminated=False at t=1.5"
+    },
+    {
+     "name": "horizon_is_truncation_not_termination",
+     "value": true,
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    }
+   ],
+   "tables": {
+    "timers": [
+     {
+      "timer": "lead_brake.brake_delay",
+      "requested_s": 1.0,
+      "fired_s": 1.0,
+      "fired_step": 9,
+      "expected_step": 9,
+      "error_steps": 0
+     },
+     {
+      "timer": "lead_brake.brake_delay",
+      "requested_s": 1.25,
+      "fired_s": 1.3,
+      "fired_step": 12,
+      "expected_step": 12,
+      "error_steps": 0
+     },
+     {
+      "timer": "lead_brake.brake_delay",
+      "requested_s": 2.0,
+      "fired_s": 2.0,
+      "fired_step": 19,
+      "expected_step": 19,
+      "error_steps": 0
+     },
+     {
+      "timer": "jaywalk.cross_delay",
+      "requested_s": 1.0,
+      "fired_s": 1.0,
+      "fired_step": 9,
+      "expected_step": 9,
+      "error_steps": 0
+     },
+     {
+      "timer": "jaywalk.cross_delay",
+      "requested_s": 1.25,
+      "fired_s": 1.3,
+      "fired_step": 12,
+      "expected_step": 12,
+      "error_steps": 0
+     },
+     {
+      "timer": "startup_ramp (1.0 s)",
+      "requested_s": 1.0,
+      "fired_s": 1.0,
+      "fired_step": 9,
+      "expected_step": 9,
+      "error_steps": 0
+     }
+    ]
+   }
+  },
+  {
+   "suite": "physics",
+   "title": "Physics: dt convergence, filter, route-end stop, scenario kinematics",
+   "verdict": "PASS",
+   "wall_time_s": 9.076804147996882,
+   "metrics": [
+    {
+     "name": "ego_convergence_order_deviation",
+     "value": 0.004056278580156114,
+     "unit": "",
+     "tolerance": 0.5,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "err(0.1)/err(0.05) = 3.01, first-order expectation 3.00"
+    },
+    {
+     "name": "ego_pos_err_coarse_vs_fine",
+     "value": 0.33452787294556136,
+     "unit": "m",
+     "tolerance": 1.0,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "max position difference at equal sim time, dt 0.1 vs 0.05"
+    },
+    {
+     "name": "ego_speed_err_coarse_vs_fine",
+     "value": 0.024637177431703794,
+     "unit": "m/s",
+     "tolerance": 0.1,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "accel_filter_tau_s",
+     "value": 0.1,
+     "unit": "s",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "lead_pos_err_coarse_vs_fine",
+     "value": 0.2217743063942521,
+     "unit": "m",
+     "tolerance": 0.5,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "lead_speed_err_coarse_vs_fine",
+     "value": 0.1814638006712741,
+     "unit": "m/s",
+     "tolerance": 0.3,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "end-of-step ramp forcing leads by rate\u00b7dt/2 (O(dt))"
+    },
+    {
+     "name": "route_end_max_overshoot",
+     "value": 1.0422619009146956,
+     "unit": "m",
+     "tolerance": 3.0,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "route_end_max_decel",
+     "value": 3.6010076919788414,
+     "unit": "m/s^2",
+     "tolerance": 3.942001,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "<= max_decel + passive resistance"
+    },
+    {
+     "name": "route_end_reports_zero_speed",
+     "value": true,
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "lead_realised_decel",
+     "value": 3.649383006829518,
+     "unit": "m/s^2",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": "mean deceleration over 1.0-2.5 s after the trigger for brake_strength=4.0"
+    },
+    {
+     "name": "lead_decel_tracking_ratio",
+     "value": 0.9123457517073795,
+     "unit": "",
+     "tolerance": 0.85,
+     "lower_is_better": false,
+     "status": "PASS",
+     "detail": "realised / requested deceleration (request above max_decel is bounded by the vehicle limit)"
+    },
+    {
+     "name": "pedestrian_crossing_time",
+     "value": 2.4000000000000004,
+     "unit": "s",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": "crossed 2.72 m after a 1.0 s wait"
+    },
+    {
+     "name": "pedestrian_completes_crossing",
+     "value": true,
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "realistic_vs_legacy_collision_lead_s",
+     "value": 0.5000000000000002,
+     "unit": "s",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": "how much earlier a 4.5 m car touches the lead than a 1.25 m square (same scene)"
+    },
+    {
+     "name": "realistic_collision_classification",
+     "value": "rear_end",
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "idm_follow_min_gap_m",
+     "value": 7.771447019299767,
+     "unit": "m",
+     "tolerance": 1.0,
+     "lower_is_better": false,
+     "status": "PASS",
+     "detail": "12 -> 5 m/s follower behind a slower lead: smallest bumper-to-bumper gap (never overlaps)"
+    },
+    {
+     "name": "idm_follow_speed_match_mps",
+     "value": 4.88833706313585e-06,
+     "unit": "m/s",
+     "tolerance": 0.3,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "follower speed minus lead speed after 25 s"
+    },
+    {
+     "name": "red_light_stop_gap_m",
+     "value": 2.7973113744347415,
+     "unit": "m",
+     "tolerance": 0.2,
+     "lower_is_better": false,
+     "status": "PASS",
+     "detail": "compliant vehicle: front-bumper gap to the red stop line once at rest (must be > 0)"
+    },
+    {
+     "name": "red_light_runner_crosses",
+     "value": true,
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "junction_yield_min_distance_m",
+     "value": 17.612706476951683,
+     "unit": "m",
+     "tolerance": 12.0,
+     "lower_is_better": false,
+     "status": "PASS",
+     "detail": "two NPCs crossing at a T-junction, later arrival yields (disabled rule: see table)"
+    }
+   ],
+   "tables": {
+    "ego_convergence": [
+     {
+      "actor": "ego",
+      "dt": 0.1,
+      "reference_dt": 0.025,
+      "max_pos_err_m": 0.5007802236281589,
+      "max_speed_err_mps": 0.04008240809677943
+     },
+     {
+      "actor": "ego",
+      "dt": 0.05,
+      "reference_dt": 0.025,
+      "max_pos_err_m": 0.16625237526071615,
+      "max_speed_err_mps": 0.015445230665075638
+     }
+    ],
+    "filter_alpha": [
+     {
+      "dt": 0.1,
+      "alpha": 0.5
+     },
+     {
+      "dt": 0.05,
+      "alpha": 0.3333333333333333
+     },
+     {
+      "dt": 0.025,
+      "alpha": 0.2
+     }
+    ],
+    "lead_convergence": [
+     {
+      "actor": "lead",
+      "dt": 0.1,
+      "vs_dt": 0.05,
+      "max_pos_err_m": 0.2217743063942521,
+      "max_speed_err_mps": 0.1814638006712741
+     }
+    ],
+    "route_end_stop": [
+     {
+      "speed_mps": 5.0,
+      "stop_offset_m": 1.0422619009146956,
+      "max_decel_mps2": 3.596225435939644,
+      "steps_to_rest": 211,
+      "reports_zero_speed": true
+     },
+     {
+      "speed_mps": 10.0,
+      "stop_offset_m": 0.8240472312968308,
+      "max_decel_mps2": 3.6010076919788414,
+      "steps_to_rest": 129,
+      "reports_zero_speed": true
+     },
+     {
+      "speed_mps": 14.0,
+      "stop_offset_m": 0.8245526131595255,
+      "max_decel_mps2": 3.5981131053007065,
+      "steps_to_rest": 111,
+      "reports_zero_speed": true
+     }
+    ],
+    "geometry_profiles": [
+     {
+      "profile": "legacy",
+      "ego_footprint": "1.25 x 1.25 m (center)",
+      "ego_px": "4 x 4",
+      "gap_at_spawn_m": 7.062499999999886,
+      "collision_t_s": 2.4000000000000004,
+      "classification": "rear_end"
+     },
+     {
+      "profile": "realistic",
+      "ego_footprint": "4.50 x 1.80 m (rear_axle)",
+      "ego_px": "6 x 14",
+      "gap_at_spawn_m": 3.8124999999998863,
+      "collision_t_s": 1.9000000000000001,
+      "classification": "rear_end"
+     }
+    ],
+    "traffic_rules": [
+     {
+      "rule": "car_following",
+      "min_gap_m": 7.771447019299767,
+      "final_gap_m": 9.090883894462564,
+      "final_speed_err_mps": -4.88833706313585e-06
+     },
+     {
+      "rule": "signal",
+      "stop_gap_m": 2.7973113744347415,
+      "compliant_final_speed_mps": 0.0,
+      "runner_crossed": true
+     },
+     {
+      "rule": "right_of_way",
+      "min_distance_m": 17.612706476951683,
+      "yielded": true,
+      "min_distance_disabled_m": 10.147305371862995
+     }
+    ]
+   }
+  },
+  {
+   "suite": "rendering",
+   "title": "Rendering: fps / render-mode independence, video rate, footprints",
+   "verdict": "PASS",
+   "wall_time_s": 27.20398541800023,
+   "metrics": [
+    {
+     "name": "max_state_diff_across_fps_and_modes",
+     "value": 0.0,
+     "unit": "",
+     "tolerance": 0.0,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "must be exactly 0: rendering is a pure observer"
+    },
+    {
+     "name": "all_digests_equal",
+     "value": true,
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "render_fps_vs_1_over_dt",
+     "value": 0,
+     "unit": "Hz",
+     "tolerance": 0.5,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "viewer_default_real_time_factor",
+     "value": 1.0,
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": "fps=None \u2192 real time"
+    },
+    {
+     "name": "video_one_frame_per_step",
+     "value": true,
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "13 frames for 12 steps (+reset frame)"
+    },
+    {
+     "name": "video_duration_vs_sim_time_error",
+     "value": 2.220446049250313e-16,
+     "unit": "s",
+     "tolerance": 1e-06,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "metric_footprints_size_invariant",
+     "value": true,
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    }
+   ],
+   "tables": {
+    "fps_independence": [
+     {
+      "fps": 60,
+      "render_mode": "rgb_array",
+      "digest_equal": true,
+      "max_state_diff": 0.0,
+      "steps": 60,
+      "wall_s": 0.08953802100222674,
+      "viewer_real_time_factor": 6.0
+     },
+     {
+      "fps": 1,
+      "render_mode": "rgb_array",
+      "digest_equal": true,
+      "max_state_diff": 0.0,
+      "steps": 60,
+      "wall_s": 0.1822939169978781,
+      "viewer_real_time_factor": 0.1
+     },
+     {
+      "fps": 5,
+      "render_mode": "human",
+      "digest_equal": true,
+      "max_state_diff": 0.0,
+      "steps": 60,
+      "wall_s": 12.314685989000282,
+      "viewer_real_time_factor": 0.5
+     },
+     {
+      "fps": 60,
+      "render_mode": "human",
+      "digest_equal": true,
+      "max_state_diff": 0.0,
+      "steps": 60,
+      "wall_s": 1.0473821659979876,
+      "viewer_real_time_factor": 6.0
+     }
+    ],
+    "record_video": [
+     {
+      "frames_recorded": 13,
+      "steps": 12,
+      "sim_time_s": 1.2000000000000002,
+      "file_fps": 10.0,
+      "file_frames": 13,
+      "file_duration_s": 1.2
+     }
+    ],
+    "footprints_by_size": [
+     {
+      "size": 64,
+      "meters_per_pixel": 0.625,
+      "ego_px": 3,
+      "vehicle_px": 7,
+      "ego_m": 4.5,
+      "vehicle_m": 4.5,
+      "map_extent_m": [
+       320.0,
+       400.0
+      ]
+     },
+     {
+      "size": 128,
+      "meters_per_pixel": 0.3125,
+      "ego_px": 6,
+      "vehicle_px": 14,
+      "ego_m": 4.5,
+      "vehicle_m": 4.5,
+      "map_extent_m": [
+       320.0,
+       400.0
+      ]
+     },
+     {
+      "size": 256,
+      "meters_per_pixel": 0.15625,
+      "ego_px": 12,
+      "vehicle_px": 29,
+      "ego_m": 4.5,
+      "vehicle_m": 4.5,
+      "map_extent_m": [
+       320.0,
+       400.0
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "suite": "replay",
+   "title": "Replay: golden fidelity, determinism, cross-size agreement",
+   "verdict": "PASS",
+   "wall_time_s": 19.855973115998495,
+   "metrics": [
+    {
+     "name": "golden_max_abs_diff",
+     "value": 0.0,
+     "unit": "",
+     "tolerance": 1e-07,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "max |\u0394| over all keys/snapshots (headings modulo 2\u03c0)"
+    },
+    {
+     "name": "golden_lengths_match",
+     "value": true,
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "golden_digests_equal",
+     "value": 7,
+     "unit": "snapshots",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": "of 7; bit-exact digests are platform specific (P-01)"
+    },
+    {
+     "name": "same_process_repeat_bitwise_identical",
+     "value": true,
+     "unit": "",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "cross_size_max_ego_pos_err",
+     "value": 0.0,
+     "unit": "m",
+     "tolerance": 1.0,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": "vs the 128-px run at equal sim time"
+    },
+    {
+     "name": "cross_size_max_npc_pos_err",
+     "value": 0.3125,
+     "unit": "m",
+     "tolerance": 1.0,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    },
+    {
+     "name": "cross_size_route_len_diff",
+     "value": 0.0,
+     "unit": "m",
+     "tolerance": 0.5,
+     "lower_is_better": true,
+     "status": "PASS",
+     "detail": ""
+    }
+   ],
+   "tables": {
+    "golden_snapshots": [
+     {
+      "snapshot": "lead_brake_l1_ongrid",
+      "length_actual": 48,
+      "length_expected": 48,
+      "max_abs_diff": 0.0,
+      "first_diff_step": null,
+      "first_diff_key": null,
+      "state_mismatches": 0,
+      "digest_equal": true,
+      "platform_rounding_only": true
+     },
+     {
+      "snapshot": "jaywalk_l3_ongrid",
+      "length_actual": 61,
+      "length_expected": 61,
+      "max_abs_diff": 0.0,
+      "first_diff_step": null,
+      "first_diff_key": null,
+      "state_mismatches": 0,
+      "digest_equal": true,
+      "platform_rounding_only": true
+     },
+     {
+      "snapshot": "lead_brake_l1_offgrid",
+      "length_actual": 61,
+      "length_expected": 61,
+      "max_abs_diff": 0.0,
+      "first_diff_step": null,
+      "first_diff_key": null,
+      "state_mismatches": 0,
+      "digest_equal": true,
+      "platform_rounding_only": true
+     },
+     {
+      "snapshot": "jaywalk_l3_offgrid",
+      "length_actual": 61,
+      "length_expected": 61,
+      "max_abs_diff": 0.0,
+      "first_diff_step": null,
+      "first_diff_key": null,
+      "state_mismatches": 0,
+      "digest_equal": true,
+      "platform_rounding_only": true
+     },
+     {
+      "snapshot": "random_nav_easy",
+      "length_actual": 30,
+      "length_expected": 30,
+      "max_abs_diff": 0.0,
+      "first_diff_step": null,
+      "first_diff_key": null,
+      "state_mismatches": 0,
+      "digest_equal": true,
+      "platform_rounding_only": true
+     },
+     {
+      "snapshot": "lead_brake_l1_offgrid_realistic",
+      "length_actual": 61,
+      "length_expected": 61,
+      "max_abs_diff": 0.0,
+      "first_diff_step": null,
+      "first_diff_key": null,
+      "state_mismatches": 0,
+      "digest_equal": true,
+      "platform_rounding_only": true
+     },
+     {
+      "snapshot": "random_nav_easy_realistic",
+      "length_actual": 23,
+      "length_expected": 23,
+      "max_abs_diff": 0.0,
+      "first_diff_step": null,
+      "first_diff_key": null,
+      "state_mismatches": 0,
+      "digest_equal": true,
+      "platform_rounding_only": true
+     }
+    ],
+    "cross_size": [
+     {
+      "size": 64,
+      "route_len_diff_m": 0.0,
+      "max_ego_pos_err_m": 0.0,
+      "max_npc_pos_err_m": 0.3125,
+      "steps_compared": 35
+     },
+     {
+      "size": 256,
+      "route_len_diff_m": 0.0,
+      "max_ego_pos_err_m": 0.0,
+      "max_npc_pos_err_m": 0.15625000000022737,
+      "steps_compared": 35
+     }
+    ]
+   }
+  },
+  {
+   "suite": "throughput",
+   "title": "Throughput: env.step() cost, phase breakdown, reset latency",
+   "verdict": "PASS",
+   "wall_time_s": 55.63025888899938,
+   "metrics": [
+    {
+     "name": "ms_per_step_128_rgb_lead_brake",
+     "value": 2.4036394150243723,
+     "unit": "ms",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "steps_per_s_128_rgb_lead_brake",
+     "value": 416.0357804707826,
+     "unit": "steps/s",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "p99_ms_per_step_128_rgb_lead_brake",
+     "value": 4.419827,
+     "unit": "ms",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": "99th percentile of env.step wall time"
+    },
+    {
+     "name": "real_time_factor_128_rgb",
+     "value": 41.60357804707826,
+     "unit": "x",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": "simulated seconds per wall second at this dt"
+    },
+    {
+     "name": "reset_s_128_lead_brake",
+     "value": 0.00914677799664787,
+     "unit": "s (wall)",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "ms_per_step_128_rgb_random_nav",
+     "value": 4.059393700044893,
+     "unit": "ms",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "reset_s_128_random_nav",
+     "value": 2.7162750870011223,
+     "unit": "s (wall)",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": "includes route planning and traffic generation (cache disabled)"
+    },
+    {
+     "name": "render_overhead_human_vs_rgb",
+     "value": 0.5146311024782335,
+     "unit": "ms",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": "window blit + display update (pacing disabled)"
+    },
+    {
+     "name": "phase_mean_ms.env.simulate",
+     "value": 0.9028730800000005,
+     "unit": "ms",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "phase_mean_ms.scene.draw_actors",
+     "value": 0.15985830249999997,
+     "unit": "ms",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "phase_mean_ms.map.draw_fov",
+     "value": 0.2996157424999999,
+     "unit": "ms",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "phase_mean_ms.scene.npc_step",
+     "value": 0.48349186500000024,
+     "unit": "ms",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "phase_mean_ms.scene.hero_step",
+     "value": 0.25935799500000006,
+     "unit": "ms",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "phase_mean_ms.env.outcome",
+     "value": 0.6922648499999994,
+     "unit": "ms",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "phase_mean_ms.env.render",
+     "value": 0.6540150674999998,
+     "unit": "ms",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "decisions_per_s_dt0.1_k1",
+     "value": 419.5863847502364,
+     "unit": "decisions/s",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "physics_steps_per_s_dt0.1_k1",
+     "value": 419.5863847502364,
+     "unit": "steps/s",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "decisions_per_s_dt0.05_k2",
+     "value": 229.24897036122425,
+     "unit": "decisions/s",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "physics_steps_per_s_dt0.05_k2",
+     "value": 458.4979407224485,
+     "unit": "steps/s",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "decisions_per_s_dt0.025_k4",
+     "value": 140.33025661606837,
+     "unit": "decisions/s",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    },
+    {
+     "name": "physics_steps_per_s_dt0.025_k4",
+     "value": 561.3210264642735,
+     "unit": "steps/s",
+     "tolerance": null,
+     "lower_is_better": true,
+     "status": "INFO",
+     "detail": ""
+    }
+   ],
+   "tables": {
+    "throughput": [
+     {
+      "size": 64,
+      "render_mode": "rgb_array",
+      "scene": "lead_brake",
+      "steps": 400,
+      "ms_per_step": 2.762382110022372,
+      "p50_ms": 2.549643,
+      "p95_ms": 4.152368,
+      "p99_ms": 7.561994,
+      "max_ms": 12.76834,
+      "steps_per_s": 362.0063988873361,
+      "real_time_x": 36.20063988873361,
+      "reset_s": 0.008110398001008434,
+      "resets_in_loop": 11
+     },
+     {
+      "size": 64,
+      "render_mode": "human",
+      "scene": "lead_brake",
+      "steps": 400,
+      "ms_per_step": 2.9788317749262205,
+      "p50_ms": 2.78127,
+      "p95_ms": 4.406561,
+      "p99_ms": 6.51671,
+      "max_ms": 8.192003,
+      "steps_per_s": 335.70207234168765,
+      "real_time_x": 33.57020723416877,
+      "reset_s": 0.0880171140015591,
+      "resets_in_loop": 11
+     },
+     {
+      "size": 128,
+      "render_mode": "rgb_array",
+      "scene": "lead_brake",
+      "steps": 400,
+      "ms_per_step": 2.4036394150243723,
+      "p50_ms": 2.277247,
+      "p95_ms": 3.619757,
+      "p99_ms": 4.419827,
+      "max_ms": 4.894137,
+      "steps_per_s": 416.0357804707826,
+      "real_time_x": 41.60357804707826,
+      "reset_s": 0.00914677799664787,
+      "resets_in_loop": 11
+     },
+     {
+      "size": 128,
+      "render_mode": "rgb_array",
+      "scene": "random_nav",
+      "steps": 400,
+      "ms_per_step": 4.059393700044893,
+      "p50_ms": 3.93909,
+      "p95_ms": 5.791626,
+      "p99_ms": 7.618649,
+      "max_ms": 8.799623,
+      "steps_per_s": 246.3422062237868,
+      "real_time_x": 24.63422062237868,
+      "reset_s": 2.7162750870011223,
+      "resets_in_loop": 11
+     },
+     {
+      "size": 128,
+      "render_mode": "human",
+      "scene": "lead_brake",
+      "steps": 400,
+      "ms_per_step": 2.918270517502606,
+      "p50_ms": 2.775836,
+      "p95_ms": 3.890148,
+      "p99_ms": 5.207524,
+      "max_ms": 7.428437,
+      "steps_per_s": 342.6687121712688,
+      "real_time_x": 34.266871217126884,
+      "reset_s": 0.046528655002475716,
+      "resets_in_loop": 11
+     },
+     {
+      "size": 256,
+      "render_mode": "rgb_array",
+      "scene": "lead_brake",
+      "steps": 400,
+      "ms_per_step": 3.0778269075563003,
+      "p50_ms": 3.106227,
+      "p95_ms": 4.094694,
+      "p99_ms": 5.011401,
+      "max_ms": 6.586479,
+      "steps_per_s": 324.9045609241129,
+      "real_time_x": 32.49045609241129,
+      "reset_s": 0.00949004900030559,
+      "resets_in_loop": 11
+     },
+     {
+      "size": 256,
+      "render_mode": "human",
+      "scene": "lead_brake",
+      "steps": 400,
+      "ms_per_step": 3.930821677486165,
+      "p50_ms": 3.790341,
+      "p95_ms": 5.124989,
+      "p99_ms": 6.244541,
+      "max_ms": 10.107399,
+      "steps_per_s": 254.3997367592414,
+      "real_time_x": 25.43997367592414,
+      "reset_s": 0.04030829499970423,
+      "resets_in_loop": 11
+     }
+    ],
+    "phase_breakdown": {
+     "lead_brake@64px/rgb_array": [
+      {
+       "phase": "env.outcome",
+       "count": 400,
+       "total_ms": 345.64543299999957,
+       "mean_ms": 0.8641135824999989,
+       "std_ms": 0.4045037606893577,
+       "min_ms": 0.290918,
+       "p50_ms": 0.802943,
+       "p95_ms": 1.514879,
+       "p99_ms": 1.839421,
+       "max_ms": 5.912185
+      },
+      {
+       "phase": "env.render",
+       "count": 400,
+       "total_ms": 242.4614009999999,
+       "mean_ms": 0.6061535024999998,
+       "std_ms": 0.37536100054071947,
+       "min_ms": 0.289871,
+       "p50_ms": 0.538987,
+       "p95_ms": 1.013471,
+       "p99_ms": 1.740826,
+       "max_ms": 5.229231
+      },
+      {
+       "phase": "env.reset",
+       "count": 11,
+       "total_ms": 105.92029800000002,
+       "mean_ms": 9.629118000000002,
+       "std_ms": 1.4356394993752946,
+       "min_ms": 7.891074,
+       "p50_ms": 9.075061,
+       "p95_ms": 13.033053,
+       "p99_ms": 13.033053,
+       "max_ms": 13.033053
+      },
+      {
+       "phase": "env.simulate",
+       "count": 400,
+       "total_ms": 436.32819399999994,
+       "mean_ms": 1.0908204849999998,
+       "std_ms": 0.5169026638643341,
+       "min_ms": 0.58868,
+       "p50_ms": 0.99384,
+       "p95_ms": 1.63105,
+       "p99_ms": 2.813842,
+       "max_ms": 6.665699
+      },
+      {
+       "phase": "env.stats",
+       "count": 400,
+       "total_ms": 16.268127,
+       "mean_ms": 0.0406703175,
+       "std_ms": 0.019202327420958475,
+       "min_ms": 0.021876,
+       "p50_ms": 0.034582,
+       "p95_ms": 0.0776,
+       "p99_ms": 0.117483,
+       "max_ms": 0.16059
+      },
+      {
+       "phase": "env.step",
+       "count": 400,
+       "total_ms": 1098.918104999999,
+       "mean_ms": 2.7472952624999976,
+       "std_ms": 1.029561330054171,
+       "min_ms": 1.327565,
+       "p50_ms": 2.549643,
+       "p95_ms": 4.152368,
+       "p99_ms": 7.561994,
+       "max_ms": 12.76834
+      },
+      {
+       "phase": "map.draw_fov",
+       "count": 400,
+       "total_ms": 101.809519,
+       "mean_ms": 0.2545237975,
+       "std_ms": 0.2550042314486693,
+       "min_ms": 0.124932,
+       "p50_ms": 0.217037,
+       "p95_ms": 0.419774,
+       "p99_ms": 0.520996,
+       "max_ms": 4.880715
+      },
+      {
+       "phase": "reward.step",
+       "count": 400,
+       "total_ms": 156.64233000000002,
+       "mean_ms": 0.391605825,
+       "std_ms": 0.3465630864190232,
+       "min_ms": 0.010409,
+       "p50_ms": 0.364965,
+       "p95_ms": 0.797378,
+       "p99_ms": 1.141202,
+       "max_ms": 5.418536
+      },
+      {
+       "phase": "scene.collision_check",
+       "count": 400,
+       "total_ms": 177.31351999999995,
+       "mean_ms": 0.4432837999999999,
+       "std_ms": 0.1694782743667164,
+       "min_ms": 0.246965,
+       "p50_ms": 0.401899,
+       "p95_ms": 0.7299,
+       "p99_ms": 1.114492,
+       "max_ms": 1.594584
+      },
+      {
+       "phase": "scene.draw_actors",
+       "count": 400,
+       "total_ms": 86.4941739999999,
+       "mean_ms": 0.21623543499999975,
+       "std_ms": 0.20967480909544375,
+       "min_ms": 0.084701,
+       "p50_ms": 0.18784,
+       "p95_ms": 0.365168,
+       "p99_ms": 0.558847,
+       "max_ms": 3.917104
+      },
+      {
+       "phase": "scene.hero_step",
+       "count": 400,
+       "total_ms": 125.63395799999996,
+       "mean_ms": 0.3140848949999999,
+       "std_ms": 0.2796818670737861,
+       "min_ms": 0.152737,
+       "p50_ms": 0.272883,
+       "p95_ms": 0.492081,
+       "p99_ms": 0.815309,
+       "max_ms": 3.948407
+      },
+      {
+       "phase": "scene.npc_step",
+       "count": 400,
+       "total_ms": 238.81788300000002,
+       "mean_ms": 0.5970447075,
+       "std_ms": 0.3701586936578377,
+       "min_ms": 0.294954,
+       "p50_ms": 0.530032,
+       "p95_ms": 0.966163,
+       "p99_ms": 1.289806,
+       "max_ms": 6.180789
+      }
+     ],
+     "lead_brake@64px/human": [
+      {
+       "phase": "env.outcome",
+       "count": 400,
+       "total_ms": 361.92598399999997,
+       "mean_ms": 0.90481496,
+       "std_ms": 0.5311938213006091,
+       "min_ms": 0.24156,
+       "p50_ms": 0.775183,
+       "p95_ms": 1.883103,
+       "p99_ms": 2.720658,
+       "max_ms": 6.277379
+      },
+      {
+       "phase": "env.render",
+       "count": 400,
+       "total_ms": 331.572452,
+       "mean_ms": 0.82893113,
+       "std_ms": 0.4065135595150094,
+       "min_ms": 0.434848,
+       "p50_ms": 0.702044,
+       "p95_ms": 1.512044,
+       "p99_ms": 2.020192,
+       "max_ms": 4.876919
+      },
+      {
+       "phase": "env.reset",
+       "count": 11,
+       "total_ms": 106.99342800000001,
+       "mean_ms": 9.726675272727274,
+       "std_ms": 1.2399284763404037,
+       "min_ms": 7.287503,
+       "p50_ms": 9.900998,
+       "p95_ms": 11.46677,
+       "p99_ms": 11.46677,
+       "max_ms": 11.46677
+      },
+      {
+       "phase": "env.simulate",
+       "count": 400,
+       "total_ms": 429.2330130000002,
+       "mean_ms": 1.0730825325000004,
+       "std_ms": 0.4143801063101533,
+       "min_ms": 0.550106,
+       "p50_ms": 0.943535,
+       "p95_ms": 1.905482,
+       "p99_ms": 2.742445,
+       "max_ms": 4.261903
+      },
+      {
+       "phase": "env.stats",
+       "count": 400,
+       "total_ms": 17.476778999999997,
+       "mean_ms": 0.043691947499999995,
+       "std_ms": 0.07518857130229131,
+       "min_ms": 0.017744,
+       "p50_ms": 0.034171,
+       "p95_ms": 0.070592,
+       "p99_ms": 0.143595,
+       "max_ms": 1.295674
+      },
+      {
+       "phase": "env.step",
+       "count": 400,
+       "total_ms": 1184.7253940000007,
+       "mean_ms": 2.9618134850000017,
+       "std_ms": 0.8398181024761551,
+       "min_ms": 1.371055,
+       "p50_ms": 2.78127,
+       "p95_ms": 4.406561,
+       "p99_ms": 6.51671,
+       "max_ms": 8.192003
+      },
+      {
+       "phase": "map.draw_fov",
+       "count": 400,
+       "total_ms": 95.18274400000006,
+       "mean_ms": 0.23795686000000013,
+       "std_ms": 0.16515748779113953,
+       "min_ms": 0.109022,
+       "p50_ms": 0.199153,
+       "p95_ms": 0.364229,
+       "p99_ms": 1.100324,
+       "max_ms": 1.559232
+      },
+      {
+       "phase": "renderer.human",
+       "count": 411,
+       "total_ms": 87.696321,
+       "mean_ms": 0.21337304379562044,
+       "std_ms": 0.14198722795699945,
+       "min_ms": 0.128008,
+       "p50_ms": 0.180963,
+       "p95_ms": 0.298761,
+       "p99_ms": 0.864655,
+       "max_ms": 1.559216
+      },
+      {
+       "phase": "reward.step",
+       "count": 400,
+       "total_ms": 163.18105099999994,
+       "mean_ms": 0.40795262749999983,
+       "std_ms": 0.4363387354380811,
+       "min_ms": 0.011082,
+       "p50_ms": 0.346236,
+       "p95_ms": 1.055994,
+       "p99_ms": 2.091588,
+       "max_ms": 5.899702
+      },
+      {
+       "phase": "scene.collision_check",
+       "count": 400,
+       "total_ms": 186.96933899999993,
+       "mean_ms": 0.4674233474999998,
+       "std_ms": 0.283070738772134,
+       "min_ms": 0.195822,
+       "p50_ms": 0.389487,
+       "p95_ms": 1.0336,
+       "p99_ms": 1.838186,
+       "max_ms": 2.247045
+      },
+      {
+       "phase": "scene.draw_actors",
+       "count": 400,
+       "total_ms": 84.46159000000003,
+       "mean_ms": 0.21115397500000008,
+       "std_ms": 0.14602501642850232,
+       "min_ms": 0.096323,
+       "p50_ms": 0.176961,
+       "p95_ms": 0.340701,
+       "p99_ms": 1.042752,
+       "max_ms": 1.125833
+      },
+      {
+       "phase": "scene.hero_step",
+       "count": 400,
+       "total_ms": 122.67554900000006,
+       "mean_ms": 0.30668887250000015,
+       "std_ms": 0.1895823646413248,
+       "min_ms": 0.154124,
+       "p50_ms": 0.259578,
+       "p95_ms": 0.509334,
+       "p99_ms": 0.959065,
+       "max_ms": 2.666142
+      },
+      {
+       "phase": "scene.npc_step",
+       "count": 400,
+       "total_ms": 233.327498,
+       "mean_ms": 0.583318745,
+       "std_ms": 0.29396325285957936,
+       "min_ms": 0.274885,
+       "p50_ms": 0.506482,
+       "p95_ms": 1.228155,
+       "p99_ms": 2.141686,
+       "max_ms": 2.443347
+      }
+     ],
+     "lead_brake@128px/rgb_array": [
+      {
+       "phase": "env.outcome",
+       "count": 400,
+       "total_ms": 276.90593999999976,
+       "mean_ms": 0.6922648499999994,
+       "std_ms": 0.29662620765129216,
+       "min_ms": 0.209876,
+       "p50_ms": 0.665369,
+       "p95_ms": 1.116159,
+       "p99_ms": 1.710462,
+       "max_ms": 3.203515
+      },
+      {
+       "phase": "env.render",
+       "count": 400,
+       "total_ms": 261.6060269999999,
+       "mean_ms": 0.6540150674999998,
+       "std_ms": 0.17582266684123224,
+       "min_ms": 0.344441,
+       "p50_ms": 0.629409,
+       "p95_ms": 0.877953,
+       "p99_ms": 1.345157,
+       "max_ms": 2.024642
+      },
+      {
+       "phase": "env.reset",
+       "count": 11,
+       "total_ms": 85.17594899999999,
+       "mean_ms": 7.74326809090909,
+       "std_ms": 1.3033033796936888,
+       "min_ms": 5.522662,
+       "p50_ms": 7.619353,
+       "p95_ms": 10.549184,
+       "p99_ms": 10.549184,
+       "max_ms": 10.549184
+      },
+      {
+       "phase": "env.simulate",
+       "count": 400,
+       "total_ms": 361.1492320000002,
+       "mean_ms": 0.9028730800000005,
+       "std_ms": 0.27477758316467266,
+       "min_ms": 0.458671,
+       "p50_ms": 0.862607,
+       "p95_ms": 1.366369,
+       "p99_ms": 2.017021,
+       "max_ms": 2.512675
+      },
+      {
+       "phase": "env.stats",
+       "count": 400,
+       "total_ms": 15.541319999999997,
+       "mean_ms": 0.03885329999999999,
+       "std_ms": 0.07355322458835506,
+       "min_ms": 0.016578,
+       "p50_ms": 0.031067,
+       "p95_ms": 0.060433,
+       "p99_ms": 0.114068,
+       "max_ms": 1.355173
+      },
+      {
+       "phase": "env.step",
+       "count": 400,
+       "total_ms": 955.3937829999999,
+       "mean_ms": 2.3884844574999997,
+       "std_ms": 0.5989355597798967,
+       "min_ms": 1.322046,
+       "p50_ms": 2.277247,
+       "p95_ms": 3.619757,
+       "p99_ms": 4.419827,
+       "max_ms": 4.894137
+      },
+      {
+       "phase": "map.draw_fov",
+       "count": 400,
+       "total_ms": 119.84629699999996,
+       "mean_ms": 0.2996157424999999,
+       "std_ms": 0.0890352206171591,
+       "min_ms": 0.152596,
+       "p50_ms": 0.287713,
+       "p95_ms": 0.439025,
+       "p99_ms": 0.556349,
+       "max_ms": 1.145275
+      },
+      {
+       "phase": "reward.step",
+       "count": 400,
+       "total_ms": 119.62663299999994,
+       "mean_ms": 0.29906658249999984,
+       "std_ms": 0.2074885075077128,
+       "min_ms": 0.009012,
+       "p50_ms": 0.296359,
+       "p95_ms": 0.570829,
+       "p99_ms": 0.952837,
+       "max_ms": 2.054255
+      },
+      {
+       "phase": "scene.collision_check",
+       "count": 400,
+       "total_ms": 147.92869000000005,
+       "mean_ms": 0.3698217250000001,
+       "std_ms": 0.16329625228703007,
+       "min_ms": 0.182537,
+       "p50_ms": 0.347552,
+       "p95_ms": 0.549639,
+       "p99_ms": 0.779278,
+       "max_ms": 2.820125
+      },
+      {
+       "phase": "scene.draw_actors",
+       "count": 400,
+       "total_ms": 63.94332099999998,
+       "mean_ms": 0.15985830249999997,
+       "std_ms": 0.10924264294304213,
+       "min_ms": 0.041948,
+       "p50_ms": 0.144939,
+       "p95_ms": 0.251692,
+       "p99_ms": 0.313983,
+       "max_ms": 1.551788
+      },
+      {
+       "phase": "scene.hero_step",
+       "count": 400,
+       "total_ms": 103.74319800000004,
+       "mean_ms": 0.25935799500000006,
+       "std_ms": 0.1377936873544103,
+       "min_ms": 0.113185,
+       "p50_ms": 0.232102,
+       "p95_ms": 0.416362,
+       "p99_ms": 0.789641,
+       "max_ms": 1.648302
+      },
+      {
+       "phase": "scene.npc_step",
+       "count": 400,
+       "total_ms": 193.3967460000001,
+       "mean_ms": 0.48349186500000024,
+       "std_ms": 0.1492513411277325,
+       "min_ms": 0.246287,
+       "p50_ms": 0.461725,
+       "p95_ms": 0.717262,
+       "p99_ms": 1.049922,
+       "max_ms": 1.551136
+      }
+     ],
+     "random_nav@128px/rgb_array": [
+      {
+       "phase": "env.outcome",
+       "count": 400,
+       "total_ms": 438.5618539999998,
+       "mean_ms": 1.0964046349999996,
+       "std_ms": 0.4866457806000703,
+       "min_ms": 0.320795,
+       "p50_ms": 1.056325,
+       "p95_ms": 1.721691,
+       "p99_ms": 2.750428,
+       "max_ms": 6.076773
+      },
+      {
+       "phase": "env.render",
+       "count": 400,
+       "total_ms": 332.0710999999999,
+       "mean_ms": 0.8301777499999997,
+       "std_ms": 0.2662014694419858,
+       "min_ms": 0.441615,
+       "p50_ms": 0.784795,
+       "p95_ms": 1.305322,
+       "p99_ms": 1.77955,
+       "max_ms": 2.88528
+      },
+      {
+       "phase": "env.reset",
+       "count": 11,
+       "total_ms": 26220.596656,
+       "mean_ms": 2383.6906050909092,
+       "std_ms": 272.5006192044384,
+       "min_ms": 1940.059837,
+       "p50_ms": 2400.859187,
+       "p95_ms": 3003.329724,
+       "p99_ms": 3003.329724,
+       "max_ms": 3003.329724
+      },
+      {
+       "phase": "env.simulate",
+       "count": 400,
+       "total_ms": 780.5989840000003,
+       "mean_ms": 1.9514974600000008,
+       "std_ms": 0.5460987482116979,
+       "min_ms": 0.872469,
+       "p50_ms": 1.932072,
+       "p95_ms": 2.712496,
+       "p99_ms": 3.93453,
+       "max_ms": 6.105748
+      },
+      {
+       "phase": "env.stats",
+       "count": 400,
+       "total_ms": 15.374000000000015,
+       "mean_ms": 0.03843500000000004,
+       "std_ms": 0.03813916402236683,
+       "min_ms": 0.01878,
+       "p50_ms": 0.031865,
+       "p95_ms": 0.065926,
+       "p99_ms": 0.132646,
+       "max_ms": 0.707997
+      },
+      {
+       "phase": "env.step",
+       "count": 400,
+       "total_ms": 1617.6299600000002,
+       "mean_ms": 4.044074900000001,
+       "std_ms": 1.0016493515705858,
+       "min_ms": 2.116809,
+       "p50_ms": 3.93909,
+       "p95_ms": 5.791626,
+       "p99_ms": 7.618649,
+       "max_ms": 8.799623
+      },
+      {
+       "phase": "map.draw_fov",
+       "count": 400,
+       "total_ms": 127.20903300000006,
+       "mean_ms": 0.31802258250000015,
+       "std_ms": 0.10566878885067338,
+       "min_ms": 0.17903,
+       "p50_ms": 0.300142,
+       "p95_ms": 0.455619,
+       "p99_ms": 0.818074,
+       "max_ms": 1.116149
+      },
+      {
+       "phase": "reward.step",
+       "count": 400,
+       "total_ms": 186.17896699999991,
+       "mean_ms": 0.4654474174999998,
+       "std_ms": 0.2683388077489784,
+       "min_ms": 0.01117,
+       "p50_ms": 0.473633,
+       "p95_ms": 0.840766,
+       "p99_ms": 1.362222,
+       "max_ms": 2.145409
+      },
+      {
+       "phase": "scene.collision_check",
+       "count": 400,
+       "total_ms": 241.30378500000003,
+       "mean_ms": 0.6032594625000001,
+       "std_ms": 0.3572764467847742,
+       "min_ms": 0.269974,
+       "p50_ms": 0.553432,
+       "p95_ms": 1.027267,
+       "p99_ms": 1.4786,
+       "max_ms": 5.457882
+      },
+      {
+       "phase": "scene.draw_actors",
+       "count": 400,
+       "total_ms": 119.52026099999995,
+       "mean_ms": 0.2988006524999999,
+       "std_ms": 0.16240963896673974,
+       "min_ms": 0.144387,
+       "p50_ms": 0.26759,
+       "p95_ms": 0.446426,
+       "p99_ms": 0.927245,
+       "max_ms": 2.283503
+      },
+      {
+       "phase": "scene.hero_step",
+       "count": 400,
+       "total_ms": 112.55931000000007,
+       "mean_ms": 0.28139827500000014,
+       "std_ms": 0.1178786587865012,
+       "min_ms": 0.128623,
+       "p50_ms": 0.264975,
+       "p95_ms": 0.422701,
+       "p99_ms": 0.614796,
+       "max_ms": 1.741107
+      },
+      {
+       "phase": "scene.npc_step",
+       "count": 400,
+       "total_ms": 600.2739719999998,
+       "mean_ms": 1.5006849299999996,
+       "std_ms": 0.4688936658884934,
+       "min_ms": 0.659554,
+       "p50_ms": 1.46263,
+       "p95_ms": 2.105098,
+       "p99_ms": 3.347511,
+       "max_ms": 5.463535
+      }
+     ],
+     "lead_brake@128px/human": [
+      {
+       "phase": "env.outcome",
+       "count": 400,
+       "total_ms": 305.47845699999993,
+       "mean_ms": 0.7636961424999998,
+       "std_ms": 0.3286556545509862,
+       "min_ms": 0.253284,
+       "p50_ms": 0.731869,
+       "p95_ms": 1.179589,
+       "p99_ms": 1.725815,
+       "max_ms": 5.137264
+      },
+      {
+       "phase": "env.render",
+       "count": 400,
+       "total_ms": 391.19171200000034,
+       "mean_ms": 0.9779792800000009,
+       "std_ms": 0.23597381396713618,
+       "min_ms": 0.548974,
+       "p50_ms": 0.926242,
+       "p95_ms": 1.383597,
+       "p99_ms": 1.861441,
+       "max_ms": 3.156393
+      },
+      {
+       "phase": "env.reset",
+       "count": 11,
+       "total_ms": 112.743364,
+       "mean_ms": 10.249396727272726,
+       "std_ms": 2.5625181484364905,
+       "min_ms": 7.656191,
+       "p50_ms": 9.473902,
+       "p95_ms": 16.161938,
+       "p99_ms": 16.161938,
+       "max_ms": 16.161938
+      },
+      {
+       "phase": "env.simulate",
+       "count": 400,
+       "total_ms": 403.4394179999999,
+       "mean_ms": 1.0085985449999997,
+       "std_ms": 0.22295927204008129,
+       "min_ms": 0.553583,
+       "p50_ms": 0.973455,
+       "p95_ms": 1.356059,
+       "p99_ms": 1.959336,
+       "max_ms": 2.331723
+      },
+      {
+       "phase": "env.stats",
+       "count": 400,
+       "total_ms": 15.661507999999998,
+       "mean_ms": 0.03915377,
+       "std_ms": 0.01803787011698166,
+       "min_ms": 0.018187,
+       "p50_ms": 0.033876,
+       "p95_ms": 0.076588,
+       "p99_ms": 0.120232,
+       "max_ms": 0.152458
+      },
+      {
+       "phase": "env.step",
+       "count": 400,
+       "total_ms": 1161.0934029999992,
+       "mean_ms": 2.902733507499998,
+       "std_ms": 0.5940981925961271,
+       "min_ms": 1.739795,
+       "p50_ms": 2.775836,
+       "p95_ms": 3.890148,
+       "p99_ms": 5.207524,
+       "max_ms": 7.428437
+      },
+      {
+       "phase": "map.draw_fov",
+       "count": 400,
+       "total_ms": 134.81936499999992,
+       "mean_ms": 0.3370484124999998,
+       "std_ms": 0.13906759998062934,
+       "min_ms": 0.179344,
+       "p50_ms": 0.306255,
+       "p95_ms": 0.548847,
+       "p99_ms": 0.681108,
+       "max_ms": 2.329496
+      },
+      {
+       "phase": "renderer.human",
+       "count": 411,
+       "total_ms": 87.49915499999992,
+       "mean_ms": 0.212893321167883,
+       "std_ms": 0.07008158475325042,
+       "min_ms": 0.148211,
+       "p50_ms": 0.197814,
+       "p95_ms": 0.28446,
+       "p99_ms": 0.512169,
+       "max_ms": 1.14246
+      },
+      {
+       "phase": "reward.step",
+       "count": 400,
+       "total_ms": 134.2120179999999,
+       "mean_ms": 0.3355300449999997,
+       "std_ms": 0.2893216215863636,
+       "min_ms": 0.01098,
+       "p50_ms": 0.330445,
+       "p95_ms": 0.618927,
+       "p99_ms": 1.010985,
+       "max_ms": 4.662958
+      },
+      {
+       "phase": "scene.collision_check",
+       "count": 400,
+       "total_ms": 160.92816299999998,
+       "mean_ms": 0.4023204075,
+       "std_ms": 0.11563014706414779,
+       "min_ms": 0.203708,
+       "p50_ms": 0.379609,
+       "p95_ms": 0.613256,
+       "p99_ms": 0.862141,
+       "max_ms": 1.411947
+      },
+      {
+       "phase": "scene.draw_actors",
+       "count": 400,
+       "total_ms": 73.63314299999998,
+       "mean_ms": 0.18408285749999995,
+       "std_ms": 0.07847391175417595,
+       "min_ms": 0.065134,
+       "p50_ms": 0.164858,
+       "p95_ms": 0.320773,
+       "p99_ms": 0.491807,
+       "max_ms": 0.719816
+      },
+      {
+       "phase": "scene.hero_step",
+       "count": 400,
+       "total_ms": 118.177395,
+       "mean_ms": 0.2954434875,
+       "std_ms": 0.09603727317677155,
+       "min_ms": 0.150657,
+       "p50_ms": 0.279934,
+       "p95_ms": 0.431214,
+       "p99_ms": 0.603116,
+       "max_ms": 1.149635
+      },
+      {
+       "phase": "scene.npc_step",
+       "count": 400,
+       "total_ms": 214.3190550000001,
+       "mean_ms": 0.5357976375000003,
+       "std_ms": 0.12538823709280345,
+       "min_ms": 0.291256,
+       "p50_ms": 0.513865,
+       "p95_ms": 0.732995,
+       "p99_ms": 0.92439,
+       "max_ms": 1.43356
+      }
+     ],
+     "lead_brake@256px/rgb_array": [
+      {
+       "phase": "env.outcome",
+       "count": 400,
+       "total_ms": 280.29092099999997,
+       "mean_ms": 0.7007273024999999,
+       "std_ms": 0.2322154803003796,
+       "min_ms": 0.209819,
+       "p50_ms": 0.714754,
+       "p95_ms": 1.053505,
+       "p99_ms": 1.303217,
+       "max_ms": 1.678011
+      },
+      {
+       "phase": "env.render",
+       "count": 400,
+       "total_ms": 497.21872599999995,
+       "mean_ms": 1.2430468149999998,
+       "std_ms": 0.30993732757460946,
+       "min_ms": 0.656608,
+       "p50_ms": 1.239124,
+       "p95_ms": 1.719869,
+       "p99_ms": 1.976998,
+       "max_ms": 4.424656
+      },
+      {
+       "phase": "env.reset",
+       "count": 11,
+       "total_ms": 113.80743,
+       "mean_ms": 10.34613,
+       "std_ms": 1.2638454352921915,
+       "min_ms": 8.400815,
+       "p50_ms": 10.268933,
+       "p95_ms": 12.35424,
+       "p99_ms": 12.35424,
+       "max_ms": 12.35424
+      },
+      {
+       "phase": "env.simulate",
+       "count": 400,
+       "total_ms": 386.553299,
+       "mean_ms": 0.9663832474999999,
+       "std_ms": 0.30044107512435153,
+       "min_ms": 0.460471,
+       "p50_ms": 0.966976,
+       "p95_ms": 1.335455,
+       "p99_ms": 1.583429,
+       "max_ms": 4.624197
+      },
+      {
+       "phase": "env.stats",
+       "count": 400,
+       "total_ms": 14.085481999999994,
+       "mean_ms": 0.035213704999999984,
+       "std_ms": 0.018598294431559442,
+       "min_ms": 0.015526,
+       "p50_ms": 0.031725,
+       "p95_ms": 0.066102,
+       "p99_ms": 0.089442,
+       "max_ms": 0.267509
+      },
+      {
+       "phase": "env.step",
+       "count": 400,
+       "total_ms": 1222.9749669999999,
+       "mean_ms": 3.0574374174999996,
+       "std_ms": 0.702492984151684,
+       "min_ms": 1.533912,
+       "p50_ms": 3.106227,
+       "p95_ms": 4.094694,
+       "p99_ms": 5.011401,
+       "max_ms": 6.586479
+      },
+      {
+       "phase": "map.draw_fov",
+       "count": 400,
+       "total_ms": 213.38744500000004,
+       "mean_ms": 0.5334686125000001,
+       "std_ms": 0.12929403277225265,
+       "min_ms": 0.28961,
+       "p50_ms": 0.525229,
+       "p95_ms": 0.728429,
+       "p99_ms": 1.040182,
+       "max_ms": 1.301889
+      },
+      {
+       "phase": "reward.step",
+       "count": 400,
+       "total_ms": 118.13930100000005,
+       "mean_ms": 0.29534825250000013,
+       "std_ms": 0.17142166107917559,
+       "min_ms": 0.009357,
+       "p50_ms": 0.319126,
+       "p95_ms": 0.532351,
+       "p99_ms": 0.755023,
+       "max_ms": 1.062283
+      },
+      {
+       "phase": "scene.collision_check",
+       "count": 400,
+       "total_ms": 152.81311899999997,
+       "mean_ms": 0.3820327974999999,
+       "std_ms": 0.11145111228640338,
+       "min_ms": 0.177282,
+       "p50_ms": 0.382901,
+       "p95_ms": 0.553284,
+       "p99_ms": 0.674214,
+       "max_ms": 1.131109
+      },
+      {
+       "phase": "scene.draw_actors",
+       "count": 400,
+       "total_ms": 66.45271199999999,
+       "mean_ms": 0.16613177999999998,
+       "std_ms": 0.05971002182139611,
+       "min_ms": 0.057533,
+       "p50_ms": 0.158032,
+       "p95_ms": 0.258673,
+       "p99_ms": 0.314798,
+       "max_ms": 0.659573
+      },
+      {
+       "phase": "scene.hero_step",
+       "count": 400,
+       "total_ms": 114.20747800000008,
+       "mean_ms": 0.2855186950000002,
+       "std_ms": 0.0954514275952276,
+       "min_ms": 0.129423,
+       "p50_ms": 0.277648,
+       "p95_ms": 0.409463,
+       "p99_ms": 0.510666,
+       "max_ms": 1.264872
+      },
+      {
+       "phase": "scene.npc_step",
+       "count": 400,
+       "total_ms": 206.48753200000004,
+       "mean_ms": 0.5162188300000001,
+       "std_ms": 0.2353074181789242,
+       "min_ms": 0.228104,
+       "p50_ms": 0.514864,
+       "p95_ms": 0.719269,
+       "p99_ms": 0.990423,
+       "max_ms": 4.306877
+      }
+     ],
+     "lead_brake@256px/human": [
+      {
+       "phase": "env.outcome",
+       "count": 400,
+       "total_ms": 332.30593899999997,
+       "mean_ms": 0.8307648474999999,
+       "std_ms": 0.2674273150927542,
+       "min_ms": 0.266677,
+       "p50_ms": 0.812158,
+       "p95_ms": 1.247048,
+       "p99_ms": 1.50637,
+       "max_ms": 2.920952
+      },
+      {
+       "phase": "env.render",
+       "count": 400,
+       "total_ms": 710.1265470000005,
+       "mean_ms": 1.7753163675000012,
+       "std_ms": 0.4834217831356769,
+       "min_ms": 0.993653,
+       "p50_ms": 1.683907,
+       "p95_ms": 2.384518,
+       "p99_ms": 3.503169,
+       "max_ms": 7.235983
+      },
+      {
+       "phase": "env.reset",
+       "count": 11,
+       "total_ms": 134.356731,
+       "mean_ms": 12.214248272727273,
+       "std_ms": 2.1608127312588614,
+       "min_ms": 8.105412,
+       "p50_ms": 12.345211,
+       "p95_ms": 16.108569,
+       "p99_ms": 16.108569,
+       "max_ms": 16.108569
+      },
+      {
+       "phase": "env.simulate",
+       "count": 400,
+       "total_ms": 455.3567699999996,
+       "mean_ms": 1.138391924999999,
+       "std_ms": 0.2468564218478413,
+       "min_ms": 0.546057,
+       "p50_ms": 1.089964,
+       "p95_ms": 1.570648,
+       "p99_ms": 1.948621,
+       "max_ms": 2.225205
+      },
+      {
+       "phase": "env.stats",
+       "count": 400,
+       "total_ms": 17.928874999999984,
+       "mean_ms": 0.04482218749999996,
+       "std_ms": 0.07598704637839494,
+       "min_ms": 0.017945,
+       "p50_ms": 0.035468,
+       "p95_ms": 0.081025,
+       "p99_ms": 0.109746,
+       "max_ms": 1.518633
+      },
+      {
+       "phase": "env.step",
+       "count": 400,
+       "total_ms": 1565.2913690000005,
+       "mean_ms": 3.9132284225000014,
+       "std_ms": 0.7534360965674156,
+       "min_ms": 2.212845,
+       "p50_ms": 3.790341,
+       "p95_ms": 5.124989,
+       "p99_ms": 6.244541,
+       "max_ms": 10.107399
+      },
+      {
+       "phase": "map.draw_fov",
+       "count": 400,
+       "total_ms": 243.57969200000014,
+       "mean_ms": 0.6089492300000003,
+       "std_ms": 0.19890037193375756,
+       "min_ms": 0.321329,
+       "p50_ms": 0.569503,
+       "p95_ms": 0.834092,
+       "p99_ms": 1.280917,
+       "max_ms": 3.356423
+      },
+      {
+       "phase": "renderer.human",
+       "count": 411,
+       "total_ms": 120.78083699999992,
+       "mean_ms": 0.2938706496350363,
+       "std_ms": 0.15834455298803893,
+       "min_ms": 0.182692,
+       "p50_ms": 0.273473,
+       "p95_ms": 0.385954,
+       "p99_ms": 0.81396,
+       "max_ms": 2.986427
+      },
+      {
+       "phase": "reward.step",
+       "count": 400,
+       "total_ms": 139.94527600000004,
+       "mean_ms": 0.3498631900000001,
+       "std_ms": 0.19386286308278308,
+       "min_ms": 0.00959,
+       "p50_ms": 0.357419,
+       "p95_ms": 0.643262,
+       "p99_ms": 0.773945,
+       "max_ms": 1.115797
+      },
+      {
+       "phase": "scene.collision_check",
+       "count": 400,
+       "total_ms": 181.1756369999999,
+       "mean_ms": 0.45293909249999975,
+       "std_ms": 0.16047216765242794,
+       "min_ms": 0.204614,
+       "p50_ms": 0.422169,
+       "p95_ms": 0.637116,
+       "p99_ms": 0.918682,
+       "max_ms": 2.565358
+      },
+      {
+       "phase": "scene.draw_actors",
+       "count": 400,
+       "total_ms": 78.102612,
+       "mean_ms": 0.19525652999999998,
+       "std_ms": 0.07433672871891189,
+       "min_ms": 0.071986,
+       "p50_ms": 0.1794,
+       "p95_ms": 0.323034,
+       "p99_ms": 0.44482,
+       "max_ms": 0.824667
+      },
+      {
+       "phase": "scene.hero_step",
+       "count": 400,
+       "total_ms": 139.8541720000001,
+       "mean_ms": 0.34963543000000025,
+       "std_ms": 0.09468659721940641,
+       "min_ms": 0.162787,
+       "p50_ms": 0.331638,
+       "p95_ms": 0.528147,
+       "p99_ms": 0.660286,
+       "max_ms": 0.885025
+      },
+      {
+       "phase": "scene.npc_step",
+       "count": 400,
+       "total_ms": 236.70270799999975,
+       "mean_ms": 0.5917567699999994,
+       "std_ms": 0.1429982270985102,
+       "min_ms": 0.288511,
+       "p50_ms": 0.563547,
+       "p95_ms": 0.839445,
+       "p99_ms": 1.149658,
+       "max_ms": 1.308512
+      }
+     ]
+    },
+    "multi_rate": [
+     {
+      "physics_dt": 0.1,
+      "action_repeat": 1,
+      "control_dt": 0.1,
+      "ms_per_decision": 2.383299449993501,
+      "decisions_per_s": 419.5863847502364,
+      "physics_steps_per_s": 419.5863847502364,
+      "real_time_x": 41.95863847502364,
+      "simulate_mean_ms": 0.8971432749999996,
+      "render_mean_ms": 0.6563577
+     },
+     {
+      "physics_dt": 0.05,
+      "action_repeat": 2,
+      "control_dt": 0.1,
+      "ms_per_decision": 4.362069755097764,
+      "decisions_per_s": 229.24897036122425,
+      "physics_steps_per_s": 458.4979407224485,
+      "real_time_x": 22.924897036122427,
+      "simulate_mean_ms": 0.9426271012658236,
+      "render_mean_ms": 0.7089134700000002
+     },
+     {
+      "physics_dt": 0.025,
+      "action_repeat": 4,
+      "control_dt": 0.1,
+      "ms_per_decision": 7.126046970297466,
+      "decisions_per_s": 140.33025661606837,
+      "physics_steps_per_s": 561.3210264642735,
+      "real_time_x": 14.033025661606837,
+      "simulate_mean_ms": 0.8322802968152864,
+      "render_mean_ms": 0.6763039199999994
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -20,6 +20,51 @@ class TestCli(unittest.TestCase):
             cli_main(["run", "interactive", "--help"])
         self.assertEqual(ctx.exception.code, 0)
 
+    def test_run_sim_help_returns_zero(self):
+        with self.assertRaises(SystemExit) as ctx:
+            cli_main(["run", "sim", "--help"])
+        self.assertEqual(ctx.exception.code, 0)
+
+    def test_run_sim_manual_requires_human_render(self):
+        with self.assertRaises(SystemExit):
+            cli_main(["run", "sim", "--control", "manual", "--render", "rgb_array", "--episodes", "1"])
+
+    def test_run_sim_headless_random_rollout_writes_episode_log(self):
+        import json
+        import os
+
+        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            code = cli_main(
+                [
+                    "run", "sim", "--control", "random", "--episodes", "2", "--no-traffic",
+                    "--max-episode-duration-s", "1.0", "--no-scene-library", "--seed", "5",
+                    "--log-dir", tmpdir, "--exp-name", "cli-test",
+                ]
+            )
+            self.assertEqual(code, 0)
+            log_path = f"{tmpdir}/cli-test/episodes.jsonl"
+            self.assertTrue(os.path.exists(log_path))
+            with open(log_path, encoding="utf-8") as handle:
+                records = [json.loads(line) for line in handle if line.strip()]
+        self.assertEqual(len(records), 2)
+        self.assertEqual({r["termination"] for r in records}, {"max_actions"})
+        self.assertTrue(all(abs(r["episode_duration_s"] - 1.0) < 1e-9 for r in records))
+
+    def test_run_sim_scenario_mode_with_custom_physics_dt(self):
+        import os
+
+        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            code = cli_main(
+                [
+                    "run", "sim", "--control", "idle", "--reset-mode", "scenario", "--scenario-id", "lead_brake",
+                    "--physics-dt", "0.05", "--episodes", "1", "--max-episode-duration-s", "1.0",
+                    "--no-scene-library", "--no-log", "--log-dir", tmpdir,
+                ]
+            )
+        self.assertEqual(code, 0)
+
     def test_analyze_scene_library_reports_core_counts(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = f"{tmpdir}/scene_library.db"

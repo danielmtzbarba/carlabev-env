@@ -1,0 +1,1157 @@
+{
+ "digest": "58851f1bfe0bd58d684466de1fa3a9527f84d4d1e923a72e020768640c9c19b5",
+ "steps": [
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.31249999999994,
+    "y_m": 288.68749999999994,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.1,
+   "sim_t": 0.1,
+   "step": 0,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "cruise",
+     "target_speed_mps": 10.0,
+     "v_mps": 9.975,
+     "x_m": 265.3124999999999,
+     "y_m": 276.37499999999994,
+     "yaw": -1.5707963267948926
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.31249999999994,
+    "y_m": 287.68749999999994,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 0.2,
+   "step": 1,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "cruise",
+     "target_speed_mps": 10.0,
+     "v_mps": 9.951349875,
+     "x_m": 265.3124999999999,
+     "y_m": 275.37749999999994,
+     "yaw": -1.57079632679489
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.31249999999994,
+    "y_m": 286.68749999999994,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.19095180574253012,
+   "sim_t": 0.30000000000000004,
+   "step": 2,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "cruise",
+     "target_speed_mps": 10.0,
+     "v_mps": 9.928976508383068,
+     "x_m": 265.3124999999999,
+     "y_m": 274.3823650124999,
+     "yaw": -1.5707963267948843
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.31249999999994,
+    "y_m": 285.68749999999994,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.19095180574253012,
+   "sim_t": 0.4,
+   "step": 3,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "cruise",
+     "target_speed_mps": 10.0,
+     "v_mps": 9.90781076806311,
+     "x_m": 265.3124999999999,
+     "y_m": 273.3894673616616,
+     "yaw": -1.570796326794885
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.31249999999994,
+    "y_m": 284.68749999999994,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.4476408080684289,
+   "sim_t": 0.5,
+   "step": 4,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "cruise",
+     "target_speed_mps": 10.0,
+     "v_mps": 9.887787286816804,
+     "x_m": 265.3124999999999,
+     "y_m": 272.39868628485533,
+     "yaw": -1.5707963267948846
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.31249999999994,
+    "y_m": 283.68749999999994,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.1,
+   "sim_t": 0.6000000000000001,
+   "step": 5,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "cruise",
+     "target_speed_mps": 10.0,
+     "v_mps": 9.868844254990098,
+     "x_m": 265.3124999999999,
+     "y_m": 271.40990755617366,
+     "yaw": -1.5707963267948455
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.31249999999994,
+    "y_m": 282.68749999999994,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.8553049632217495,
+   "sim_t": 0.7000000000000001,
+   "step": 6,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "cruise",
+     "target_speed_mps": 10.0,
+     "v_mps": 9.850923224854743,
+     "x_m": 265.31249999999994,
+     "y_m": 270.42302313067466,
+     "yaw": -1.5707963267948293
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.31249999999994,
+    "y_m": 281.68749999999994,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 0.8,
+   "step": 7,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "cruise",
+     "target_speed_mps": 10.0,
+     "v_mps": 9.83396892593561,
+     "x_m": 265.3125,
+     "y_m": 269.4379308081892,
+     "yaw": -1.5707963267948186
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.31249999999994,
+    "y_m": 280.68749999999994,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.19095180574253012,
+   "sim_t": 0.9,
+   "step": 8,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "cruise",
+     "target_speed_mps": 10.0,
+     "v_mps": 9.817929090671576,
+     "x_m": 265.31250000000006,
+     "y_m": 268.4545339155956,
+     "yaw": -1.570796326794822
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.31249999999994,
+    "y_m": 279.68749999999994,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.19095180574253012,
+   "sim_t": 1.0,
+   "step": 9,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 9.6,
+     "v_mps": 9.443650744345685,
+     "x_m": 265.3125000000001,
+     "y_m": 267.47274100652845,
+     "yaw": -1.570796326794831
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.31249999999994,
+    "y_m": 278.68749999999994,
+    "yaw": -1.538200521637029
+   },
+   "pedestrians": [],
+   "reward": 0.27706095656213403,
+   "sim_t": 1.1,
+   "step": 10,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 9.2,
+     "v_mps": 9.070814236469449,
+     "x_m": 265.31250000000017,
+     "y_m": 266.52837593209387,
+     "yaw": -1.5707963267948315
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.3450900333639,
+    "y_m": 277.68803119622197,
+    "yaw": -1.5056047164791613
+   },
+   "pedestrians": [],
+   "reward": 0.6243454502646574,
+   "sim_t": 1.2000000000000002,
+   "step": 11,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 8.799999999999999,
+     "v_mps": 8.699358302286942,
+     "x_m": 265.3125000000002,
+     "y_m": 265.6212945084469,
+     "yaw": -1.5707963267948375
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.4102354766865,
+    "y_m": 276.6901554167713,
+    "yaw": -1.4730089113212936
+   },
+   "pedestrians": [],
+   "reward": 0.1,
+   "sim_t": 1.3,
+   "step": 12,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 8.399999999999999,
+     "v_mps": 8.329222535312628,
+     "x_m": 265.3125000000003,
+     "y_m": 264.7513586782182,
+     "yaw": -1.570796326794841
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.5078671199412,
+    "y_m": 275.69493279733615,
+    "yaw": -1.440413106163426
+   },
+   "pedestrians": [],
+   "reward": 0.8410243756880076,
+   "sim_t": 1.4000000000000001,
+   "step": 13,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 7.999999999999998,
+     "v_mps": 7.960347345704076,
+     "x_m": 265.31250000000034,
+     "y_m": 263.91843642468694,
+     "yaw": -1.5707963267948495
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.63788124000774,
+    "y_m": 274.7034206549076,
+    "yaw": -1.4078173010055584
+   },
+   "pedestrians": [],
+   "reward": 0.17503915526398595,
+   "sim_t": 1.5,
+   "step": 14,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 7.599999999999998,
+     "v_mps": 7.592673919731224,
+     "x_m": 265.3125000000004,
+     "y_m": 263.12240169011653,
+     "yaw": -1.5707963267948521
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.80013971086737,
+    "y_m": 273.7166723644939,
+    "yaw": -1.3752214958476907
+   },
+   "pedestrians": [],
+   "reward": 0.17503915526398595,
+   "sim_t": 1.6,
+   "step": 15,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 7.1999999999999975,
+     "v_mps": 7.226144180280951,
+     "x_m": 265.31250000000045,
+     "y_m": 262.3631342981434,
+     "yaw": -1.57079632679486
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 265.9944701503467,
+    "y_m": 272.7357362400231,
+    "yaw": -1.342625690689823
+   },
+   "pedestrians": [],
+   "reward": 0.25006417732227215,
+   "sim_t": 1.7000000000000002,
+   "step": 16,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 6.799999999999997,
+     "v_mps": 6.860700748338109,
+     "x_m": 265.31250000000045,
+     "y_m": 261.6405198801153,
+     "yaw": -1.570796326794867
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 266.2206661032551,
+    "y_m": 271.76165442062194,
+    "yaw": -1.3100298855319554
+   },
+   "pedestrians": [],
+   "reward": 0.5008227334912522,
+   "sim_t": 1.8,
+   "step": 17,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 6.399999999999997,
+     "v_mps": 6.49628690538646,
+     "x_m": 265.31250000000045,
+     "y_m": 260.95444980528146,
+     "yaw": -1.5707963267948741
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 266.47848726072135,
+    "y_m": 270.7954617634553,
+    "yaw": -1.2774340803740878
+   },
+   "pedestrians": [],
+   "reward": 0.6212888065183936,
+   "sim_t": 1.9000000000000001,
+   "step": 18,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 5.9999999999999964,
+     "v_mps": 6.13284655667504,
+     "x_m": 265.31250000000045,
+     "y_m": 260.3048211147428,
+     "yaw": -1.5707963267948744
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 266.7676597154959,
+    "y_m": 269.83818474430166,
+    "yaw": -1.2448382752162201
+   },
+   "pedestrians": [],
+   "reward": 0.5418454573956372,
+   "sim_t": 2.0,
+   "step": 19,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 5.599999999999996,
+     "v_mps": 5.770324195297496,
+     "x_m": 265.31250000000045,
+     "y_m": 259.69153645907534,
+     "yaw": -1.5707963267948757
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 267.08787625294764,
+    "y_m": 268.8908403670331,
+    "yaw": -1.2774340803740878
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 2.1,
+   "step": 20,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 5.199999999999996,
+     "v_mps": 5.408664867033729,
+     "x_m": 265.31250000000045,
+     "y_m": 259.1145040395456,
+     "yaw": -1.5707963267948755
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 267.37704870772217,
+    "y_m": 267.93356334787944,
+    "yaw": -1.3100298855319554
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 2.2,
+   "step": 21,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 4.799999999999995,
+     "v_mps": 5.047814135904952,
+     "x_m": 265.31250000000045,
+     "y_m": 258.57363755284223,
+     "yaw": -1.5707963267948766
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 267.6348698651884,
+    "y_m": 266.9673706907128,
+    "yaw": -1.342625690689823
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 2.3000000000000003,
+   "step": 22,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 4.399999999999995,
+     "v_mps": 4.687718050394824,
+     "x_m": 265.31250000000045,
+     "y_m": 258.06885613925175,
+     "yaw": -1.5707963267948764
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 267.86106581809685,
+    "y_m": 265.9932888713117,
+    "yaw": -1.3752214958476907
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 2.4000000000000004,
+   "step": 23,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 3.999999999999995,
+     "v_mps": 4.328323110290825,
+     "x_m": 265.31250000000045,
+     "y_m": 257.6000843342123,
+     "yaw": -1.5707963267948752
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 268.05539625757615,
+    "y_m": 265.01235274684086,
+    "yaw": -1.4078173010055584
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 2.5,
+   "step": 24,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 3.599999999999995,
+     "v_mps": 3.969576234101409,
+     "x_m": 265.31250000000045,
+     "y_m": 257.1672520231832,
+     "yaw": -1.5707963267948755
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 268.2176547284358,
+    "y_m": 264.0256044564272,
+    "yaw": -1.440413106163426
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 2.6,
+   "step": 25,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 3.1999999999999953,
+     "v_mps": 3.6114247270057405,
+     "x_m": 265.31250000000045,
+     "y_m": 256.7702943997731,
+     "yaw": -1.5707963267948748
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 268.34766884850234,
+    "y_m": 263.0340923139986,
+    "yaw": -1.4730089113212936
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 2.7,
+   "step": 26,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 2.7999999999999954,
+     "v_mps": 3.253816249293975,
+     "x_m": 265.31250000000045,
+     "y_m": 256.4091519270725,
+     "yaw": -1.5707963267948735
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 268.445300491757,
+    "y_m": 262.03886969456346,
+    "yaw": -1.5056047164791613
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 2.8000000000000003,
+   "step": 27,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 2.3999999999999955,
+     "v_mps": 2.896698785257141,
+     "x_m": 265.31250000000045,
+     "y_m": 256.08377030214314,
+     "yaw": -1.5707963267948715
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 268.51044593507964,
+    "y_m": 261.0409939151128,
+    "yaw": -1.538200521637029
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 2.9000000000000004,
+   "step": 28,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 1.9999999999999956,
+     "v_mps": 2.540020612486639,
+     "x_m": 265.31250000000045,
+     "y_m": 255.79410042361744,
+     "yaw": -1.5707963267948715
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 268.5430359684436,
+    "y_m": 260.0415251113348,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 3.0,
+   "step": 29,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 1.5999999999999956,
+     "v_mps": 2.1837302715442677,
+     "x_m": 265.31250000000045,
+     "y_m": 255.54009836236878,
+     "yaw": -1.5707963267948706
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 268.5430359684436,
+    "y_m": 259.0415251113348,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 3.1,
+   "step": 30,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 1.1999999999999957,
+     "v_mps": 1.827776535964496,
+     "x_m": 265.31250000000045,
+     "y_m": 255.32172533521435,
+     "yaw": -1.570796326794869
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 268.5430359684436,
+    "y_m": 258.0415251113348,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 3.2,
+   "step": 31,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.7999999999999957,
+     "v_mps": 1.4721083825514114,
+     "x_m": 265.31250000000045,
+     "y_m": 255.1389476816179,
+     "yaw": -1.5707963267948668
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 10.0,
+    "x_m": 268.5430359684436,
+    "y_m": 257.0415251113348,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 3.3000000000000003,
+   "step": 32,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.3999999999999957,
+     "v_mps": 1.1166749619334158,
+     "x_m": 265.31250000000045,
+     "y_m": 254.99173684336276,
+     "yaw": -1.570796326794868
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 9.99468750712782,
+    "x_m": 268.5430359684436,
+    "y_m": 256.0415251113348,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 3.4000000000000004,
+   "step": 33,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.761425569339294,
+     "x_m": 265.31250000000045,
+     "y_m": 254.8800693471694,
+     "yaw": -1.5707963267948644
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 9.979541882855216,
+    "x_m": 268.5430359684436,
+    "y_m": 255.042056360622,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 3.5,
+   "step": 34,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.7182383370928005,
+     "x_m": 265.31250000000045,
+     "y_m": 254.8039267902355,
+     "yaw": -1.5707963267948641
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 9.959509945099748,
+    "x_m": 268.5430359684436,
+    "y_m": 254.0441021723365,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 3.6,
+   "step": 35,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.6772232469763865,
+     "x_m": 265.31250000000045,
+     "y_m": 254.7321029565262,
+     "yaw": -1.5707963267948637
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 9.93707479238736,
+    "x_m": 268.5430359684436,
+    "y_m": 253.04815117782653,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 3.7,
+   "step": 36,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.6382703583623182,
+     "x_m": 265.31250000000045,
+     "y_m": 254.66438063182858,
+     "yaw": -1.5707963267948633
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 9.913482670488216,
+    "x_m": 268.5430359684436,
+    "y_m": 252.0544436985878,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 3.8000000000000003,
+   "step": 37,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.6012753626341295,
+     "x_m": 265.31250000000045,
+     "y_m": 254.60055359599235,
+     "yaw": -1.5707963267948626
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 9.889358895672837,
+    "x_m": 268.5430359684436,
+    "y_m": 251.06309543153895,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 3.9000000000000004,
+   "step": 38,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.5661392880900808,
+     "x_m": 265.31250000000045,
+     "y_m": 254.54042605972893,
+     "yaw": -1.5707963267948617
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 9.865017066328406,
+    "x_m": 268.5430359684436,
+    "y_m": 250.07415954197168,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 4.0,
+   "step": 39,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.5327682209468729,
+     "x_m": 265.31250000000045,
+     "y_m": 254.48381213091992,
+     "yaw": -1.5707963267948606
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 9.765614295484294,
+    "x_m": 268.5430359684436,
+    "y_m": 249.08765783533883,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 4.1000000000000005,
+   "step": 40,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.501073041504079,
+     "x_m": 265.31250000000045,
+     "y_m": 254.43053530882523,
+     "yaw": -1.570796326794863
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 9.628876187805423,
+    "x_m": 268.5430359684436,
+    "y_m": 248.1110964057904,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 4.2,
+   "step": 41,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.4709691745902907,
+     "x_m": 265.31250000000045,
+     "y_m": 254.38042800467483,
+     "yaw": -1.5707963267948652
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 9.473735608301977,
+    "x_m": 268.5430359684436,
+    "y_m": 247.14820878700985,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 4.3,
+   "step": 42,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.4423763534680933,
+     "x_m": 265.31250000000045,
+     "y_m": 254.3333310872158,
+     "yaw": -1.570796326794867
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 9.309690151912655,
+    "x_m": 268.5430359684436,
+    "y_m": 246.20083522617966,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 4.4,
+   "step": 43,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.4152183964270671,
+     "x_m": 265.31250000000045,
+     "y_m": 254.289093451869,
+     "yaw": -1.5707963267948686
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 9.14150039064553,
+    "x_m": 268.5430359684436,
+    "y_m": 245.2698662109884,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 4.5,
+   "step": 44,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.38942299534236746,
+     "x_m": 265.31250000000045,
+     "y_m": 254.2475716122263,
+     "yaw": -1.5707963267948661
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 8.971548807072752,
+    "x_m": 268.5430359684436,
+    "y_m": 244.35571617192383,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 4.6000000000000005,
+   "step": 45,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.3649215155213888,
+     "x_m": 265.31250000000045,
+     "y_m": 254.20862931269207,
+     "yaw": -1.5707963267948675
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 8.801024146486593,
+    "x_m": 268.5430359684436,
+    "y_m": 243.45856129121657,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": 0.0,
+   "sim_t": 4.7,
+   "step": 46,
+   "terminated": false,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.3416488062028213,
+     "x_m": 265.31250000000045,
+     "y_m": 254.17213716113991,
+     "yaw": -1.5707963267948648
+    }
+   ]
+  },
+  {
+   "hero": {
+    "v_mps": 8.63051601359081,
+    "x_m": 268.5430359684436,
+    "y_m": 242.5784588765679,
+    "yaw": -1.5707963267948966
+   },
+   "pedestrians": [],
+   "reward": -1.0,
+   "sim_t": 4.800000000000001,
+   "step": 47,
+   "terminated": true,
+   "truncated": false,
+   "vehicles": [
+    {
+     "behavior_state": "braking",
+     "target_speed_mps": 0.0,
+     "v_mps": 0.31954302111132427,
+     "x_m": 265.31250000000045,
+     "y_m": 254.13797228051962,
+     "yaw": -1.5707963267948661
+    }
+   ]
+  }
+ ]
+}

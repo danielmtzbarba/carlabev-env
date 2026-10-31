@@ -175,13 +175,15 @@ def stop_line_ahead(actor, signals, lookahead_m: float):
 
     A light applies when it controls the vehicle's travel direction (within 45
     degrees), the vehicle is laterally within the strip span (measured in the
-    line's frame), and the strip is ahead (front bumper not yet past it).
+    line's frame). Signed gap is measured from the occupied front; retain the
+    line until the rear clears it so crossing detection can observe its sign.
     """
     own = kinematics_of(actor)
     if own is None:
         return None, None
     best, best_gap = None, None
     half_length = 0.5 * float(getattr(actor, "length_m", 0.0))
+    body = actor.body() if hasattr(actor, "body") else None
     for light in signals or ():
         yaw_c = getattr(light, "controlled_yaw", None)
         if yaw_c is None:
@@ -195,10 +197,22 @@ def stop_line_ahead(actor, signals, lookahead_m: float):
         # vehicle still aligning with the lane is not filtered out by its yaw.
         forward = dx * math.cos(yaw_c) + dy * math.sin(yaw_c)
         lateral = -dx * math.sin(yaw_c) + dy * math.cos(yaw_c)
-        if abs(lateral) > half_span:
-            continue
-        gap = forward - half_length
-        if gap < -half_length or gap > lookahead_m:
+        if body is not None:
+            rear, front = body.projection(yaw_c)
+            side_min, side_max = body.projection(yaw_c + math.pi / 2)
+            line_forward = lx * math.cos(yaw_c) + ly * math.sin(yaw_c)
+            line_side = -lx * math.sin(yaw_c) + ly * math.cos(yaw_c)
+            if side_min > line_side + half_span or side_max < line_side - half_span:
+                continue
+            gap = line_forward - front
+            cleared = line_forward < rear
+        else:
+            # Compatibility for point/length-only traffic-policy clients.
+            if abs(lateral) > half_span:
+                continue
+            gap = forward - half_length
+            cleared = gap < -half_length
+        if cleared or gap > lookahead_m:
             continue  # already crossed, or too far
         if best_gap is None or gap < best_gap:
             best, best_gap = light, gap

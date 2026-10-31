@@ -49,10 +49,15 @@ passed; `uv run carlabev validate simulator-semantics` → 19 PASS.
    is the same at every size.
 6. **Physically consistent NPCs.** A background actor's reported velocity must
    match its realised motion for the whole episode, including at route end.
-7. **Per-second reward semantics.** Non-terminal per-step rewards are scaled by
-   `physics_dt / 0.1` (`REWARD_REFERENCE_DT_S`), so the return per simulated
-   second — and per control step — does not depend on the physics step;
-   terminal rewards are paid once. At `dt = 0.1` the factor is exactly 1.
+7. **Per-second reward semantics.** Shaping progress and first motion
+   differences are converted to the reference interval (`0.1 s`) before
+   nonlinear squashing; changes of yaw rate receive a second time conversion.
+   The resulting reward rate is integrated once using `physics_dt / 0.1`.
+   Constant-rate isolated terms are invariant; varying signals converge with
+   finer sampling, rather than promising identical finite-step returns.
+   Checkpoint and terminal rewards are discrete, unscaled events. Different
+   timesteps can detect different checkpoint events, which is a separate
+   collision/trigger sampling limitation. At `dt = 0.1` coefficients are unchanged.
 8. **Realistic footprints by default.** `geometry_profile="realistic"` (rear-axle
    referenced 4.5 × 1.8 m cars, 0.3 m pedestrian circles) since Phase 6;
    `"legacy"` restores the historical 1.25 m squares for attribution.
@@ -112,6 +117,33 @@ EnvConfig.action_repeat       │              │  begin_control_step() once pe
 * `scene_info` / `info["hero"]` expose `sim_time_s`, `step_index`, `physics_dt_s`;
   `CarlaBEV.sim_time_s` / `CarlaBEV.physics_dt_s` expose them on the env.
 
+### Public information and integration corrections
+
+`reset()` returns initial `hero`, `scene`, and `signals` information without
+performing collision or checkpoint updates. `step()` returns the complete final
+sub-step information, also available as `env.current_info`, together with
+`episode_info` (empty on ongoing steps). Terminal and truncated steps retain
+both the clock and episode summary; early termination reports the actual
+physics time, not the scheduled control duration. Wrapped vector environments
+retain their usual per-field masks and episode statistics.
+
+Regression commands:
+
+```bash
+SDL_VIDEODRIVER=dummy uv run pytest tests/physics_time/clock/test_public_info.py
+SDL_VIDEODRIVER=dummy uv run pytest tests/physics_time/clock/test_shaping_reward_time.py
+SDL_VIDEODRIVER=dummy uv run pytest tests/physics_time/behavior/test_stop_line_geometry.py
+```
+
+The shaping regressions isolate progress, constant turning, acceleration,
+braking, and changing yaw rate at `0.1`, `0.05`, and `0.025 s`. They compare
+against reference-interval calculations rather than regenerated snapshots.
+Yaw differences are wrapped at ±π. Histories begin with zero previous yaw
+rate; abrupt turn onset and discrete events do not imply exact timestep invariance.
+`progress_term` is now reported at the reference interval while `delta_progress`
+remains the actual per-physics-step distance. Finer-step shaping returns change
+intentionally; checkpoint/terminal magnitudes and reward coefficients do not.
+
 ## Findings register
 
 Baseline measured on the pre-refactor code (all 72 legacy tests green).
@@ -165,7 +197,7 @@ Baseline measured on the pre-refactor code (all 72 legacy tests green).
 | B-06 | Pedestrians crossed on a timer regardless of traffic (fine for an adversarial jaywalk, wrong as a default for background pedestrians). | `jaywalk.py` | `GapAccepted(min_ttc_s)` trigger; `gap_accept_s` parameter on the jaywalk behaviours/scenario/registry (0 = legacy jaywalk). | `test_behavior_framework.py::test_jaywalk_gap_acceptance_*`, `::test_gap_accepted_*` | RESOLVED (Phase 4.5) |
 | G-02 | Canonical-graph junction centroids (`junction_centroids`) are biased ≈ 4 m towards the arm with more nodes and tag bends/straights as junctions (`intersection_13/15`). | probe vs the hand-measured centres in `red_light_running.py` (offsets 2.4–9.4 m) | `junctions.junction_geometry()`: centreline crossing + arm count; zones within 0.6–2.5 m of the measured centres. `junction_centroids` left untouched for the graph validator. | `test_traffic_rules.py::test_junction_map_has_only_real_junctions_with_accurate_centres` | RESOLVED (Phase 4.4) |
 | M-01 | **Physics, decision, observation and display rates were welded together** (one `env.step()` = one physics step = one observation = one window frame): finer physics changed the task, the viewer could not exceed 1/dt frames without fast-forwarding, and drawing was paid inside the physics step. | `carlabev.py::step`, `world.py::step` | `TimeConfig.action_repeat` / `control_dt_s`; `CarlaBEV.step` holds the action over `k` sub-steps (`BaseMap.advance`, no drawing), sums rewards, latches the first terminal cause, renders once (`BaseMap.render_world`); `render_fps = 1/control_dt`; `episode_info` gains `action_repeat`, `control_dt_s`, `physics_steps`, `decisions`. `WorldSnapshot` + `Presenter` (`envs/presenter.py`, `EnvConfig.display_fps`) show interpolated 30/60 Hz frames in real time, read-only. `k = 1` is bit-identical to the legacy step (goldens unchanged). | `clock/test_action_repeat.py` (9), `rendering/test_presenter.py` (4), validator `action_repeat_consistency`, benchmark `multi_rate` table | RESOLVED (Phase 5) |
-| R-06 | **Per-step rewards were tied to the 0.1 s step**: CaRL's route-completion term `clip(Δs/L·100)` saturated at 10 m/s and the shaping reward's base cost/penalties were per step, so a finer physics step changed the return per simulated second (k = 2 at 0.05 s doubled the CaRL return). | `carl_reward_fn.py`, `reward.py`; probe at (0.1, 1)/(0.05, 2)/(0.025, 4) | `REWARD_REFERENCE_DT_S = 0.1`: non-terminal per-step rewards scaled by `dt/0.1` (CaRL progress clipped per *reference* step, sidewalk ramp in reference steps); terminal rewards unscaled. Returns at equal simulated time now agree within the physics-convergence band (CaRL 6.28 / 5.96 / 5.71 instead of 6.28 / 11.6 / 17.8). Residual: comfort/jerk terms are per-step derivatives (documented). | `clock/test_action_repeat.py::test_return_per_simulated_second_is_physics_step_invariant` | RESOLVED (Phase 5) |
+| R-06 | **Per-step rewards were tied to the 0.1 s step**: CaRL's route-completion term `clip(Δs/L·100)` saturated at 10 m/s and the shaping reward's base cost/penalties were per step, so a finer physics step changed the return per simulated second (k = 2 at 0.05 s doubled the CaRL return). | `carl_reward_fn.py`, `reward.py`; probe at (0.1, 1)/(0.05, 2)/(0.025, 4) | `REWARD_REFERENCE_DT_S = 0.1`: non-terminal per-step rewards scaled by `dt/0.1` (CaRL progress clipped per *reference* step, sidewalk ramp in reference steps); terminal rewards unscaled. Returns at equal simulated time now agree within the physics-convergence band (CaRL 6.28 / 5.96 / 5.71 instead of 6.28 / 11.6 / 17.8). Integration correction: shaping progress and motion differences are normalized before squashing (see public integration corrections above). Residual differences come from finite sampling and potentially different discrete checkpoint events, not an extra timestep multiplier on progress. | `clock/test_action_repeat.py::test_return_per_simulated_second_is_physics_step_invariant` | RESOLVED (Phase 5) |
 | S-03 | The `red_light_runner` scenario claims a "4-way" intersection; Town01 has only T-junctions, so the adversary's west→east route turns at the junction and the ego's light sits on the through road. | scenario probe | Documented; routes are still valid (the adversary crosses the ego's path). Scenario redesign on a richer map is a follow-up. | — | OPEN (documented) |
 | F-02 | Footprint realism: the legacy 1.25 m ego/vehicle footprint is preserved as the `legacy` profile; `geometry_profile="realistic"` provides rear-axle referenced oriented boxes (car 4.5 × 1.8 m, van, bus) and 0.3 m pedestrian circles, with collisions, gaps and TTC computed on the shapes. Implemented (Phase 2); **promoted to the default in Phase 6** (`EnvConfig.geometry_profile`, `UnitContract()`, `carlabev run sim`); legacy goldens pinned with an explicit `geometry_profile="legacy"` and unchanged. See [actor_geometry.md](actor_geometry.md). | RESOLVED |
 | F-03 | Ego accel-filter dt-invariance. | **RESOLVED (Phase 4)** — see decision record below. |

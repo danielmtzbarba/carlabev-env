@@ -282,7 +282,7 @@ def test_compliant_vehicle_stops_before_a_red_stop_line_and_runner_crosses_it():
             assert adv.last_traffic_policy["constraint"] == "signal"
             assert 0.0 < adv.last_traffic_policy["signal_gap_m"] < 3.0
             assert (
-                adv._controller.x_m + 0.5 * adv.length_m < line_x
+                max(x for x, _ in adv.body().corner_tuples()) < line_x
             )  # front bumper before the line
         else:
             assert adv.last_traffic_policy["constraint"] is None
@@ -474,10 +474,21 @@ def test_ego_red_light_crossings_are_counted_but_never_enforced():
         for light in scene.actor_manager.actors["traffic_light"]:
             if light.controls_heading == "north":
                 light.set_signal_state(TrafficLightState.RED)
+                controlled_light = light
+        # Independent corner-based oracle for the first occupied point crossing
+        # the northbound stop line (north is decreasing world y).
+        line_y = controlled_light.stop_line_m()[1]
+        previous_gap = min(y for _, y in scene.hero.body().corner_tuples()) - line_y
+        expected_violations = 0
         speeds, violations, states = [], [], set()
         for _ in range(80):
             _, _, terminated, truncated, info = env.step(_autopilot(scene.hero))
-            signals = env.current_info["signals"]
+            signals = info["signals"]
+            gap = min(y for _, y in scene.hero.body().corner_tuples()) - line_y
+            if previous_gap >= 0.0 > gap:
+                expected_violations += 1
+            assert signals["red_light_violations"] == expected_violations
+            previous_gap = gap
             speeds.append(scene.hero.speed_mps)
             violations.append(signals["red_light_violations"])
             states.add(signals["state"])

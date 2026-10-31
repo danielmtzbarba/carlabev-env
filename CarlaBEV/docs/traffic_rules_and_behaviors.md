@@ -89,13 +89,23 @@ commands a full stop instead of IDM's asymptotic creep.
 
 `TrafficLight(controls_heading="north"|"south"|"east"|"west", cycle=SignalCycle)`.
 A light controls the vehicles travelling in that direction (within 45°) whose
-lateral position is within the strip span; the stop line is a virtual lead at
+lateral footprint intersects the strip span; the stop line is a virtual lead at
 rest `stop_line_margin_m` (0.5 m) before the strip. Red → stop; yellow → stop
 only if `gap ≥ v²/(2b)`; green → ignore. Lights without `controls_heading` are
 decorative (legacy authored scenes). `SignalCycle(green_s, yellow_s, red_s,
 offset_s)` derives the phase from `t` (`state_at(t)`), so two lights with
 complementary offsets form a fixed-time plan; static lights keep their authored
 state. Scenario JSON: `"controls_heading": "east"`, `"cycle": {"green_s": 10, "yellow_s": 3, "red_s": 13, "offset_s": 0}`.
+
+Signed stop-line clearance uses the occupied footprint projected onto the
+controlled heading. Rear-axle offset, vehicle rotation, dimensions, circles,
+and legacy axis-aligned geometry therefore agree with collision geometry.
+For an aligned 4.5 m car with its rear axle 10 m before the line, clearance is
+6.3 m (front overhang from the reference is 3.7 m). The same signed clearance
+feeds braking, yellow-light decisions, and sampled ego crossing counts; a
+crossing line remains selected until the rear of the footprint clears it.
+This corrects traffic motion and violation timing relative to the previous
+centre-assuming calculation. It does not add swept stop-line detection.
 
 ### Junction right-of-way
 

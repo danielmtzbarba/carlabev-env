@@ -14,10 +14,11 @@ from CarlaBEV.semantics import (
 REWARD_REFERENCE_DT_S = 0.1
 """Physics step the per-step reward magnitudes were tuned for.
 
-Non-terminal per-step rewards are scaled by ``dt / REWARD_REFERENCE_DT_S`` so
-that the reward accumulated per simulated second (and per control step when
-sub-steps are summed) does not depend on the physics step. Terminal rewards
-are paid once and are not scaled. At ``dt = 0.1`` the factor is exactly 1.
+State-dependent terms are reference-step reward rates. Motion increments are
+converted to the reference interval before squashing; the final non-terminal
+reward is integrated with ``dt / REWARD_REFERENCE_DT_S`` exactly once. For
+varying signals, equal-time returns converge as sampling is refined. Discrete
+checkpoint/terminal rewards are not scaled. At ``dt = 0.1`` the factor is 1.
 """
 
 
@@ -61,6 +62,8 @@ class RewardFn(object):
         self.max_actions = max_actions
         self.metric = metric if metric is not None else DEFAULT_METRIC_FRAME
         self.dt = float(dt)
+        if not np.isfinite(self.dt) or self.dt <= 0.0:
+            raise ValueError("dt must be positive and finite")
         self.step_scale = self.dt / REWARD_REFERENCE_DT_S
         if route_dev_start is not None:
             route_dev_start_m = self.metric.distance_surface_to_meters(route_dev_start)
@@ -220,10 +223,11 @@ class RewardFn(object):
 
         # progress only if improving distance AND (optionally) not off-road
         delta_progress = distance_t_1 - distance_t
+        reference_progress = delta_progress / self.step_scale
         if delta_progress > 0 and not (
             offroad_mask and self.zero_progress_reward_offroad
         ):
-            r += self.k_progress * delta_progress * max(0.0, yaw_alignment)
+            r += self.k_progress * reference_progress * max(0.0, yaw_alignment)
 
         # flow (speed reward) — disabled while off-road if configured
         if v > 0.3 and not (offroad_mask and self.zero_speed_reward_offroad):
@@ -248,15 +252,19 @@ class RewardFn(object):
             r += reverse_term
 
         # comfort: steering and jerk
-        delta_yaw = yaw_1 - yaw
+        # First differences represent rates over the reference interval. The
+        # difference between consecutive yaw rates needs one further dt factor
+        # to represent angular acceleration at the same reference scale.
+        yaw_difference = np.arctan2(np.sin(yaw_1 - yaw), np.cos(yaw_1 - yaw))
+        delta_yaw = yaw_difference / self.step_scale
         steer_magnitude = abs(delta_yaw)
-        steer_jerk = abs(delta_yaw - self._last_delta_yaw)
+        steer_jerk = abs(delta_yaw - self._last_delta_yaw) / self.step_scale
         self._last_delta_yaw = delta_yaw
 
         r -= self.k_steer_smooth * steer_magnitude
         r -= self.k_steer_jerk * steer_jerk
 
-        speed_jerk = abs(v_1 - v) + abs(delta_yaw)
+        speed_jerk = abs(v_1 - v) / self.step_scale + abs(delta_yaw)
         jerk_penalty = -self.k_smooth * speed_jerk
         r += jerk_penalty
 
@@ -274,7 +282,7 @@ class RewardFn(object):
                 self.k_flow * min(v, self.max_speed_for_flow) * max(0.0, yaw_alignment)
             ),
             "progress_term": float(
-                self.k_progress * delta_progress * max(0.0, yaw_alignment)
+                self.k_progress * reference_progress * max(0.0, yaw_alignment)
             ),
             "align_bonus": float(align_bonus),
             "ttc_bonus": float(self.k_ttc * ttc_term),

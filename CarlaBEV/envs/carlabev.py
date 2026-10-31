@@ -170,6 +170,9 @@ class CarlaBEV(gym.Env):
 
     def _get_info(self):
         info = {"episode_horizon": self.episode_horizon}
+        if self.map.hero is not None:
+            # Reading scene_info does not perform collision/target updates.
+            info.update(self.map.scene_info)
         if hasattr(self, "_scenario_context") and self._scenario_context:
             info["scenario"] = dict(self._scenario_context)
         if hasattr(self, "_scene_descriptor") and self._scene_descriptor:
@@ -548,7 +551,7 @@ class CarlaBEV(gym.Env):
             if self.presenter is not None:
                 with profiling.phase("renderer.human"):
                     self.presenter.present(self.map, snapshots)
-        return obs, total_reward, terminated, truncated, info_out
+        return obs, total_reward, terminated, truncated, info
 
     def render(self):
         if self.obs_mode == "bev_class":

@@ -207,6 +207,22 @@ class Body:
     def velocity(self) -> tuple[float, float]:
         return self.v_mps * math.cos(self.yaw), self.v_mps * math.sin(self.yaw)
 
+    def projection(self, axis_yaw: float) -> tuple[float, float]:
+        """Occupied interval along a world-frame unit axis, in metres.
+
+        Uses the footprint centre and orientation, rather than assuming the
+        kinematic reference point is the centre of the occupied shape.
+        """
+        cx, cy = self.center()
+        centre = cx * math.cos(axis_yaw) + cy * math.sin(axis_yaw)
+        if self.is_circle:
+            extent = self.footprint.radius_m
+        else:
+            angle = self.effective_yaw - axis_yaw
+            extent = (self.footprint.half_length_m * abs(math.cos(angle))
+                      + self.footprint.half_width_m * abs(math.sin(angle)))
+        return centre - extent, centre + extent
+
     def heading_vector(self) -> tuple[float, float]:
         return math.cos(self.yaw), math.sin(self.yaw)
 

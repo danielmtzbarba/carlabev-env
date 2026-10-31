@@ -150,7 +150,18 @@ def test_return_per_simulated_second_is_physics_step_invariant(reward_mode):
     for dt, k in ((0.1, 1), (0.05, 2), (0.025, 4)):
         env = make_env(physics_dt=dt, action_repeat=k, reward_mode=reward_mode)
         try:
-            traj = _rollout(env, scripted_action, 30)
+            # The turning manoeuvre crosses 3 checkpoints at dt=.1 but 4 at
+            # finer dt: its discrete event bonus is not a rate-invariance
+            # oracle. Use a controlled braking approach for shaping; individual
+            # progress/turn/acceleration terms are tested analytically in
+            # test_shaping_reward_time.py (without a convergence allowance).
+            if reward_mode == "shaping":
+                options = {**LEAD_BRAKE_OPTIONS, "ego_speed": 3.0,
+                           "lead_gap": 30.0, "brake_delay": 50.0}
+                traj = _rollout(env, lambda _: np.array([0.0, 0.0, 1.0], dtype=np.float32),
+                                30, options=options)
+            else:
+                traj = _rollout(env, scripted_action, 30)
             assert traj[-1]["t"] == pytest.approx(3.0)
             returns[(dt, k)] = sum(s["r"] for s in traj)
         finally:

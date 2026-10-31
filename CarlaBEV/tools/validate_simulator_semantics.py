@@ -910,14 +910,16 @@ def check_known_clock_unit_inconsistencies() -> CheckResult:
         render_fps = env.metadata.get("render_fps")
         if not math.isclose(float(render_fps), 1.0 / DOCUMENTED_PHYSICS_DT_S, rel_tol=1e-9):
             findings.append(f"C-06 metadata.render_fps={render_fps} but physics rate is {1.0 / DOCUMENTED_PHYSICS_DT_S:.0f} Hz")
-        env.reset(seed=3, options=_CLOCK_SCENARIO_OPTIONS)
+        _, reset_info = env.reset(seed=3, options=_CLOCK_SCENARIO_OPTIONS)
+        if reset_info.get("scene", {}).get("sim_time_s") != 0.0:
+            findings.append("C-05 reset information does not expose the initial clock")
         if "speed_limit_mps" not in env.map.scene_info["scene"]:
             findings.append("U-04 scene_info.speed_limit has no explicit unit (speed_limit_mps missing)")
         for _ in range(10):
-            env.step(np.array([0.0, 0.0, 1.0], dtype=np.float32))
+            _, _, _, _, step_info = env.step(np.array([0.0, 0.0, 1.0], dtype=np.float32))
         if env.map._t != 1.0:
             findings.append(f"C-03 scene clock after 10 x 0.1 s is {env.map._t!r}, not 1.0")
-        if "sim_time_s" not in env.current_info["hero"]:
+        if "sim_time_s" not in step_info.get("hero", {}):
             findings.append("C-05 sim_time_s not exposed in info['hero']")
     finally:
         env.close()

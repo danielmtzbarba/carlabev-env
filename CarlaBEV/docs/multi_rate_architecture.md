@@ -61,8 +61,11 @@ on every physics step even when no observation is needed.
 - **Task defined in seconds**: horizons, timers, scenario parameters are already
   in simulated seconds; `control_dt` changes the agent's decision rate, not the
   task. Rewards are summed over sub-steps so per-second reward density is
-  invariant to `action_repeat` for rate-like terms (progress, time penalties);
-  per-decision terms (action smoothness) are evaluated once per control step.
+  invariant to grouping identical physics steps with `action_repeat`.
+  Shaping progress and motion differences are normalized to the reference
+  interval before squashing, then integrated once. Smoothness is evaluated on
+  each physics sub-step, not once per decision. Varying-signal returns converge
+  with sampling refinement; checkpoint and terminal rewards are unscaled events.
 - **Termination inside a control step** ends the step early: the returned
   observation is the state at the terminal sub-step, `sim_time_s` reflects it.
 - **Frame-skip observation**: the observation is rendered once per control

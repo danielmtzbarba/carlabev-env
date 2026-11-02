@@ -1,10 +1,14 @@
+> Archived design and audit record. Descriptions, defaults, timings and test counts
+> below reflect the implementation stage at which this was written. For current
+> behavior, start with the [documentation index](../README.md).
+
 # Stage 1: Simulator Semantics Hardening (Historical)
 
 Status recorded on 2026-10-30: this is an earlier design proposal, not a current
 runtime diagnosis or API contract. Metric-state dynamics and explicit geometry
 conversions have since landed. Consult the current
-[kinematics](../docs/ego_kinematics.md), [geometry](../docs/geometry_and_metric_frame.md),
-and [integration API](../docs/downstream_integration_api.md) documentation for
+[kinematics](../ego_kinematics.md), [geometry](../geometry_and_metric_frame.md),
+and [integration API](../downstream_integration_api.md) documentation for
 implemented behavior and remaining limitations.
 
 This document defines the proposed Stage 1 fixes for CarlaBEV before we refactor the simulator core. The goal is to make the simulator scientifically legible, numerically consistent, and testable enough for later publication-grade experiments.

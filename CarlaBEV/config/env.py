@@ -136,7 +136,7 @@ class EnvConfig(BaseModel):
     ``SceneLibraryMissError`` instead of generating. Scenario/authored resets never use the library and are
     unaffected. Requires ``scene_library_enabled=True``."""
     scene_library_generator_version: str = "role_traffic_v3"
-    # --- Variation layer (docs/replay_and_scene_cache_plan.md): seeded, instantiation-time
+    # --- Variation layer (docs/history/replay_and_scene_cache_plan.md): seeded, instantiation-time
     # perturbations of a cached scene. Never part of the scene identity / cache key.
     variation_policy: Literal["frozen", "per_reset"] = "frozen"
     """``frozen``: a reset without ``variation_seed`` replays the scene's frozen realization (evaluation, replay).

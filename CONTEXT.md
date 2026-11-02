@@ -10,23 +10,23 @@ Historical design material is labeled separately in those docs.
 CarlaBEV is a lightweight Gymnasium-compatible 2D BEV driving simulator for
 route following, traffic interactions, and authored edge cases. Town01 is the
 supported map; map loading still contains Town01-specific paths. Dynamics use
-a simplified bicycle model and collision footprints are rectangle approximations.
+a simplified bicycle model with metric oriented vehicle boxes and pedestrian circles.
 
 ## Runtime path
 
 1. `CarlaBEV.envs.make_env()` creates a `SyncVectorEnv` with automatic reset
    disabled. The direct `CarlaBEV(EnvConfig(...))` path omits wrappers.
 2. Reset resolves local scene/route/traffic/scenario RNGs and checks the scene
-   library. A valid cache hit reuses serialized actors; a miss generates a scene.
+   library. A valid cache hit instantiates a stored scene specification; a miss generates one.
 3. `SceneGenerator` supplies the ego route and actors. `BaseMap.reset()` delegates
    actor loading and ego initialization to `Scene.reset_scene()`.
-4. Spawn validation can reject a generated scene and retry. Invalid writable
-   cache entries are evicted; invalid read-only entries raise an error.
-5. A step advances ego controls and traffic, renders the world, computes reward
-   and collisions, updates statistics, and determines episode outcome.
-6. Public step information is empty during ongoing episodes and includes
-   `episode_info` on termination. Detailed per-step telemetry remains internal
-   in the unwrapped environment's `current_info`.
+4. Spawn validation can reject a generated scene and retry. Required-hit replay
+   rejects invalid entries without writes; ordinary writable caching repairs them.
+   Non-strict read-only caching can generate an uncached replacement.
+5. Each control step advances physics, collision/reward evaluation and statistics
+   over its substeps, then renders a boundary observation.
+6. Public step information includes detailed telemetry. `episode_info` is empty
+   until termination or truncation; `current_info` retains the same step details.
 
 ## Main modules
 
@@ -81,14 +81,15 @@ and [Route Generation And Planning](CarlaBEV/docs/route_generation_and_planning.
 
 ## Known runtime boundaries
 
-- Scene caching is enabled by default. Read-only mode prevents scene insertion
-  and deletion but still permits schema/counter writes and generation on misses.
-  Required-hit enforcement is not implemented.
-- The builder and runtime must agree on all identity-bearing options and seed
-  schedules to replay a prepared corpus. Metadata labels do not select a scene.
-- `EnvConfig.max_actions` is not automatically wired into reward construction.
-- Detailed hero/reward telemetry is internal; episode comfort aggregates are
-  available through the public termination summary.
+- Scene caching is enabled by default. Read-only uses SQLite `mode=ro`; add
+  `scene_library_require_hit=True` to prevent generation on cache misses.
+- Builder and runtime must agree on generation identity and seed schedules.
+  Identity v2 includes generation settings, footprints and map-asset hashes;
+  older corpora require rebuilding. Metadata labels do not select a scene.
+- `max_episode_duration_s` sets the horizon; `max_actions` is a legacy alias
+  converted using `physics_dt`. Horizon expiry is truncation.
+- The default NPC path mode is `fillet_v2`; use explicit `fillet_v1` to replay
+  corpora built with the earlier curvature calculation.
 - GUI/editor workflows have less executable coverage than the core runtime.
 
 ## Inspection and verification

@@ -1,6 +1,6 @@
 """Scene specification layers: identity (cached) and variation (instantiation-time).
 
-See ``docs/replay_and_scene_cache_plan.md``.
+See ``docs/history/replay_and_scene_cache_plan.md``.
 
 * :class:`NpcSpec` — one background actor, fully resolved: stable id, route,
   resolved spawn offset, speeds, geometry, behaviour spec, rule flags, runtime

@@ -33,7 +33,7 @@ This is the coordinate frame used by:
 - compatibility actor pose and speed views (`x`, `y`, `v`, `state`)
 - camera following
 - crop and rotation logic
-- current collision rectangles
+- compatibility rectangles used for target triggers and GUI tooling
 
 ## Metric Coordinates
 
@@ -69,7 +69,7 @@ raw→surface scale of `1024 / size`. Coordinate sources and their frames:
 The 128-px raster is the reference frame all legacy data are expressed in. The
 observation resolution can also be changed cheaply with `obs_size`.
 
-Derived conversions:
+Derived conversions at the default 128-px scale:
 
 - `raw -> surface`: divide by `8`
 - `surface -> meters`: multiply by `0.3125`
@@ -108,17 +108,21 @@ It checks consistency across:
 
 ## Footprints And Thresholds
 
-Actor footprints are declared in meters (`ActorFootprints`, `EgoPhysics`) and
-derived to pixels through the metric frame: ego and vehicles `1.25 m` (4 px),
-pedestrians `0.625 m` (2 px), checkpoints `0.625 m`, goal `1.25 m`. Scene
-thresholds are SI as well: `speed_limit_mps` (default `35/3.6`) and
-`proximity_radius_m` (default `10.9375`, the legacy 35 px).
+Actor footprints are declared in meters and converted to pixels for rendering.
+The default `realistic` profile uses rear-axle-referenced oriented cars
+(4.5 × 1.8 m) and pedestrian circles (radius 0.3 m). The `legacy` profile keeps
+1.25 m vehicle squares and 0.625 m pedestrian squares. Checkpoints are 0.625 m;
+goals are 1.25 m. See [Actor Geometry](actor_geometry.md).
+
+Dynamic collision, shape gaps and TTC use metric bodies. Scene thresholds are
+also SI: `speed_limit_mps` defaults to `35/3.6`; `proximity_radius_m` defaults
+to `10.9375`. Static-map contact samples the body against the semantic raster.
 
 ## Notes
 
 - Actor dynamics state uses SI units; surface/world properties expose converted compatibility values.
 - Some handcrafted scenario anchors are map-specific.
-- Collision and target footprints use rectangle approximations in the runtime frame.
+- Target triggers retain surface rectangles; dynamic collision uses metric geometry.
 
 ## Implementation References
 

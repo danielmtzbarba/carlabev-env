@@ -87,6 +87,6 @@ The example samples random actions; replace that line with your policy. Actions 
 
 The simulation advances on an explicit clock. Rendering observes its state and does not control physics timing.
 
-[Python integration](CarlaBEV/docs/downstream_integration_api.md) · [Scenarios](CarlaBEV/docs/scenario_specifications.md) · [Diagnostics and validation](CarlaBEV/docs/debugging_and_diagnostics.md)
+[Documentation](CarlaBEV/docs/README.md) · [Python integration](CarlaBEV/docs/downstream_integration_api.md) · [Scenarios](CarlaBEV/docs/scenario_specifications.md) · [Diagnostics and validation](CarlaBEV/docs/debugging_and_diagnostics.md)
 
 Original software and documentation are licensed under [Apache-2.0](LICENSE.md).

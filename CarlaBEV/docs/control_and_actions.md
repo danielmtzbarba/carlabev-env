@@ -115,12 +115,11 @@ reward and statistics processing:
   - `yaw_rate`
   - `yaw_acc`
 
-These are attached to the internal `info["hero"]` dictionary and summarized by
-`CarlaBEV/src/deeprl/stats.py`. The current public `step()` result does not return
-that internal dictionary: ongoing steps return empty info, and terminating steps
-return `episode_info` with comfort aggregates. The unwrapped environment retains
-detailed telemetry in `current_info`, an implementation detail rather than a
-stable external contract. See [Public Integration API](downstream_integration_api.md).
+These are attached to the returned `info["hero"]` dictionary. `step()` exposes
+telemetry on ongoing steps as well as episode boundaries; `episode_info` is
+populated on termination or truncation with comfort aggregates from
+`CarlaBEV/src/deeprl/stats.py`. The unwrapped environment retains the same step
+information in `current_info`. See [Public Integration API](downstream_integration_api.md).
 
 ## Notes
 

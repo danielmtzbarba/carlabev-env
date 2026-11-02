@@ -211,7 +211,7 @@ class CarlaBEV(gym.Env):
     MAX_VARIATION_ATTEMPTS = 5
 
     def _reset(self, seed=0, options=None):
-        """Reset flow (see docs/replay_and_scene_cache_plan.md):
+        """Reset flow (see docs/history/replay_and_scene_cache_plan.md):
 
         1. resolve seeds and the scene identity key;
         2. obtain a :class:`SceneSpec` — from the scene library (random scenes

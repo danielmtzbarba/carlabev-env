@@ -10,7 +10,7 @@ golden snapshots or adding bit-exact assertions.
 | Scope | Guarantee | Enforced by |
 | --- | --- | --- |
 | Same machine, same environment | A seeded episode is **bit-identical** across runs, across `fps` values and across `render_mode` (rendering is a pure observer). | `tests/physics_time/rendering/test_fps_independence.py` (SHA-256 digest equality), `carlabev validate simulator-semantics` → `render_fps_independence` |
-| Across machines / OS / CPU | A seeded episode is **physically identical within tolerance**: positions within `1e-7 m`, speeds within `1e-7 m/s`, headings equal modulo 2π, same termination, same scenario events. Bit-exact equality is *not* guaranteed. | `tests/physics_time/regression/test_golden_trajectory.py` (`atol = 1e-7`, angular comparison) |
+| Across machines / OS / CPU, replaying the same stored scene | Physics is expected to agree within the regression tolerance: positions within `1e-7 m`, speeds within `1e-7 m/s`, headings equal modulo 2π, same termination, same scenario events. Bit-exact equality is *not* guaranteed. | `tests/physics_time/regression/test_golden_trajectory.py` (`atol = 1e-7`, angular comparison) |
 | Same machine, independent processes | A seeded episode is **bit-identical** across fresh interpreters (different `PYTHONHASHSEED`), across scene-library misses and hits, and through traffic-lifecycle recycles. State is `f(EnvConfig, scene identity, variation_seed, actions)`. | `tests/physics_time/regression/test_replay_determinism.py`, `carlabev validate replay` (default: subprocess isolation, varied hash seeds), `carlabev benchmark run` → `cross_process_bitwise_identical` |
 | Scene generation across machines | **Not guaranteed.** Generation decisions consume BLAS `dot`/`norm` and libm `pow` roundings, so a *miss* on another OS/CPU may realise a different, equally valid scene for the same seed. A scene served from a **library** replays identically everywhere (within the 1e-7 physics tolerance) because a hit never re-runs generation. The library is the cross-machine reproducibility mechanism; `verify-library` measures the drift. | `carlabev scene verify-library`, `carlabev validate replay --cache-mode hit-only --atol 1e-7` |
 | Across `physics_dt` | Same physical outcome within first-order (Euler) discretisation error at equal simulated time. | `tests/physics_time/clock/test_dt_convergence.py`, `dt_convergence` check |
@@ -71,7 +71,7 @@ decimals flips whenever a value sits on a rounding boundary.
 ## Incidents R-01..R-03 — replay determinism (fixed, Stage 2 of the replay plan)
 
 Found while building `carlabev validate replay`; see
-[replay_and_scene_cache_plan.md](replay_and_scene_cache_plan.md) for the
+[replay_and_scene_cache_plan.md](history/replay_and_scene_cache_plan.md) for the
 full analysis and the design that fixed them.
 
 | ID | Symptom | Cause | Fix |
@@ -97,7 +97,8 @@ switches so every earlier realization stays reproducible:
 `scene_library_generator_version="role_traffic_v2"`,
 `npc_route_geometry="legacy"`, `map_collision_mode="center"` (the eight
 original golden snapshots are pinned to exactly this and were byte-identical
-after the change; three new snapshots describe the Stage 7 defaults).
+after the change; three snapshots describe the historical Stage 7 defaults
+and now explicitly select `fillet_v1`).
 
 | ID | Symptom | Cause | Fix |
 | --- | --- | --- | --- |
@@ -161,7 +162,7 @@ after the change; three new snapshots describe the Stage 7 defaults).
 - Anything drawn at *load* time that defines the initial state (spawn offsets)
   must be resolved at *generation* time and persisted with the scene, otherwise
   a scene-library hit is not a replay of the miss. See
-  [replay_and_scene_cache_plan.md](replay_and_scene_cache_plan.md).
+  [replay_and_scene_cache_plan.md](history/replay_and_scene_cache_plan.md).
 - When a test depends on a route that is exactly axis-aligned, remember that it
   is a degenerate case for any tangent computation; prefer a slightly oblique
   route unless the straight case is what is under test.

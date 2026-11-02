@@ -1,6 +1,6 @@
 # Actor Geometry And Collision
 
-Phase 2 of the actor/rendering/behaviour plan. Actors have **metric footprints**
+Actors have **metric footprints**
 bound to a **reference point**, collisions and proximity are computed on
 **oriented bodies in meters**, and the geometry profile is selected by
 `EnvConfig.geometry_profile`.
@@ -10,7 +10,7 @@ bound to a **reference point**, collisions and proximity are computed on
 | Profile | Ego | Vehicles | Pedestrians | Reference point | Orientation |
 | --- | --- | --- | --- | --- | --- |
 | `legacy` | 1.25 × 1.25 m square | 1.25 × 1.25 m square | 0.625 m square | footprint centre = state position | ignored (axis-aligned, as before) |
-| `realistic` (default since Phase 6) | car 4.5 × 1.8 m | `car` 4.5 × 1.8 (wheelbase 2.9), `van` 5.2 × 2.0 (3.2), `bus` 10.5 × 2.5 (5.9) | circle r = 0.3 m | **rear axle** for vehicles, centre for pedestrians | oriented by yaw |
+| `realistic` (default) | car 4.5 × 1.8 m | `car` 4.5 × 1.8 (wheelbase 2.9), `van` 5.2 × 2.0 (3.2), `bus` 10.5 × 2.5 (5.9) | circle r = 0.3 m | **rear axle** for vehicles, centre for pedestrians | oriented by yaw |
 
 Implementation: `CarlaBEV/src/geometry/body.py` — `Footprint` (shape, size,
 `ref_point`, `center_offset_m`, `oriented`), `Body` (footprint at a pose:
@@ -77,7 +77,7 @@ the flags. NPC bodies are tallied the same way
 `npc_moving_steps` (fractions of moving NPC-steps with a body sample on the
 respective class).
 
-## Rewards (slice 2.4)
+## Rewards
 
 `reward_signals.compute_ttc` and `compute_ttc_raw` (CaRL) consume the shape TTC
 from `actors_state` when present and fall back to the point-mass line-of-sight
@@ -87,30 +87,18 @@ for the ego *front* to reach it rather than the time for centres to coincide.
 
 ## Rendering
 
-`geometry/render.py::draw_body` draws oriented polygons (boxes), circles
-(pedestrians) or — for non-oriented legacy footprints — the historical
-axis-aligned rectangle, pixel-identical to the previous renderer. Sprite
-rectangles (`actor.rect`, `hero.rect`) are the surface AABB of the body.
+`WorldRenderer.draw_body()` in `envs/world_renderer.py` draws oriented vehicle
+polygons, pedestrian circles or non-oriented legacy rectangles. Compatibility
+`surface_rect()` methods derive surface-frame bounding rectangles for target
+triggers and tooling; rendering rectangles do not define dynamic collision.
 
-## Validation
+## Validation and compatibility
 
-- `tests/physics_time/geometry/` — footprints/bodies (7), collision system (7),
-  environment integration under both profiles (6).
-- Golden snapshots: legacy goldens regenerated (kinematics identical; rewards
-  changed by the shape TTC; one random-nav collision fires one step earlier
-  because overlap is continuous in meters instead of integer pixel rects);
-  three new `*_realistic` goldens.
-- `carlabev benchmark` physics suite: `geometry_profiles` table (footprint, gap
-  at spawn, collision time, classification) and
-  `realistic_vs_legacy_collision_lead_s` (≈ 0.5 s earlier contact for a 4.5 m
-  car at 10 m/s in the crash scene).
+`tests/physics_time/geometry/` checks footprints, collision geometry, map contact
+and environment integration. The benchmark physics suite compares profiles,
+spawn gaps and collision timing; see [benchmarking](benchmarking.md).
 
-## Promotion (Phase 6)
-
-`realistic` is the default (`EnvConfig.geometry_profile`, `UnitContract()`,
-`carlabev run sim`) now that the renderer draws oriented bodies (Phase 3) and
-the traffic rules follow on shape gaps (Phase 4). `geometry_profile="legacy"`
-(`--geometry-profile legacy`) restores the historical 1.25 m squares; the five
-legacy golden snapshots are pinned to it and unchanged, the `*_realistic`
-snapshots describe the default. Random traffic spawns were checked for overlap
-under both profiles (none in 6 seeds × 3 vehicles).
+`geometry_profile="legacy"` (`--geometry-profile legacy`) restores the historical
+square footprints. Golden cases explicitly select their historical geometry and
+NPC motion settings; changing only the footprint profile does not reproduce an
+entire older simulator configuration.

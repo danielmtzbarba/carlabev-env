@@ -1,6 +1,6 @@
 # Rendering Architecture
 
-Phase 3 of the actor/rendering/behaviour plan. Rendering is a **pure observer**
+Rendering is a **pure observer**
 of the simulation: it reads actor bodies and poses, never mutates state, and
 cannot influence a trajectory (enforced by `tests/physics_time/rendering`).
 
@@ -65,7 +65,11 @@ for four **intended** fixes:
 Semantic masks (`rgb_to_semantic_mask`) also accept an `(H, W)` class-id
 raster directly (`ids_to_semantic_mask`).
 
-## Performance (standard benchmark, this sandbox)
+## Historical rendering measurements
+
+These measurements describe the rendering migration on its original benchmark
+host, not current throughput guarantees. Run `carlabev benchmark run` to measure
+your checkout and machine.
 
 | config | before (ms/step) | after | speed-up |
 | --- | --- | --- | --- |
@@ -87,9 +91,9 @@ output surface is preallocated — both found with `carlabev benchmark`.
 a full redraw every frame; observation RGB equals the palette lookup of the
 ids; `bev_class` mode; reset frame contains actors (R-04); traffic-light strips
 at their position (R-05); masked corners are VOID; pygame-free domain modules.
-FPS-independence digests and all goldens unchanged.
+FPS-independence and golden regression tests cover rendering behavior.
 
-## Multi-rate presentation (Phase 5)
+## Multi-rate presentation
 
 Drawing is no longer part of the physics step: `BaseMap.advance()` integrates
 and updates the semantic tile under the ego, `BaseMap.render_world()` draws the

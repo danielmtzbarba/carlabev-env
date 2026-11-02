@@ -1,7 +1,7 @@
 """REGRESSION / replay determinism guards (findings R-01..R-03, fixed in Stage 2).
 
 Originally the Stage 0 characterization tests of
-``CarlaBEV/docs/replay_and_scene_cache_plan.md`` (``tests/test_replay_characterization.py``);
+``CarlaBEV/docs/history/replay_and_scene_cache_plan.md`` (``tests/test_replay_characterization.py``);
 promoted here in Stage 5. They pin the fixes:
 
 * **B1** — a scene-library *hit* must be indistinguishable from the miss that

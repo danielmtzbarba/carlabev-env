@@ -12,7 +12,7 @@ The links and examples below are archival. In particular, the
 `assets/scenes/...` examples assume a downstream asset layout; packaged scenes
 are discovered through `CarlaBEV.scenarios.list_authored_scene_paths()`.
 Per-step `info["hero"]` statements below describe the intended interface; the
-current public step result does not expose that internal telemetry.
+current public step result now exposes detailed telemetry; consult the implemented API.
 
 ---
 

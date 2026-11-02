@@ -31,7 +31,8 @@ Discrete-time update:
 where:
 
 - `dt` is the physics step from the simulation clock (`EnvConfig.physics_dt`,
-  default `0.1 s`); one `env.step()` advances exactly one `dt`
+  default `0.1 s`); one `env.step()` executes up to `action_repeat` physics
+  substeps, ending early at termination or the horizon
 - `L = 2.9 m` (`EgoPhysics.wheelbase_m`)
 - `delta` is the steering angle command
 - `a` is the filtered longitudinal acceleration command

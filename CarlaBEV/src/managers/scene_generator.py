@@ -35,7 +35,7 @@ class GenerationPolicy:
     cache key namespace), so a behaviour change never silently alters the
     scenes an existing seed/library produces: ``role_traffic_v2`` reproduces
     the pre-Stage-7 generator, ``role_traffic_v3`` adds spawn occupancy and
-    the role-pool fixes (docs/replay_and_scene_cache_plan.md, Stage 7).
+    the role-pool fixes (docs/history/replay_and_scene_cache_plan.md, Stage 7).
     """
 
     version: str
@@ -219,7 +219,7 @@ class SceneGenerator:
     # ------------------------------------------------------------------
     # Point-to-route projection.
     #
-    # Decision identity (docs/replay_and_scene_cache_plan.md, Stage 4): every
+    # Decision identity (docs/history/replay_and_scene_cache_plan.md, Stage 4): every
     # threshold test in the role logic consumes these numbers, so they must be
     # *bit-identical* to the historical per-segment loop. BLAS ``dot``/``norm``
     # on 2-vectors and NumPy scalar ``**`` are not bit-identical to explicit
@@ -1201,7 +1201,7 @@ class SceneGenerator:
         Idempotent: actors that already carry an id / seed / offset are left
         untouched, and an agent tuple that already carries its offset is kept.
 
-        Realisation-preserving by construction (docs/replay_and_scene_cache_plan.md):
+        Realisation-preserving by construction (docs/history/replay_and_scene_cache_plan.md):
 
         * NPC spawn offsets used to be drawn in ``ActorManager.reset_all`` order
           (vehicles, then pedestrians) from a *deep copy* of the actors' shared

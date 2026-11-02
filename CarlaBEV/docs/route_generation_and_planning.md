@@ -278,5 +278,5 @@ Use the visualization when checking:
 ## Related Docs
 
 - `CarlaBEV/docs/downstream_integration_api.md`
-- `CarlaBEV/docs/town01_canonical_graph_plan.md`
+- `CarlaBEV/docs/history/town01_canonical_graph_plan.md`
 - `CarlaBEV/docs/debugging_and_diagnostics.md`

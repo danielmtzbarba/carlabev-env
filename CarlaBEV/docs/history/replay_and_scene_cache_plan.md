@@ -1,3 +1,7 @@
+> Archived design and audit record. Descriptions, defaults, timings and test counts
+> below reflect the implementation stage at which this was written. For current
+> behavior, start with the [documentation index](../README.md).
+
 # Replay Determinism And Scene-Cache Plan
 
 Status: **complete** — Stages 0–7 delivered.

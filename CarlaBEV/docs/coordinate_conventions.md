@@ -79,7 +79,10 @@ This avoids false obstacle/off-road detections caused by:
 
 ## Collision Convention
 
-Collision checks now use the actual ego rectangle and actor rectangles in the same projected frame.
+Dynamic collision checks use metric actor bodies (oriented boxes or circles),
+independent of rendering. Static-map contact samples the ego footprint against
+the semantic raster; target triggers use surface rectangles. See
+[Actor Geometry](actor_geometry.md).
 
 The previous offset-based collision heuristic was removed because it became incorrect once the FOV centering was fixed.
 

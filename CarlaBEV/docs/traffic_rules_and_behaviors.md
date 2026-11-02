@@ -1,4 +1,4 @@
-# Traffic rules and actor behaviours (Phase 4)
+# Traffic Rules And Actor Behaviors
 
 Background traffic is driven by two layers, both pure functions of the
 simulated state and the scene clock (no accumulated timers, no wall-clock,

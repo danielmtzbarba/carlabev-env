@@ -59,7 +59,7 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 | `seed` | `int = 0` | `CarlaBEV.reset()`, `wrap_env()` | Fallback episode seed when `reset(seed=...)` and `scene_seed` are omitted; also used to seed the wrapped action space. |
 | `fps` | `int \| None = None` | `Renderer` | Wall-clock frame-rate cap for `render_mode="human"` only. `None` = real time (`1 / control_dt`); an explicit value gives `real_time_factor = fps * control_dt`. Never affects simulated state or recorded-video rate (see [Simulation Clock And Unit Contract](simulation_clock_and_units.md)). |
 | `physics_dt` | `float = 0.1` | `TimeConfig` → `Scene`/`SimClock`, `ActorManager`, hero and NPC `Controller`, reward functions | Physics integration step in simulated seconds (10 Hz default); one `env.step()` advances `action_repeat × physics_dt`. The single clock shared by ego/NPC integration, scenario timers, startup ramps and reward derivatives; per-step rewards are scaled by `physics_dt / 0.1`. |
-| `action_repeat` | `int = 1` | `TimeConfig.action_repeat` → `CarlaBEV.step` | Physics sub-steps per `env.step()`; the action is held for `control_dt = action_repeat × physics_dt`, sub-step rewards are summed, the first terminal sub-step ends the step, one observation is rendered. `1` = legacy behaviour. See [multi_rate_architecture.md](multi_rate_architecture.md). |
+| `action_repeat` | `int = 1` | `TimeConfig.action_repeat` → `CarlaBEV.step` | Physics sub-steps per `env.step()`; the action is held for `control_dt = action_repeat × physics_dt`, sub-step rewards are summed, the first terminal sub-step ends the step, one observation is rendered. `1` = legacy behaviour. See [multi-rate execution](multi_rate_architecture.md). |
 | `display_fps` | `int \| None = None` | `Presenter` (human mode) | Interpolated real-time viewer at this wall-clock frame rate (frames between the sub-step snapshots); mutually exclusive with `fps`. Never affects the simulation. |
 | `size` | `int = 128` | `CarlaBEV`, `BaseMap`, `get_obs_space()`, `UnitContract.metric` | Native simulator raster size (`64, 128, 256, 512, 1024`; assets required) and direct observation size before wrappers. The field of view always spans 40 m, so the metric frame is `40 / size` m/px and the physical world is identical at every size; only rendering cost changes. Prefer `obs_size` to change observation resolution. |
 | `ego_accel_mps2` | `float = 4.5` | `UnitContract.ego` → hero | Full-throttle longitudinal acceleration (SI). |
@@ -224,7 +224,7 @@ The replay contract is `state(k) = f(EnvConfig, scene identity, variation_seed, 
 the same seeds and options yield the same `scene_descriptor.scene_key`; a cache hit
 instantiates the stored spec through the same path as the miss; a variation seed
 changes the spawn state of that scene but not its identity. See
-[Replay Determinism And Scene-Cache Plan](replay_and_scene_cache_plan.md).
+[Replay Determinism And Scene-Cache Plan](history/replay_and_scene_cache_plan.md).
 
 ### Random Traffic Role Model
 
@@ -415,10 +415,10 @@ options = build_random_navigation_options(
 )
 ```
 
-## Known Gaps
+## Integration Notes
 
 - A strict corpus replay requires `scene_library_read_only=True` **and** `scene_library_require_hit=True`; read-only alone still generates (without storing) on a miss.
-- Per-step hero/reward telemetry is internal. Public ongoing step info is empty; terminal info contains episode summaries. See [Public Integration API](downstream_integration_api.md).
+- Public step info includes detailed telemetry. `episode_info` is empty until termination or truncation. See [Public Integration API](downstream_integration_api.md).
 
 - `EnvConfig.scenes_path` is accepted for compatibility, but the active runtime path does not read it.
 - `obs_size`, `frame_stack`, `semantic_mask_ch`, and `temporal_fusion_mode` only affect environments created through `make_env()` wrappers, not direct `CarlaBEV(...)` instances.

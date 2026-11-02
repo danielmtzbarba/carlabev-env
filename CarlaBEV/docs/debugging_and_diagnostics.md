@@ -18,7 +18,7 @@ Use:
 uv run carlabev --help
 ```
 
-Phase-1 command groups:
+Command groups:
 
 - `carlabev run sim` — run the simulator (render mode, fps, physics dt, `--action-repeat`, `--display-fps` interpolated real-time viewer, scene, control mode, episodes, video; traffic-rule switches `--car-following idm|legacy`, `--no-signals`, `--no-right-of-way` and `--geometry-profile legacy` for attribution)
 - `carlabev run interactive` — legacy manual viewer (= `run sim --control manual`)
@@ -318,7 +318,7 @@ across machines. `--variation-seed N` replays a specific variant;
 scene identity while changing the spawn state. `--report FILE.json
 [--save-traces]` writes the artefact; exit codes 0 / 1 (divergence) / 2
 (worker error). See [numerical_determinism.md](numerical_determinism.md) for
-the contract and [replay_and_scene_cache_plan.md](replay_and_scene_cache_plan.md)
+the contract and [replay_and_scene_cache_plan.md](history/replay_and_scene_cache_plan.md)
 for the design.
 
 ## Recommended Local Checks

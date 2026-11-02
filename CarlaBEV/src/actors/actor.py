@@ -150,7 +150,7 @@ class Actor:
         self.np_rng = np_rng
         # Static-map clearance transform (px), bound by the ActorManager like drivable_mask.
         self.blocking_clearance_px = None
-        # --- Replayable NPC identity (see docs/replay_and_scene_cache_plan.md) ---
+        # --- Replayable NPC identity (see docs/history/replay_and_scene_cache_plan.md) ---
         # ``npc_id``: stable, scene-scoped id ("vehicle:003"); ``runtime_seed``:
         # per-NPC seed for every random draw made *after* spawn (recycle jitter);
         # ``spawn_jitter_m``: the resolved start offset, drawn once at scene

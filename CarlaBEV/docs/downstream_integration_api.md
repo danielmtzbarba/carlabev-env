@@ -244,8 +244,10 @@ simulated-time horizon returns `truncated=True` with `terminated=False`
 (episode summary `termination == "max_actions"`), so value bootstrapping at
 truncation remains valid. Training loops should reset on `terminated or truncated`.
 
-The current public `step()` information is empty on ongoing steps and contains
-`episode_info` on termination. Episode summaries include outcomes, route and
+Public `step()` information includes the final physics substep's `hero`,
+`scene`, `collision`, `reward`, and `signals` telemetry. `episode_info` is empty
+on ongoing steps and populated on termination or truncation. Episode summaries
+include outcomes, route and
 traffic metadata, the simulated duration (`episode_duration_s`, `physics_dt_s`,
 `length` in steps), and comfort aggregates such as `mean_abs_accel_long`,
 `mean_abs_jerk_lat`, `comfort_violation_rate`, and `harsh_brake_rate`, plus
@@ -263,12 +265,11 @@ decisions).
 Vector environments collate these dictionaries using Gymnasium's vector-info
 convention.
 
-Per-step hero, reward, scene, signal (`current_info["signals"]`: controlling
-light state, gap to its stop line, violation count) and collision telemetry is
-computed internally and the unwrapped environment retains it in `current_info`. It is not returned as
-`info["hero"]` or `info["reward"]` by the current public step API. `current_info`
-is an implementation detail, not a stable downstream contract. See
-[Control And Actions](control_and_actions.md) for the internal comfort signals.
+The unwrapped environment also retains this step information in `current_info`.
+For training, use the returned `info` dictionary. `reward.control_reward` and
+`reward.substep_rewards` distinguish the returned decision reward from the final
+substep's reward details. See [Control And Actions](control_and_actions.md) for
+control and comfort signals.
 
 ### NPC motion defaults and existing corpora
 

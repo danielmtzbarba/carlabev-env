@@ -1,10 +1,14 @@
+> Archived design and audit record. Descriptions, defaults, timings and test counts
+> below reflect the implementation stage at which this was written. For current
+> behavior, start with the [documentation index](../README.md).
+
 # Town01 Canonical Graph Migration Plan (Historical)
 
 Status recorded on 2026-10-30: the canonical graph builder, asset, planner
 integration, compatibility aliases, and route diagnostics are implemented.
 The pre-migration problems and proposed schema below are preserved as design
 history. They are not an inventory of outstanding work or a replacement for
-[Route Generation And Planning](route_generation_and_planning.md), which documents
+[Route Generation And Planning](../route_generation_and_planning.md), which documents
 the current main planner. Some scenario-specific code still uses legacy assets;
 the migration should not be read as removing every older graph file.
 
@@ -328,7 +332,7 @@ repo assets.
 ## PlannerManager changes
 
 Refactor `PlannerManager` in
-[scene_generator.py](../src/managers/scene_generator.py)
+[scene_generator.py](../../src/managers/scene_generator.py)
 to load the canonical graph once.
 
 Proposed shape:
@@ -351,7 +355,7 @@ as distinct asset identities.
 ## GraphPlanner changes
 
 Refactor
-[graph_planner.py](../src/planning/graph_planner.py)
+[graph_planner.py](../../src/planning/graph_planner.py)
 so it can:
 
 - route on a passed-in graph view
@@ -364,7 +368,7 @@ This avoids loading different pickle files to get different behavior.
 ## MapGraph changes
 
 Refactor
-[map_graph.py](../src/planning/map_graph.py)
+[map_graph.py](../../src/planning/map_graph.py)
 to stop inferring lane membership by string parsing alone.
 
 The indexing layer should instead expose groups such as:
@@ -382,7 +386,7 @@ runtime planner truth.
 ## Ego route sampling
 
 Update
-[find_route_in_range()](../src/scenes/utils.py)
+[find_route_in_range()](../../src/scenes/utils.py)
 to sample start/end nodes from:
 
 - non-junction lane nodes
@@ -394,7 +398,7 @@ This should improve route variety while keeping route semantics meaningful.
 ## Traffic spawning
 
 Update random traffic generation in
-[scene_generator.py](../src/managers/scene_generator.py)
+[scene_generator.py](../../src/managers/scene_generator.py)
 to sample from corridor entry/exit nodes rather than arbitrary lane nodes.
 
 Proposed first version:

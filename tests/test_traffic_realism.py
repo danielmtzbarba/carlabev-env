@@ -195,7 +195,7 @@ class RouteGeometryTests(unittest.TestCase):
 
 class NpcMotionIntegrationTests(unittest.TestCase):
     def test_default_units_use_fillet_geometry_and_legacy_is_selectable(self):
-        self.assertEqual(DEFAULT_UNIT_CONTRACT.npc_motion.route_geometry, "fillet_v1")
+        self.assertEqual(DEFAULT_UNIT_CONTRACT.npc_motion.route_geometry, "fillet_v2")
         legacy = UnitContract.from_env_config(EnvConfig(render_mode="rgb_array", npc_route_geometry="legacy"))
         self.assertEqual(legacy.npc_motion.route_geometry, "legacy")
         with self.assertRaises(ValueError):
@@ -209,7 +209,7 @@ class NpcMotionIntegrationTests(unittest.TestCase):
         vehicle = Vehicle(map_size=128, routeX=route_x, routeY=route_y, target_speed=12.0)
         vehicle.reset()
         ctrl = vehicle._controller
-        self.assertEqual(ctrl.route_smoothing_mode, "fillet_v1")
+        self.assertEqual(ctrl.route_smoothing_mode, "fillet_v2")
         self.assertAlmostEqual(ctrl.min_turn_radius_m, 2.9 / math.tan(math.radians(30)), places=6)
         self.assertIsNotNone(ctrl.curve_speed_cap)
         arc = np.abs(ctrl.ck) > 0

@@ -119,10 +119,11 @@ class EnvConfig(BaseModel):
     128 px). The graph's lane centrelines run ~0.94 m from 1-px curb lines, less than half a car width."""
     npc_map_contact_metrics_enabled: bool = True
     """Tally NPC-body contact with sidewalk / non-drivable pixels (episode_info npc_*_contact_fraction)."""
-    # --- NPC route geometry (Stage 7). ``fillet_v1``: sharp route vertices become feasible arcs, the path is
+    # --- NPC route geometry. ``fillet_v2``: sharp route vertices become feasible arcs, the path is
     # resampled at 1 m and the target speed is capped on curves. ``legacy``: Savitzky-Golay smoothing with raw
     # fallback, no curvature awareness (reproduces pre-Stage-7 NPC motion).
-    npc_route_geometry: Literal["fillet_v1", "legacy"] = "fillet_v1"
+    # ``fillet_v1`` preserves pre-adjustment curvature for historical replay.
+    npc_route_geometry: Literal["fillet_v1", "fillet_v2", "legacy"] = "fillet_v2"
     npc_fillet_target_radius_m: float = 6.0
     npc_curve_lat_accel_mps2: float = 2.5
     scene_library_enabled: bool = True

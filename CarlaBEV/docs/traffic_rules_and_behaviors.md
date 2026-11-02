@@ -138,7 +138,7 @@ Graph routes sample roads every ~4.3 m, so a 90° junction is a single vertex
 with a three-point radius of ~2.5 m — far below the bicycle's minimum turning
 radius `L / tan(max_steer)` ≈ 5.0 m. 60 % of NPC routes contained such a
 corner; Stanley overshot by up to 7 m and bodies swept through the inner
-corner. `fillet_v1` (default) builds the controller path as follows:
+corner. `fillet_v2` (default) builds the controller path as follows:
 straight runs are merged, junction connector chains (2–3 diagonal legs of
 2–8 m) are replaced by the corner of the two approach legs, every corner gets
 a circular fillet as large as the legs and the drivable mask allow (inner edge
@@ -149,10 +149,19 @@ pixels where the lane centreline lies closer than half a body width + 0.3 m
 `sqrt(curve_lat_accel_mps2 / |k|)` with a backward deceleration pass, and the
 cap's ramp is fed forward to the speed loop (S-01). Routes with a dead-end
 turnaround (heading reversal within 12 m) are not given to background actors.
+After the nudge, v2 computes chord arc length, tangent heading and signed
+three-point circumcircle curvature from the final coordinates. Consecutive
+duplicate points are removed; short paths have zero curvature and reversals
+use their sampled heading-change rate. Speed caps use this final curvature.
+`fillet_v1` preserves the earlier pre-nudge curvature calculation for replay.
+The correction does not reject or resample graph routes based on steering
+capability and does not reduce obstacle adjustments. A speed cap limits lateral
+acceleration; it cannot make an impossible turning radius feasible.
+
 Pedestrians keep their authored geometry. `legacy` reproduces the historical
 Savitzky–Golay paths without curvature awareness.
 
-Measured on identical scenes (6 medium scenes × 150 steps): NPC cross-track
+Historical measurements for `fillet_v1` on identical scenes (6 medium scenes × 150 steps): NPC cross-track
 error p95 2.1 m → 0.5 m (max 7.6 → 0.8 m); body samples on non-drivable
 pixels 4.25 % → 0.6 % of moving NPC-steps, on sidewalks 57 % → 10 % (the
 remainder is raster quantisation: lanes are ~1.9 m wide in the 128-px raster

@@ -232,16 +232,19 @@ class SceneUnits:
 class NpcMotion:
     """Background-actor path geometry and curvature handling (Stage 7, finding V-03).
 
-    ``route_geometry="fillet_v1"``: sharp route vertices are replaced by
+    ``route_geometry="fillet_v2"`` (default): sharp route vertices are replaced by
     circular arcs (as large as the legs and the drivable mask allow, never
     below the bicycle's minimum turning radius unless nothing else fits) and
     the path is resampled at ``sample_spacing_m``; the actor's target speed is
     capped to ``sqrt(curve_lat_accel_mps2 / |curvature|)`` with a backward
-    deceleration pass. ``"legacy"`` keeps the historical Savitzky-Golay
+    deceleration pass. Heading, distance and signed curvature are recomputed
+    after the final obstacle-clearance adjustment. ``fillet_v1`` retains the
+    earlier metadata calculation for replay. Neither mode rejects navigation
+    routes based on vehicle capability. ``"legacy"`` keeps the historical Savitzky-Golay
     smoothing with raw-route fallback and no curvature awareness.
     """
 
-    route_geometry: str = "fillet_v1"
+    route_geometry: str = "fillet_v2"
     fillet_target_radius_m: float = 6.0
     sample_spacing_m: float = 1.0
     curve_lat_accel_mps2: float = 2.5
@@ -252,8 +255,8 @@ class NpcMotion:
     """Largest lateral shift the nudge may apply to a path point."""
 
     def __post_init__(self):
-        if self.route_geometry not in ("fillet_v1", "legacy"):
-            raise ValueError(f"route_geometry must be 'fillet_v1' or 'legacy', got {self.route_geometry!r}")
+        if self.route_geometry not in ("fillet_v1", "fillet_v2", "legacy"):
+            raise ValueError(f"route_geometry must be 'fillet_v1', 'fillet_v2' or 'legacy', got {self.route_geometry!r}")
         for name in ("fillet_target_radius_m", "sample_spacing_m", "curve_lat_accel_mps2", "curve_decel_mps2"):
             _require_positive(name, getattr(self, name))
 

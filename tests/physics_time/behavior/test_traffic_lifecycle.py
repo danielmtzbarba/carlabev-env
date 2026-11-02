@@ -17,7 +17,7 @@ from CarlaBEV.src.diagnostics.rollouts import RANDOM_NAV_OPTIONS
 from physics_time_helpers import LEAD_BRAKE_OPTIONS, brake_only_action, make_env
 
 
-def _run(seed_opts, steps=500, **env_kw):
+def _run(seed_opts, steps=500, on_step=None, **env_kw):
     env = make_env(max_episode_duration_s=120.0, **env_kw)
     try:
         env.reset(seed=3, options=seed_opts)
@@ -30,6 +30,8 @@ def _run(seed_opts, steps=500, **env_kw):
             )  # ego holds still
             vehicles = env.map.actor_manager.actors["vehicle"]
             moving.append(sum(1 for v in vehicles if v._controller.v_mps > 0.3))
+            if on_step is not None:
+                on_step(lc, hero, vehicles, env.physics_dt_s)
             if terminated or truncated:
                 break
         return lc, hero, moving, vehicles, info
@@ -38,7 +40,25 @@ def _run(seed_opts, steps=500, **env_kw):
 
 
 def test_random_traffic_density_is_maintained():
-    lc, hero, moving, vehicles, _ = _run({**RANDOM_NAV_OPTIONS, "num_vehicles": 6})
+    stopped_duration = {}
+
+    def check_recycle_delay(lc, hero, vehicles, dt):
+        for vehicle in vehicles:
+            ctrl = vehicle._controller
+            stopped_at_end = (
+                abs(ctrl.v_mps) <= 0.05
+                and ctrl.target_idx >= len(ctrl.cx) - 2
+                and lc.is_out_of_view(vehicle, hero)
+            )
+            key = vehicle.npc_id
+            stopped_duration[key] = stopped_duration.get(key, 0.0) + dt if stopped_at_end else 0.0
+            # Finishing integration and lifecycle dispatch occur on successive
+            # steps. Check sustained stalls, not a particular snapshot's timing.
+            assert stopped_duration[key] < 1.0, f"NPC {key} was not recycled within 1 s"
+
+    lc, hero, moving, vehicles, _ = _run(
+        {**RANDOM_NAV_OPTIONS, "num_vehicles": 6}, on_step=check_recycle_delay,
+    )
     assert lc is not None and lc.enabled
     assert all(v.recyclable for v in vehicles)
     assert lc.stats.recycled >= 2
@@ -46,11 +66,6 @@ def test_random_traffic_density_is_maintained():
     # Density is maintained: no vehicle sits finished *out of view* (those are
     # recycled); a vehicle that finishes in view parks by design (deferred), and
     # vehicles may briefly stop at signals/junctions, so allow two non-moving.
-    stalled_out_of_view = [
-        v for v in vehicles
-        if v._controller.v_mps <= 0.05 and v._controller.target_idx >= len(v._controller.cx) - 2 and lc.is_out_of_view(v, hero)
-    ]
-    assert not stalled_out_of_view
     late = moving[len(moving) // 2 :]
     assert min(late) >= len(vehicles) - 2, f"traffic decayed: {moving[::50]}"
 

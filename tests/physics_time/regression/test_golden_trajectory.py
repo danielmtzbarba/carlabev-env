@@ -91,14 +91,14 @@ CASES = {
     "lead_brake_l1_offgrid_v3": {
         "options": {**LEAD_BRAKE_OPTIONS, "ego_speed": 8.0, "lead_gap": 20.0, "brake_delay": 1.25},
         "num_steps": 100,
-        "env": {},
+        "env": {"npc_route_geometry": "fillet_v1"},
     },
     "jaywalk_l3_offgrid_v3": {
         "options": {**JAYWALK_OPTIONS, "cross_delay": 1.25, "yield_duration": 1.25},
         "num_steps": 100,
-        "env": {},
+        "env": {"npc_route_geometry": "fillet_v1"},
     },
-    "random_nav_easy_v3": {"options": RANDOM_NAV_OPTIONS, "num_steps": 60, "env": {}},
+    "random_nav_easy_v3": {"options": RANDOM_NAV_OPTIONS, "num_steps": 60, "env": {"npc_route_geometry": "fillet_v1"}},
 }
 
 

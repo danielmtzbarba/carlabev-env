@@ -131,7 +131,9 @@ class Controller(State):
         ``geometry="legacy"``: Savitzky-Golay smoothing with raw-route fallback
         (no curvature). ``geometry="fillet_v1"``: feasible fillets + 1 m
         resampling + curvature (``motion`` is an ``NpcMotion``; ``inner_clearance_m``
-        keeps the inner edge of the body on the drivable mask).
+        keeps the inner edge of the body on the drivable mask). ``fillet_v2``
+        recomputes heading, arc length and curvature after the final adjustment;
+        v1 preserves the historical pre-adjustment curvature for replay.
 
         ``spawn_offset_m`` is an explicit, already-resolved start offset (metres);
         when given it is applied verbatim and no random draw happens. Otherwise
@@ -143,7 +145,7 @@ class Controller(State):
         ax_m = ax * mpp
         ay_m = ay * mpp
         self.curve_speed_cap = None
-        if geometry == "fillet_v1":
+        if geometry in ("fillet_v1", "fillet_v2"):
             from CarlaBEV.src.control.route_geometry import curvature_speed_profile, fillet_route
 
             motion = motion if motion is not None else _default_npc_motion()
@@ -177,12 +179,17 @@ class Controller(State):
                     max_shift_m=float(motion.edge_max_shift_m),
                     is_drivable=is_drivable,
                 )
-                dx = np.where(np.abs(np.gradient(cx_m)) < 1e-9, 0.0, np.gradient(cx_m))
-                dy = np.where(np.abs(np.gradient(cy_m)) < 1e-9, 0.0, np.gradient(cy_m))
-                cyaw = np.arctan2(dy, dx)
-                s = np.concatenate(([0.0], np.cumsum(np.hypot(np.diff(cx_m), np.diff(cy_m)))))
+                if geometry == "fillet_v1":
+                    dx = np.where(np.abs(np.gradient(cx_m)) < 1e-9, 0.0, np.gradient(cx_m))
+                    dy = np.where(np.abs(np.gradient(cy_m)) < 1e-9, 0.0, np.gradient(cy_m))
+                    cyaw = np.arctan2(dy, dx)
+                    s = np.concatenate(([0.0], np.cumsum(np.hypot(np.diff(cx_m), np.diff(cy_m)))))
+            if geometry == "fillet_v2":
+                from CarlaBEV.src.control.route_geometry import sampled_path_geometry
+
+                cx_m, cy_m, cyaw, ck, s = sampled_path_geometry(cx_m, cy_m)
             offroad_points, offroad_fraction = self._route_offroad_stats((cx_m, cy_m), drivable_mask)
-            self.route_smoothing_mode = "fillet_v1"
+            self.route_smoothing_mode = geometry
             self.curve_speed_cap = curvature_speed_profile(
                 ck,
                 s,

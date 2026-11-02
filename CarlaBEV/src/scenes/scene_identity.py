@@ -45,7 +45,7 @@ class GenerationSettings(BaseModel):
     geometry_profile: Literal["legacy", "realistic"]
     traffic_enabled: bool
     physics_dt: float = Field(gt=0)
-    npc_route_geometry: Literal["legacy", "fillet_v1"]
+    npc_route_geometry: Literal["legacy", "fillet_v1", "fillet_v2"]
     npc_fillet_target_radius_m: float = Field(gt=0)
     npc_curve_lat_accel_mps2: float = Field(gt=0)
     map_collision_mode: Literal["center", "footprint"]

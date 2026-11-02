@@ -270,7 +270,7 @@ computed internally and the unwrapped environment retains it in `current_info`. 
 is an implementation detail, not a stable downstream contract. See
 [Control And Actions](control_and_actions.md) for the internal comfort signals.
 
-### Stage 7 defaults and existing corpora
+### NPC motion defaults and existing corpora
 
 The defaults changed to `scene_library_generator_version="role_traffic_v3"`,
 `npc_route_geometry="fillet_v1"` and `map_collision_mode="footprint"`. A
@@ -280,6 +280,16 @@ never served to a v3 configuration; to replay it set
 NPC motion and collision semantics, `npc_route_geometry="legacy"`,
 `map_collision_mode="center"`). `verify-library` uses the library's own
 generator version when regenerating.
+
+The current default is now `npc_route_geometry="fillet_v2"`. It retains the
+same route-generation and obstacle-adjustment policies but recomputes heading,
+distance and curvature from final path coordinates before calculating speed
+caps. NPC speeds and episode outcomes may change. To replay identity-v2 corpora
+built with the earlier default, select `npc_route_geometry="fillet_v1"` explicitly.
+Generation identity includes this setting: default v2 requests cannot hit v1
+entries. Build a new corpus for corrected default behavior; healthy v1 corpora
+remain usable with their recorded configuration. No graph asset/version change
+or vehicle-capability filtering is introduced.
 
 ## Immutable corpora and strict replay
 

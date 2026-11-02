@@ -25,6 +25,50 @@ DEFAULT_MIN_TURN_RAD = math.radians(12.0)
 CONNECTOR_MIN_TURN_RAD = math.radians(20.0)
 
 
+class RouteGeometryError(ValueError):
+    """A sampled path has invalid numerical coordinates."""
+
+
+def sampled_path_geometry(cx_m, cy_m):
+    """Coordinates, tangent heading, signed curvature and chord arc length.
+
+    Circumcircle curvature is computed from neighbouring points, so unequal
+    sample spacing does not bias a circular arc. Endpoints use the nearest
+    three-point circle; one/two-point paths have zero curvature. Consecutive
+    coincident points are removed before geometry is computed.
+    """
+    cx, cy = np.asarray(cx_m, dtype=float), np.asarray(cy_m, dtype=float)
+    if cx.ndim != 1 or cy.ndim != 1 or len(cx) != len(cy) or not len(cx):
+        raise RouteGeometryError("path must have matching, nonempty one-dimensional coordinates")
+    if not np.isfinite(cx).all() or not np.isfinite(cy).all():
+        raise RouteGeometryError("path coordinates must be finite")
+    cx, cy = _dedupe(cx, cy)
+    if len(cx) == 1:
+        return cx, cy, np.zeros(1), np.zeros(1), np.zeros(1)
+    segments = np.column_stack((np.diff(cx), np.diff(cy)))
+    ds = np.hypot(segments[:, 0], segments[:, 1])
+    headings = np.unwrap(np.arctan2(segments[:, 1], segments[:, 0]))
+    s = np.concatenate(([0.0], np.cumsum(ds)))
+    if len(cx) == 2:
+        return cx, cy, np.full(2, headings[0]), np.zeros(2), s
+    before, after = segments[:-1], segments[1:]
+    across = before + after
+    chord = np.hypot(across[:, 0], across[:, 1])
+    cross = before[:, 0] * after[:, 1] - before[:, 1] * after[:, 0]
+    denominator = ds[:-1] * ds[1:] * chord
+    interior = np.divide(2.0 * cross, denominator, out=np.zeros_like(cross), where=chord > 1e-6)
+    # A reversal has no finite osculating circle. Represent its sampled turn
+    # rate rather than rejecting the navigation route or pretending it is straight.
+    reversing = np.abs(np.diff(headings)) >= math.pi - 1e-6
+    interior[reversing] = np.diff(headings)[reversing] / (0.5 * (ds[:-1] + ds[1:]))[reversing]
+    ck = np.concatenate(([interior[0]], interior, [interior[-1]]))
+    # Tangent at each point of its local circle; exact on a sampled circular arc.
+    yaw = np.empty(len(cx))
+    yaw[1:] = headings + np.arcsin(np.clip(ck[1:] * ds * 0.5, -1.0, 1.0))
+    yaw[0] = headings[0] - math.asin(float(np.clip(ck[0] * ds[0] * 0.5, -1.0, 1.0)))
+    return cx, cy, np.unwrap(yaw), ck, s
+
+
 def _unit(vec):
     norm = float(np.hypot(vec[0], vec[1]))
     if norm <= 1e-9:

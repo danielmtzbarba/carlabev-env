@@ -53,8 +53,8 @@ GOLDEN_CASES = {
     "lead_brake_l1_offgrid_realistic": {"options": OFFGRID_LEAD_BRAKE, "num_steps": 100, "env": REALISTIC},
     "random_nav_easy_realistic": {"options": RANDOM_NAV_OPTIONS, "num_steps": 60, "env": REALISTIC},
     # Stage 7 defaults: generation policy v3, fillet_v1 NPC geometry, footprint map collision.
-    "lead_brake_l1_offgrid_v3": {"options": OFFGRID_LEAD_BRAKE, "num_steps": 100},
-    "random_nav_easy_v3": {"options": RANDOM_NAV_OPTIONS, "num_steps": 60},
+    "lead_brake_l1_offgrid_v3": {"options": OFFGRID_LEAD_BRAKE, "num_steps": 100, "env": {"npc_route_geometry": "fillet_v1"}},
+    "random_nav_easy_v3": {"options": RANDOM_NAV_OPTIONS, "num_steps": 60, "env": {"npc_route_geometry": "fillet_v1"}},
 }
 
 

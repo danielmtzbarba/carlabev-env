@@ -28,6 +28,11 @@ from typing import Any
 import numpy as np
 
 from CarlaBEV.src.randomness import derive_seed
+from CarlaBEV.src.scenes.scene_identity import (
+    NON_IDENTITY_OPTION_KEYS,
+    SceneGenerationConfig,
+    SceneGenerationIdentity,
+)
 
 ACTOR_PAYLOAD_SCHEMA_VERSION = 3
 """Payload schema: v3 = scene/NPC spec layers with behaviours, signals and variation support."""
@@ -74,26 +79,21 @@ def _normalize_jsonable(value: Any) -> Any:
 
 
 # Reset options that never take part in scene identity.
-NON_IDENTITY_OPTION_KEYS = frozenset({"reset_mask", "variation_seed", "variation_profile"})
-
-
 def identity_options(options: dict[str, Any]) -> dict[str, Any]:
     """Resolved reset options that define the scene (variation and vector-env keys removed)."""
     return {key: value for key, value in options.items() if key not in NON_IDENTITY_OPTION_KEYS}
 
 
 def scene_identity_key(
-    *, generator_version: str, surface_size: int, options: dict[str, Any], seeds: dict[str, Any]
+    *, generator_version: str, surface_size: int, options: dict[str, Any], seeds: dict[str, Any],
+    generation_config: SceneGenerationConfig,
 ) -> str:
-    """Stable scene identity: generator version, surface scale, identity options and component seeds."""
-    payload = {
-        "generator_version": str(generator_version),
-        # Cached coordinates are surface px: scenes are only valid at their own scale.
-        "surface_size": int(surface_size),
-        "options": _normalize_jsonable(identity_options(options)),
-        "seeds": _normalize_jsonable(seeds),
-    }
-    return hashlib.sha256(_json_dumps(payload).encode("utf-8")).hexdigest()
+    """Hash a complete generation request; a configuration-free key is unsafe."""
+    if generation_config.environment.size != int(surface_size):
+        raise ValueError("generation identity surface size mismatch")
+    return SceneGenerationIdentity.from_request(
+        generator_version=generator_version, config=generation_config, options=options, seeds=seeds,
+    ).key()
 
 
 def npc_uid_for(scene_key: str | None, npc_id: str) -> str | None:

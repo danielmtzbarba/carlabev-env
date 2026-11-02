@@ -18,6 +18,7 @@ from CarlaBEV.src.control.route_metrics import (
 from CarlaBEV.src.managers.scene_generator import SceneGenerator
 from CarlaBEV.src.managers.traffic_lifecycle import TrafficLifecycle
 from CarlaBEV.src.managers.scene_library import SceneLibrary, SceneLibraryMissError
+from CarlaBEV.src.scenes.scene_identity import SceneGenerationConfig, SceneGenerationIdentity
 from CarlaBEV.src.scenes.scene_spec import (
     DEFAULT_VARIATION_PROFILE,
     SceneSpec,
@@ -25,7 +26,6 @@ from CarlaBEV.src.scenes.scene_spec import (
     apply_variation,
     capture_scene,
     instantiate_scene,
-    scene_identity_key,
 )
 from CarlaBEV.src.randomness import build_rng_bundle, derive_seed
 from CarlaBEV.src.diagnostics import profiling
@@ -158,6 +158,7 @@ class CarlaBEV(gym.Env):
 
         self.map = BaseMap(self.cfg, units=self.units)
         self.scene_generator = SceneGenerator(self.cfg, units=self.units)
+        self._generation_config = SceneGenerationConfig.from_environment(self.cfg, self.units, self.scene_generator)
         self.scene_library = self._build_scene_library()
         self.options = None
 
@@ -320,9 +321,12 @@ class CarlaBEV(gym.Env):
 
     def _scene_identity_key(self, options) -> str:
         """Identity of the requested scene; computed whether or not a library is attached."""
-        return scene_identity_key(
+        return self._scene_generation_identity(options).key()
+
+    def _scene_generation_identity(self, options) -> SceneGenerationIdentity:
+        return SceneGenerationIdentity.from_request(
             generator_version=self._generator_version(),
-            surface_size=self.units.metric.surface_size,
+            config=self._generation_config,
             options=options,
             seeds=self._scene_seeds(options),
         )
@@ -347,13 +351,23 @@ class CarlaBEV(gym.Env):
         if record is None:
             if self._require_hit:
                 raise SceneLibraryMissError(
-                    scene_key, reason="scene not in library", seeds=self._scene_seeds(options), options=options
+                    scene_key, reason="scene not in library for generation identity v2; rebuild older corpora",
+                    seeds=self._scene_seeds(options), options=options
                 )
             return None, None
         try:
             spec = SceneSpec.from_payload(record["actors_payload"])
             if spec.surface_size != int(self.units.metric.surface_size):
                 raise ValueError("surface size mismatch")
+            stored_identity = SceneGenerationIdentity.model_validate(spec.identity.get("generation"))
+            requested_identity = self._scene_generation_identity(options)
+            if (
+                stored_identity != requested_identity
+                or stored_identity.key() != scene_key
+                or spec.scene_key != scene_key
+                or spec.generator_version != requested_identity.generator_version
+            ):
+                raise ValueError("scene generation identity mismatch; rebuild the scene library")
         except (ValueError, KeyError, TypeError) as exc:
             if self._require_hit:
                 raise SceneLibraryMissError(
@@ -395,6 +409,7 @@ class CarlaBEV(gym.Env):
                     "map_name": str(getattr(self.cfg, "map_name", "Town01")),
                     "geometry_profile": str(getattr(self.cfg, "geometry_profile", "realistic")),
                     "scene": str(options.get("scene", "rdm")),
+                    "generation": self._scene_generation_identity(options).to_payload(),
                 },
             )
             # Validate the frozen realization through the same path a hit takes.

@@ -169,11 +169,29 @@ mode derives component seeds from
 reproduce that schedule and the resolved reset options to request the same cache
 keys. Matching metadata labels alone does not guarantee a cache hit.
 
-The key includes the generator version, the surface size, resolved options
-except `reset_mask` / `variation_seed` / `variation_profile`, and component
-seeds. Additional bookkeeping options can therefore change scene identity. The
-key is reported as `scene_descriptor.scene_key` whether or not a library is
-attached. See [scene-library workflows](debugging_and_diagnostics.md).
+Scene identity **v2** includes the generator version, resolved options except
+`reset_mask` / `variation_seed` / `variation_profile`, component seeds, and a
+validated generation configuration. That configuration records map name and
+surface scale, resolved metric footprints and NPC motion settings, traffic
+enablement, physics dt, generator defaults, and map-contact settings used by
+spawn validation. It also includes SHA-256 fingerprints of the loaded semantic
+rasters and vehicle/pedestrian planning graphs. Rendering settings, RGB artwork,
+reward profiles and episode duration do not participate. Additional bookkeeping
+reset options still change identity.
+
+The complete request is stored in `SceneSpec.identity["generation"]` and checked
+against the request and key on cache loads. The same identity is used with or
+without a library; its key is reported as `scene_descriptor.scene_key`.
+`SceneLibrary.build_scene_key()` now requires an explicit `generation_config`;
+configuration-free keys cannot safely identify scenes. Map/configuration inputs
+are captured at environment construction: create a new environment after changing
+them. Town01 remains the supported map, using its existing asset layout.
+
+**Rebuild corpora prepared before identity v2.** Their ambiguous keys are not
+migrated or relabeled: ordinary resets miss and generate new entries, while
+required-hit resets fail with a rebuild message. Existing rows are retained;
+build a new database to avoid mixing key generations.
+See [scene-library workflows](debugging_and_diagnostics.md).
 
 ### Replay contract and the variation layer
 
@@ -278,7 +296,8 @@ EnvConfig(
   file and its spec-layer schema (`scenes` + `npcs` tables) must already exist.
   Read-only hits are also the fastest resets (no counter write).
 - `scene_library_require_hit=True` turns a miss — or a stored entry that is not
-  replayable (stale schema, wrong surface size) — into
+  replayable (stale schema, wrong surface size, missing or incompatible generation
+  identity) — into
   `CarlaBEV.src.managers.scene_library.SceneLibraryMissError`, which carries
   the scene key, the component seeds and the resolved options so the caller
   can reconcile its seed schedule with the builder's. Nothing is generated,

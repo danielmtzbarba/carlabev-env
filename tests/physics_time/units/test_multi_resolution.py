@@ -284,9 +284,13 @@ def test_scene_library_payloads_and_keys_are_frame_tagged():
     with tempfile.TemporaryDirectory() as tmp:
         library = SceneLibrary(f"{tmp}/lib.db", generator_version="test")
         key_128 = library.build_scene_key(
-            {"scene": "rdm"}, {"scene_seed": 1}, surface_size=128
+            {"scene": "rdm"}, {"scene_seed": 1}, surface_size=128, generation_config=env._generation_config,
         )
-        key_256 = library.build_scene_key(
-            {"scene": "rdm"}, {"scene_seed": 1}, surface_size=256
-        )
+        larger = _env(256)
+        try:
+            key_256 = library.build_scene_key(
+                {"scene": "rdm"}, {"scene_seed": 1}, surface_size=256, generation_config=larger._generation_config,
+            )
+        finally:
+            larger.close()
         assert key_128 != key_256

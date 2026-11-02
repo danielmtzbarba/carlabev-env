@@ -5,6 +5,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from CarlaBEV.src.scenes.scene_identity import SceneGenerationConfig
 
 from CarlaBEV.src.scenes.scene_spec import (
     ACTOR_PAYLOAD_SCHEMA_VERSION,
@@ -244,13 +245,15 @@ class SceneLibrary:
             )
 
     def build_scene_key(
-        self, resolved_options: dict[str, Any], seeds: dict[str, Any], *, surface_size: int | None = None
+        self, resolved_options: dict[str, Any], seeds: dict[str, Any], *,
+        generation_config: SceneGenerationConfig, surface_size: int | None = None
     ) -> str:
         return scene_identity_key(
             generator_version=self.generator_version,
-            surface_size=int(surface_size) if surface_size is not None else 128,
+            surface_size=int(surface_size) if surface_size is not None else generation_config.environment.size,
             options=resolved_options,
             seeds=seeds,
+            generation_config=generation_config,
         )
 
     def get_scene_by_key(self, scene_key: str) -> dict[str, Any] | None:

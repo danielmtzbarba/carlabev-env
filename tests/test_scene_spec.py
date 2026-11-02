@@ -108,12 +108,14 @@ class CaptureInstantiateTests(unittest.TestCase):
     def test_identity_key_ignores_variation_and_reset_mask(self):
         base = {"scene": "rdm", "difficulty_preset_id": "easy", "scene_seed": 1}
         seeds = {"scene_seed": 1, "route_seed": 2, "traffic_seed": 3, "scenario_seed": 4}
-        k1 = scene_identity_key(generator_version="v", surface_size=128, options=base, seeds=seeds)
+        config = self.env._generation_config
+        k1 = scene_identity_key(generator_version="v", surface_size=128, options=base, seeds=seeds, generation_config=config)
         k2 = scene_identity_key(
             generator_version="v", surface_size=128,
             options={**base, "variation_seed": 9, "variation_profile": "spawn_v1", "reset_mask": [True]}, seeds=seeds,
+            generation_config=config,
         )
-        k3 = scene_identity_key(generator_version="v", surface_size=128, options={**base, "num_vehicles": 3}, seeds=seeds)
+        k3 = scene_identity_key(generator_version="v", surface_size=128, options={**base, "num_vehicles": 3}, seeds=seeds, generation_config=config)
         self.assertEqual(k1, k2)
         self.assertNotEqual(k1, k3)
 

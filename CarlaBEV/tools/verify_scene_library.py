@@ -32,6 +32,7 @@ import time
 from typing import Any
 
 from CarlaBEV.src.scenes.scene_spec import SceneSpec
+from CarlaBEV.src.scenes.scene_identity import SceneGenerationIdentity
 
 
 def _fetch_scene_rows(db_path: str, *, sample: int | None, seed: int) -> list[dict[str, Any]]:
@@ -105,28 +106,22 @@ def verify_scene_library(
         for index, record in enumerate(records):
             try:
                 stored = SceneSpec.from_payload(record["actors_payload"])
+                identity = SceneGenerationIdentity.model_validate(stored.identity.get("generation"))
             except ValueError as exc:
                 results.append({"scene_key": record["scene_key"], "status": "unreadable", "detail": str(exc)})
                 continue
-            identity = stored.identity
-            env_key = (
-                stored.surface_size,
-                identity.get("map_name", "Town01"),
-                identity.get("geometry_profile", "realistic"),
-                record["generator_version"],
-            )
+            environment = identity.config.environment.model_dump()
+            env_key = (json.dumps(environment, sort_keys=True), record["generator_version"])
             env = envs.get(env_key)
             if env is None:
                 env = CarlaBEV(
                     EnvConfig(
-                        map_name=env_key[1],
+                        **environment,
                         render_mode="rgb_array",
                         obs_mode="bev_rgb",
                         action_mode="discrete",
-                        size=env_key[0],
-                        geometry_profile=env_key[2],
                         scene_library_enabled=False,
-                        scene_library_generator_version=env_key[3],
+                        scene_library_generator_version=record["generator_version"],
                     )
                 )
                 envs[env_key] = env
@@ -144,7 +139,7 @@ def verify_scene_library(
                     {
                         "scene_key": record["scene_key"],
                         "status": "key_mismatch",
-                        "detail": f"regenerated key {regenerated.scene_key} (generator/options/size differ)",
+                        "detail": f"regenerated key {regenerated.scene_key} (generation inputs or map assets differ)",
                         "wall_s": wall,
                     }
                 )

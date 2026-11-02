@@ -47,7 +47,8 @@ class EnvConfig:
     scene_library_enabled: bool = True
     scene_library_path: str = "CarlaBEV/assets/scenes/scene_library.db"
     scene_library_read_only: bool = False
-    scene_library_generator_version: str = "role_traffic_v1"
+    scene_library_require_hit: bool = False
+    scene_library_generator_version: str = "role_traffic_v3"
     # Curriculum
     curriculum_enabled: bool = False
     start_ep: int = 100
@@ -145,6 +146,7 @@ def to_public_env_config(env_cfg: EnvConfig) -> PublicEnvConfig:
         scene_library_enabled=env_cfg.scene_library_enabled,
         scene_library_path=env_cfg.scene_library_path,
         scene_library_read_only=env_cfg.scene_library_read_only,
+        scene_library_require_hit=env_cfg.scene_library_require_hit,
         scene_library_generator_version=env_cfg.scene_library_generator_version,
     )
 

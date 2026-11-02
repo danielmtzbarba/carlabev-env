@@ -107,10 +107,42 @@ class EnvConfig(BaseModel):
     junction_radius_m: float = 7.0
     """Radius of the circular right-of-way zone around each canonical junction centre."""
     route_direction_metrics_enabled: bool = False
+    # --- Static-map contact (Stage 7). ``footprint``: the ego's oriented body is sampled against the
+    # class raster — touching a non-drivable pixel with any part of the body is a collision and the
+    # ego is off-road when >= 50% of the footprint leaves the drivable area. ``center``: legacy single
+    # pixel under the state point (the rear axle with the realistic footprint).
+    map_collision_mode: Literal["footprint", "center"] = "footprint"
+    map_offroad_footprint_fraction: float = 0.5
+    """Fraction of the ego footprint off the drivable area from which the ego counts as off-road (footprint mode)."""
+    map_contact_inset_m: float = 0.3
+    """Raster tolerance: the footprint sampled against the map is shrunk by this much on every side (~1 px at
+    128 px). The graph's lane centrelines run ~0.94 m from 1-px curb lines, less than half a car width."""
+    npc_map_contact_metrics_enabled: bool = True
+    """Tally NPC-body contact with sidewalk / non-drivable pixels (episode_info npc_*_contact_fraction)."""
+    # --- NPC route geometry (Stage 7). ``fillet_v1``: sharp route vertices become feasible arcs, the path is
+    # resampled at 1 m and the target speed is capped on curves. ``legacy``: Savitzky-Golay smoothing with raw
+    # fallback, no curvature awareness (reproduces pre-Stage-7 NPC motion).
+    npc_route_geometry: Literal["fillet_v1", "legacy"] = "fillet_v1"
+    npc_fillet_target_radius_m: float = 6.0
+    npc_curve_lat_accel_mps2: float = 2.5
     scene_library_enabled: bool = True
     scene_library_path: str = "CarlaBEV/assets/scenes/scene_library.db"
     scene_library_read_only: bool = False
-    scene_library_generator_version: str = "role_traffic_v1"
+    """Open the library with SQLite ``mode=ro``: no schema migration, no usage counters, no insert/delete.
+    The file and its schema must already exist (immutable corpus)."""
+    scene_library_require_hit: bool = False
+    """Strict corpus replay: a cacheable (random-navigation) reset whose scene is not in the library raises
+    ``SceneLibraryMissError`` instead of generating. Scenario/authored resets never use the library and are
+    unaffected. Requires ``scene_library_enabled=True``."""
+    scene_library_generator_version: str = "role_traffic_v3"
+    # --- Variation layer (docs/replay_and_scene_cache_plan.md): seeded, instantiation-time
+    # perturbations of a cached scene. Never part of the scene identity / cache key.
+    variation_policy: Literal["frozen", "per_reset"] = "frozen"
+    """``frozen``: a reset without ``variation_seed`` replays the scene's frozen realization (evaluation, replay).
+    ``per_reset``: derive a variation seed from (scene_seed, reset index) for training diversity; the seed is
+    recorded in ``scene_descriptor.variation_seed`` and must be passed explicitly to replay that episode."""
+    variation_profile: str = "spawn_phase_v1"
+    """Default variation profile (``spawn_v1`` = legacy ±1-step offsets only, ``spawn_phase_v1`` = training default)."""
 
     @model_validator(mode="before")
     @classmethod
@@ -175,6 +207,12 @@ class EnvConfig(BaseModel):
             raise ValueError("max_episode_duration_s must be > 0 seconds")
         if not self.offroad_terminate_after_s > 0.0:
             raise ValueError("offroad_terminate_after_s must be > 0 seconds")
+        if not (0.0 < self.map_offroad_footprint_fraction <= 1.0):
+            raise ValueError("map_offroad_footprint_fraction must be in (0, 1]")
+        if self.map_contact_inset_m < 0.0:
+            raise ValueError("map_contact_inset_m must be >= 0")
+        if self.scene_library_require_hit and not self.scene_library_enabled:
+            raise ValueError("scene_library_require_hit=True requires scene_library_enabled=True")
         if self.max_actions < 1:
             raise ValueError("max_actions must be >= 1")
         # The metric frame (map assets, routes, anchors) is defined for one surface scale.
@@ -324,10 +362,20 @@ def _to_env_mapping(value: Any):
         "junction_right_of_way_enabled",
         "junction_radius_m",
         "route_direction_metrics_enabled",
+        "map_collision_mode",
+        "map_offroad_footprint_fraction",
+        "map_contact_inset_m",
+        "npc_map_contact_metrics_enabled",
+        "npc_route_geometry",
+        "npc_fillet_target_radius_m",
+        "npc_curve_lat_accel_mps2",
         "scene_library_enabled",
         "scene_library_path",
         "scene_library_read_only",
+        "scene_library_require_hit",
         "scene_library_generator_version",
+        "variation_policy",
+        "variation_profile",
         "action_profile_id",
         "reward_profile_id",
     }}

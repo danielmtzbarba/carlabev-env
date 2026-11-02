@@ -34,7 +34,7 @@ tests/physics_time/
 ├── npc_motion/                 NPC MOTION – route-end semantics, scenario route adequacy
 ├── behavior/                   BEHAVIOR   – ego-aware traffic, speed feed-forward, traffic lifecycle, behaviour FSM, traffic rules
 ├── geometry/                   GEOMETRY   – footprints/bodies, collision system, geometry profiles in the env
-├── regression/                 REGRESSION – golden trajectory snapshots (+ golden/*.json)
+├── regression/                 REGRESSION – golden trajectory snapshots (+ golden/*.json), replay determinism guards
 └── benchmark/                  BENCHMARK  – pipeline instrumentation, `carlabev benchmark` report/compare/baseline
 ```
 
@@ -238,6 +238,11 @@ resolved D-01/D-02 (documentation). Golden snapshots **unchanged** since Phase 1
 | `test_golden_trajectory.py[random_nav_easy]` | random-nav snapshot (Stanley NPCs, ramps) | unchanged | PASS | regenerated: ego identical; ramps complete one step earlier (C-04); collision one step later. Phase 4: vehicle 1 follows under IDM from step 0 (episode ends at step 30 instead of 28, still a collision); legacy rule switches reproduce the old snapshot |
 | `test_golden_trajectory.py[lead_brake_l1_ongrid]` | seeded snapshot, 1.0 s timers | shifts with C-03 | PASS | regenerated: old episode ended by hitting the frozen phantom lead at step 17; now ends out-of-bounds at step 47 |
 | `test_golden_trajectory.py[jaywalk_l3_ongrid]` | idem | idem | PASS | regenerated (see offgrid) |
+| `test_golden_trajectory.py[*_v3]` | Stage 7 defaults (generation policy v3, `fillet_v1` NPC geometry, footprint map collision) | new snapshots | PASS (Stage 7) | the eight earlier snapshots are pinned to `LEGACY_TRAFFIC` (v2 / legacy / center) and were byte-identical after Stage 7 |
+| `geometry/test_map_contact.py` (3) | footprint vs centre static-map contact, synthetic raster fractions, NPC contact tallies | collision at first (inset) body contact; centre mode = legacy | PASS (V-02) | |
+| `test_replay_determinism.py::test_cache_hit_replays_identical_npc_spawn_state` | scene-library hit vs the miss that produced it (resolved NPC spawn state) | miss == hit == hit | PASS (R-01, Stage 2) | hits rebuilt NPCs without their seeded RNG: spawn jitter drawn unseeded. Fix: spawn offsets resolved at generation, persisted in the spec, replayed by `instantiate_scene()` |
+| `test_replay_determinism.py::test_independent_processes_replay_identical_trajectories_through_recycle` | two fresh interpreters with different `PYTHONHASHSEED` through a lifecycle recycle (child: `_replay_probe_child.py`) | per-step fingerprints identical | PASS (R-02, Stage 2) | `TrafficLifecycle.np_rng` seeded from `hash(str)` (per-process randomized). Fix: `derive_seed`; recycle jitter from the NPC's `runtime_seed` |
+| `test_replay_determinism.py::test_cached_scenario_scene_retains_behaviors` | scenario reset replayed from the library | behaviours kept, or scene not cached | PASS (R-03, Stage 2) | cached payload dropped behaviours/signals/flags. Fix: spec layer serialises them; cache serves random scenes only (`scene_cache.bypassed`) |
 
 ### BENCHMARK — `benchmark/`
 

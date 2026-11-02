@@ -169,9 +169,49 @@ mode derives component seeds from
 reproduce that schedule and the resolved reset options to request the same cache
 keys. Matching metadata labels alone does not guarantee a cache hit.
 
-The key includes the generator version, resolved options except `reset_mask`,
-and component seeds. Additional bookkeeping options can therefore change scene
-identity. See [scene-library workflows](debugging_and_diagnostics.md).
+The key includes the generator version, the surface size, resolved options
+except `reset_mask` / `variation_seed` / `variation_profile`, and component
+seeds. Additional bookkeeping options can therefore change scene identity. The
+key is reported as `scene_descriptor.scene_key` whether or not a library is
+attached. See [scene-library workflows](debugging_and_diagnostics.md).
+
+### Replay contract and the variation layer
+
+A reset resolves a *scene spec* (ego route and spawn offset, every NPC with a
+stable `npc_id`, route, resolved spawn offset, speeds, behaviour, rule flags
+and a per-NPC `runtime_seed`, plus traffic signals). The environment always
+instantiates actors from that spec — whether it was just generated or served
+from the library — so a cache hit is a replay of the miss by construction:
+
+```
+state(k) = f(EnvConfig, scene identity (scene_key), variation_seed, actions)
+```
+
+Only random-navigation scenes (`scene == "rdm"`) are cached; scenario and
+authored resets report `scene_cache.bypassed == "non_random_scene"`.
+
+Training diversity is a separate, seeded layer: pass `variation_seed` (and
+optionally `variation_profile`) in the reset options, or set
+`EnvConfig.variation_policy = "per_reset"`. The variation never changes the
+cache key; the effective seed, profile, whether it was applied and the
+realised perturbations are reported in `scene_descriptor` / `info["variation"]`
+and in `episode_info`, so any logged episode can be replayed by passing the
+recorded `variation_seed` explicitly. `variation_seed=None` (the default
+policy) replays the frozen realization — use it for evaluation corpora and
+benchmarks. `carlabev validate replay` proves both properties
+(`--variation-seed`, `--variation-independence`).
+
+Portability: generation is deterministic on one machine but its decisions
+depend on platform floating-point rounding, so the same seed may generate a
+different scene on another OS/CPU. Scenes served from a shared library replay
+identically everywhere (physics within 1e-7). Build libraries once, ship the
+`.db`, and run `carlabev scene verify-library` on each platform to measure
+generator drift; `carlabev validate replay --cache-mode hit-only --atol 1e-7`
+proves the replay.
+
+Collision telemetry identifies dynamic actors by `npc_id`
+(`info["collision"]["npc_id"]`, `actors_state[*]["npc_id"]`); the legacy
+`actor_id` keeps its type-id semantics.
 
 ## Reset and step information
 
@@ -212,18 +252,47 @@ computed internally and the unwrapped environment retains it in `current_info`. 
 is an implementation detail, not a stable downstream contract. See
 [Control And Actions](control_and_actions.md) for the internal comfort signals.
 
+### Stage 7 defaults and existing corpora
+
+The defaults changed to `scene_library_generator_version="role_traffic_v3"`,
+`npc_route_geometry="fillet_v1"` and `map_collision_mode="footprint"`. A
+library built under `role_traffic_v2` is keyed under that version, so it is
+never served to a v3 configuration; to replay it set
+`scene_library_generator_version="role_traffic_v2"` (and, for bit-identical
+NPC motion and collision semantics, `npc_route_geometry="legacy"`,
+`map_collision_mode="center"`). `verify-library` uses the library's own
+generator version when regenerating.
+
+## Immutable corpora and strict replay
+
+```python
+EnvConfig(
+    scene_library_enabled=True,
+    scene_library_path="corpora/navigation_medium_v1.db",
+    scene_library_read_only=True,      # SQLite mode=ro: no schema, counter, insert or delete writes
+    scene_library_require_hit=True,    # a random-scene reset not in the corpus raises SceneLibraryMissError
+)
+```
+
+- `scene_library_read_only=True` opens the file with SQLite `mode=ro`; the
+  file and its spec-layer schema (`scenes` + `npcs` tables) must already exist.
+  Read-only hits are also the fastest resets (no counter write).
+- `scene_library_require_hit=True` turns a miss — or a stored entry that is not
+  replayable (stale schema, wrong surface size) — into
+  `CarlaBEV.src.managers.scene_library.SceneLibraryMissError`, which carries
+  the scene key, the component seeds and the resolved options so the caller
+  can reconcile its seed schedule with the builder's. Nothing is generated,
+  stored or evicted. Variants (`variation_seed`) of a cached scene are still
+  hits; scenario/authored resets bypass the library and remain available.
+- `carlabev validate replay --cache-mode hit-only --scene-library FILE` uses
+  both flags; `carlabev run sim --scene-library FILE --scene-library-read-only
+  --scene-library-require-hit` replays a corpus from the CLI.
+
 ## Known integration limitations
 
-- `scene_library_read_only=True` suppresses scene insertion and deletion, but
-  schema initialization and cache usage counters can still write to SQLite.
-- A cache miss can generate a scene even in read-only mode. A required-hit option
-  is not implemented in the public environment configuration.
 - `EnvConfig.max_actions` is a legacy step-count alias; prefer
   `max_episode_duration_s`. The environment enforces the horizon for every
   reward family; a reward profile may only shorten it.
 - `env_id` and `scenes_path` are compatibility fields with no active runtime use.
 - `obs_size`, frame stacking, semantic conversion, and temporal fusion require
   the wrapped construction path.
-
-The intended immutable, strict corpus workflow needs additional implementation.
-Do not infer those guarantees from the current read-only setting.

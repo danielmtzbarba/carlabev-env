@@ -37,7 +37,15 @@ from physics_time_helpers import (
 REGEN = os.environ.get("CARLABEV_REGEN_GOLDEN", "") not in ("", "0", "false")
 STRICT_DIGEST = os.environ.get("CARLABEV_STRICT_GOLDEN", "") not in ("", "0", "false")
 
-LEGACY = {"geometry_profile": "legacy"}  # the historical 1.25 m squares (realistic is the default since Phase 6)
+# Pre-Stage-7 traffic behaviour: generation policy v2 (no spawn occupancy / role-pool fixes), Savitzky-Golay
+# NPC paths without curvature caps, centre-pixel map collision. Existing snapshots describe exactly this.
+LEGACY_TRAFFIC = {
+    "scene_library_generator_version": "role_traffic_v2",
+    "npc_route_geometry": "legacy",
+    "map_collision_mode": "center",
+}
+LEGACY = {"geometry_profile": "legacy", **LEGACY_TRAFFIC}  # + the historical 1.25 m square footprints
+REALISTIC = {"geometry_profile": "realistic", **LEGACY_TRAFFIC}
 
 CASES = {
     "lead_brake_l1_ongrid": {"options": LEAD_BRAKE_OPTIONS, "num_steps": 80, "env": LEGACY},
@@ -67,18 +75,30 @@ CASES = {
             "brake_delay": 1.25,
         },
         "num_steps": 100,
-        "env": {"geometry_profile": "realistic"},
+        "env": REALISTIC,
     },
     "jaywalk_l3_offgrid_realistic": {
         "options": {**JAYWALK_OPTIONS, "cross_delay": 1.25, "yield_duration": 1.25},
         "num_steps": 100,
-        "env": {"geometry_profile": "realistic"},
+        "env": REALISTIC,
     },
     "random_nav_easy_realistic": {
         "options": RANDOM_NAV_OPTIONS,
         "num_steps": 60,
-        "env": {"geometry_profile": "realistic"},
+        "env": REALISTIC,
     },
+    # Stage 7 defaults: generation policy v3, fillet_v1 NPC geometry, footprint map collision.
+    "lead_brake_l1_offgrid_v3": {
+        "options": {**LEAD_BRAKE_OPTIONS, "ego_speed": 8.0, "lead_gap": 20.0, "brake_delay": 1.25},
+        "num_steps": 100,
+        "env": {},
+    },
+    "jaywalk_l3_offgrid_v3": {
+        "options": {**JAYWALK_OPTIONS, "cross_delay": 1.25, "yield_duration": 1.25},
+        "num_steps": 100,
+        "env": {},
+    },
+    "random_nav_easy_v3": {"options": RANDOM_NAV_OPTIONS, "num_steps": 60, "env": {}},
 }
 
 

@@ -167,6 +167,35 @@ class TrafficLight(Actor):
         self._set_color()
         self._update_rect()
 
+    # --- spec (scene cache / replay) --------------------------------------------
+    def to_spec(self) -> dict:
+        """Serializable description; :meth:`from_spec` rebuilds an identical light."""
+        return {
+            "pos_x": float(self.x),
+            "pos_y": float(self.y),
+            "orientation": str(self.orientation),
+            "signal_state": int(self.initial_signal_state),
+            "width": float(self.width),
+            "length": float(self.length),
+            "controls_heading": self.controls_heading,
+            "cycle": None if self.cycle is None else self.cycle.to_spec(),
+        }
+
+    @classmethod
+    def from_spec(cls, spec: dict, *, map_size=128, units=None) -> "TrafficLight":
+        return cls(
+            pos_x=float(spec["pos_x"]),
+            pos_y=float(spec["pos_y"]),
+            map_size=map_size,
+            orientation=str(spec.get("orientation", "horizontal")),
+            signal_state=int(spec.get("signal_state", TrafficLightState.RED)),
+            width=spec.get("width"),
+            length=spec.get("length"),
+            units=units,
+            controls_heading=spec.get("controls_heading"),
+            cycle=spec.get("cycle"),
+        )
+
     @property
     def semantic_class(self) -> SemanticClass:
         if self.signal_state == TrafficLightState.RED:

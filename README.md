@@ -173,11 +173,13 @@ Phase-1 command groups:
 - `carlabev scene design`
 - `carlabev scene build-library`
 - `carlabev scene analyze-library`
+- `carlabev scene verify-library`
 - `carlabev scene analyze-routes`
 - `carlabev graph build-town01-canonical`
 - `carlabev graph visualize-town01-canonical`
 - `carlabev graph validate-town01-joins`
 - `carlabev validate simulator-semantics`
+- `carlabev validate replay`
 - `carlabev benchmark run|compare|baseline`
 - `carlabev viz semantic-channels`
 - `carlabev viz vehicle-temporal-fusion`
@@ -204,6 +206,7 @@ uv run carlabev run sim --control random --physics-dt 0.05 --episodes 5 --no-tra
 uv run carlabev run sim --reset-mode scenario --scenario-id lead_brake --scenario-level 3
 uv run carlabev run sim --reset-mode authored --scene-file CarlaBEV/assets/scenes/jaywalk-01.01.json
 uv run carlabev run sim --control random --record-video runs/videos --episodes 2
+uv run carlabev run sim --control random --episodes 5 --scene-library corpora/eval.db --scene-library-read-only --scene-library-require-hit
 ```
 
 - `--render human|rgb_array` (default: `human` for manual control, headless otherwise), `--fps` (wall-clock cap; default real time = `1/control_dt`), `--display-fps 30|60` (interpolated real-time viewer)
@@ -244,6 +247,7 @@ uv run carlabev scene analyze-library summary
 uv run carlabev scene analyze-library breakdown --by difficulty --by route-profile
 uv run carlabev scene analyze-library quality
 uv run carlabev scene analyze-library query --limit 10
+uv run carlabev scene analyze-library npcs --role lead     # NPC layer (npcs table)
 ```
 
 For the full set of debugging and route-diagnostics tools, see:
@@ -268,6 +272,32 @@ This checks core simulator contracts such as:
 - rendering FPS / render mode never changing the simulated outcome
 - the SI unit contract and dt-convergence of the dynamics
 
+### Replay Validation
+
+```bash
+uv run carlabev validate replay                                   # 3 isolated runs, seed 0, medium random traffic
+uv run carlabev validate replay --seed 11 --runs 4 --steps 300 --policy random --action-seed 7
+uv run carlabev validate replay --cache-mode miss-then-hit        # run 0 populates a fresh scene library, runs 1.. replay hits
+uv run carlabev validate replay --reset-mode scenario --scenario-id lead_brake --report runs/replay.json
+```
+
+`carlabev scene verify-library --scene-library-path runs/lib.db` regenerates
+cached scenes on the current machine and compares their spec digests with the
+library: generation is deterministic per machine but its decisions depend on
+platform floating-point rounding, so a prebuilt library — not regeneration —
+is the cross-machine reproducibility mechanism.
+
+`validate replay` runs the same seeded reset and the same action sequence in
+`N` **independent interpreters** (each with a different `PYTHONHASHSEED`) and
+asserts that the simulator state is identical at every step: ego and target
+spawn, ego and NPC routes, every NPC pose/speed/behavior state, signals,
+rewards, termination and the observation hash. The first divergence is
+reported (step, key, values, delta); exit code 1 on mismatch. Use
+`--cache-mode miss-then-hit|hit-only` to prove that scene-library hits are
+indistinguishable from the generated scene, and `--atol 1e-7` for
+cross-machine comparisons. See
+[Replay Determinism And Scene-Cache Plan](CarlaBEV/docs/replay_and_scene_cache_plan.md).
+
 The per-feature physics/time contract suite lives in `tests/physics_time`
 (`uv run pytest tests/physics_time`, documented in `tests/physics_time/README.md`).
 For explicit numbers (timer accuracy, convergence error, determinism, throughput
@@ -278,23 +308,6 @@ uv run carlabev benchmark run
 ```
 
 See [Benchmarking And Instrumentation](CarlaBEV/docs/benchmarking.md).
-
-### Git Hooks
-
-This repo uses `pre-commit` to run local quality checks.
-
-Install the hooks once per clone:
-
-```bash
-./scripts/setup-hooks.sh
-```
-
-Hook behavior:
-
-- `pre-commit`: `ruff --fix` and `ruff-format`
-- `pre-push`: `ruff --fix` and `ruff-format`
-- `pre-push`: `uv run pytest`
-- `pre-push`: `uv run python CarlaBEV/tools/validate_simulator_semantics.py`
 
 ## Release Workflow
 
@@ -379,14 +392,16 @@ The intended downstream workflow is:
 
 - prebuild benchmark- or study-specific scene libraries ahead of training
 - point downstream study configs at those `.db` files
-- point replay runs at the prepared library, with the current limitations below
+- point replay runs at the prepared library in strict mode
 
-`scene_library_read_only=True` suppresses scene insertion/deletion, but schema
-initialization and cache usage counters can still write. Cache misses can still
-generate scenes; required-hit enforcement is not implemented. Immutable, strict
-corpus replay is an intended workflow rather than a current guarantee. Builders
-and callers must also agree on resolved options and seed schedules to obtain
-matching cache keys. See [Public Integration API](CarlaBEV/docs/downstream_integration_api.md).
+`scene_library_read_only=True` opens the library with SQLite `mode=ro` (no
+schema, counter, insert or delete writes; the file must exist) and
+`scene_library_require_hit=True` makes a random-scene reset that is not in the
+corpus raise `SceneLibraryMissError` instead of generating — together they give
+an immutable, strictly replayed corpus. Builders and callers must agree on
+resolved options and seed schedules to obtain matching cache keys (the
+exception reports the key, seeds and options of the miss). See
+[Public Integration API](CarlaBEV/docs/downstream_integration_api.md).
 
 Common `RunConfig` options include:
 
@@ -523,6 +538,27 @@ Practical interpretation:
 - route-relative traffic perturbation: hold `traffic_seed` fixed and vary `route_seed`
 - traffic-only perturbation: hold `route_seed` fixed and vary `traffic_seed`
 
+## Variation Layer (Training Diversity vs. Replay)
+
+A cached scene is one frozen realization. Training diversity comes from a
+separate, seeded *variation* layer applied when the scene is instantiated —
+never stored in the library, never part of the cache key:
+
+```python
+# frozen realization (evaluation, replay, goldens)
+RandomNavigationReset(scene_seed=1000)
+# a specific, replayable variant of the same cached scene
+RandomNavigationReset(scene_seed=1000, variation_seed=7, variation_profile="spawn_phase_v1")
+# training loops: EnvConfig(variation_policy="per_reset") derives and records a seed per reset
+```
+
+Profiles: `spawn_v1` (legacy ±1-step start offsets) and `spawn_phase_v1`
+(ego start progress, NPC route phase, initial-speed/ramp jitter, bounded lateral
+offset; training default). The effective seed and realised perturbations are
+reported in `scene_descriptor` / `info["variation"]` and in `episode_info`;
+replay an episode by passing its recorded `variation_seed`. Details in
+[Replay Determinism And Scene-Cache Plan](CarlaBEV/docs/replay_and_scene_cache_plan.md).
+
 ## Scene Descriptor
 
 Random-navigation resets and episode summaries now expose a `scene_descriptor`
@@ -530,7 +566,8 @@ payload intended for analysis and dataset-style logging.
 
 The descriptor captures scene-level metadata such as:
 
-- `scene_seed`, `route_seed`, `traffic_seed`
+- `scene_key` (scene identity), `scene_seed`, `route_seed`, `traffic_seed`
+- `variation_seed`, `variation_profile`, `variation_applied`
 - `scene_benchmark_id`, `scene_profile_id`, `scene_split`
 - `num_vehicles_near_ego`
 - `traffic_role_profile`
@@ -561,10 +598,31 @@ It is a weaker fit for:
 - sensor-realism studies
 - direct simulation-to-real transfer claims without additional validation
 
+## Traffic Realism (Stage 7)
+
+- Static-map collision is footprint-based (`map_collision_mode="footprint"`):
+  the ego collides when any part of its oriented body touches a non-drivable
+  pixel (the legacy `center` mode tested one pixel under the rear axle, 3.7 m
+  behind the bumper). Spawn validation applies the same test.
+- Random traffic generation `role_traffic_v3`: no overlapping spawns (2 m
+  bumper gap, unique start nodes, lifecycle respawns included), exact requested
+  density, working `rear` / `cross_path` / `opposite_lane` role pools, no
+  dead-end U-turn routes. `role_traffic_v2` reproduces the previous generator.
+- NPC route geometry `fillet_v1`: kinematically feasible junction arcs,
+  curvature speed caps and an off-road nudge — NPC bodies on non-drivable
+  pixels 4.3 % → 0.6 % of moving steps, on sidewalks 57 % → 10 %; `legacy`
+  reproduces the previous paths. `episode_info` reports
+  `npc_nondrivable_contact_fraction` / `npc_sidewalk_contact_fraction`.
+- `carlabev validate simulator-semantics` → `traffic_realism` pins all three.
+  Details: [Actor Geometry](CarlaBEV/docs/actor_geometry.md),
+  [Traffic Rules And Behaviors](CarlaBEV/docs/traffic_rules_and_behaviors.md).
+
 ## Known Modeling Boundaries
 
 - Ego dynamics use a simplified kinematic bicycle model.
-- Collision footprints are coarse relative to real vehicle geometry.
+- Lanes are ~1.9 m wide in the 128-px raster against 1.8 m car bodies, so NPC
+  corners touch sidewalk pixels on a fraction of steps; map contact uses a
+  ~1 px inset as tolerance.
 - Some scenario anchors remain map-specific even though the geometry pipeline now exposes explicit metric conversions.
 - The simulator is optimized for research iteration speed, not photorealism or detailed physics.
 

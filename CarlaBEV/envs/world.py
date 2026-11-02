@@ -22,6 +22,7 @@ working.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 
 import numpy as np
 import pygame
@@ -35,12 +36,26 @@ from CarlaBEV.src.units import UnitContract
 from CarlaBEV.src.diagnostics import profiling
 from CarlaBEV.semantics import (
     BLOCKING_CLASSES,
+    DRIVABLE_CLASSES,
+    OFFROAD_CLASSES,
     MAP_LABEL_TO_CLASS,
     PALETTE_LUT,
     SemanticClass,
     semantic_class_from_id,
     semantic_class_from_rgb,
 )
+
+
+def _class_lut(classes) -> np.ndarray:
+    lut = np.zeros(256, dtype=bool)
+    for semantic_class in classes:
+        lut[int(semantic_class)] = True
+    return lut
+
+
+_CLASS_IS_BLOCKING = _class_lut(BLOCKING_CLASSES)
+_CLASS_IS_OFFROAD = _class_lut(OFFROAD_CLASSES)
+_CLASS_IS_DRIVABLE = _class_lut(DRIVABLE_CLASSES)
 
 
 @dataclass(frozen=True)
@@ -105,7 +120,12 @@ class BaseMap:
         self.crop_resolution = self.fov_renderer.crop_resolution
         self.scene.crop_resolution = self.crop_resolution
         self.scene.drivable_mask = self._drivable_mask
+        self.scene.blocking_clearance_px = self.blocking_clearance_px
         self.scene.tile_provider = self
+        self.scene.map_collision_mode = str(getattr(cfg, "map_collision_mode", "footprint"))
+        self.scene.map_contact_inset_m = float(getattr(cfg, "map_contact_inset_m", 0.3))
+        self.scene.map_offroad_footprint_fraction = float(getattr(cfg, "map_offroad_footprint_fraction", 0.5))
+        self.scene.npc_map_contact_metrics_enabled = bool(getattr(cfg, "npc_map_contact_metrics_enabled", True))
 
         # --- Observation surface and state
         self._fov_surface = None
@@ -149,9 +169,9 @@ class BaseMap:
     # =====================================================
     # --- Scene Control ---
     # =====================================================
-    def reset(self, actors=None, hero_np_rng=None):
+    def reset(self, actors=None, hero_np_rng=None, *, copy_actors=True):
         """Reset scene, redraw the world and the first observation."""
-        self.scene.reset_scene(actors, hero_np_rng=hero_np_rng)
+        self.scene.reset_scene(actors, hero_np_rng=hero_np_rng, copy_actors=copy_actors)
         self._theta = 0.0
         self.world_renderer.reset()
         if self.scene.hero is not None and getattr(self.scene, "camera", None) is not None:
@@ -304,6 +324,121 @@ class BaseMap:
 
     def semantic_tile_at(self, position):
         return np.array(PALETTE_LUT[self.semantic_id_at(position)], dtype=np.uint8)
+
+    @property
+    def blocking_clearance_px(self) -> np.ndarray:
+        """Distance (px) of every pixel to the nearest off-road pixel (cached Euclidean distance transform).
+
+        Off-road = anything that is not a drivable class (buildings *and*
+        sidewalks): NPC paths are nudged away from both so that the body stays
+        on the carriageway. The graph's lane centrelines sit ~3 px from the
+        curb in the raster while the road extends much farther on the other
+        side, so a bounded shift towards the road centre is always available.
+        """
+        cached = self.__dict__.get("_blocking_clearance_px")
+        if cached is None:
+            from scipy import ndimage
+
+            cached = ndimage.distance_transform_edt(_CLASS_IS_DRIVABLE[self._static_ids]).astype(np.float32)
+            self._blocking_clearance_px = cached
+        return cached
+
+    # --- footprint vs static map ------------------------------------------------
+    MAP_CONTACT_SAMPLE_SPACING_M = 0.3
+    """Grid spacing (metres) of the footprint samples; fixed in SI so results do not depend on the raster size."""
+
+    def _footprint_sample_grid(self, half_length: float, half_width: float):
+        """Flattened local-frame sample grid for a footprint size (cached; identical for every car)."""
+        cache = self.__dict__.setdefault("_footprint_grids", {})
+        key = (round(float(half_length), 6), round(float(half_width), 6))
+        grid = cache.get(key)
+        if grid is None:
+            spacing = self.MAP_CONTACT_SAMPLE_SPACING_M
+            n_l = max(2, int(math.ceil(2.0 * half_length / spacing)) + 1)
+            n_w = max(2, int(math.ceil(2.0 * half_width / spacing)) + 1)
+            uu, vv = np.meshgrid(
+                np.linspace(-half_length, half_length, n_l), np.linspace(-half_width, half_width, n_w), indexing="ij"
+            )
+            grid = (uu.ravel(), vv.ravel())
+            cache[key] = grid
+        return grid
+
+    def bodies_map_contact(self, bodies, inset_m: float = 0.0) -> list[dict]:
+        """Batch version of :meth:`body_map_contact` (one raster lookup for all bodies of a footprint size)."""
+        results = [None] * len(bodies)
+        groups: dict[tuple, list[int]] = {}
+        obbs = []
+        for index, body in enumerate(bodies):
+            obb = body.obb()
+            obbs.append(obb)
+            half_length = max(obb.half_length - inset_m, 0.05)
+            half_width = max(obb.half_width - inset_m, 0.05)
+            groups.setdefault((round(half_length, 6), round(half_width, 6)), []).append(index)
+        ids = self._static_ids
+        height, width = ids.shape
+        inv_mpp = 1.0 / self._units.metric.meters_per_pixel
+        for (half_length, half_width), indices in groups.items():
+            uu, vv = self._footprint_sample_grid(half_length, half_width)
+            n = uu.size
+            cx = np.array([obbs[i].cx for i in indices])[:, None]
+            cy = np.array([obbs[i].cy for i in indices])[:, None]
+            yaw = np.array([obbs[i].yaw for i in indices])[:, None]
+            c, s = np.cos(yaw), np.sin(yaw)
+            xi = np.rint((cx + uu[None, :] * c - vv[None, :] * s) * inv_mpp).astype(np.intp)
+            yi = np.rint((cy + uu[None, :] * s + vv[None, :] * c) * inv_mpp).astype(np.intp)
+            np.clip(xi, 0, width - 1, out=xi)
+            np.clip(yi, 0, height - 1, out=yi)
+            classes = ids[yi, xi]
+            blocking = _CLASS_IS_BLOCKING[classes].sum(axis=1)
+            offroad = _CLASS_IS_OFFROAD[classes].sum(axis=1)
+            drivable = _CLASS_IS_DRIVABLE[classes].sum(axis=1)
+            for row, index in enumerate(indices):
+                results[index] = {
+                    "blocking": bool(blocking[row] > 0),
+                    "blocking_fraction": float(blocking[row]) / n,
+                    "offroad_fraction": float(offroad[row]) / n,
+                    "drivable_fraction": float(drivable[row]) / n,
+                    "samples": int(n),
+                }
+        return results
+
+    def body_map_contact(self, body, inset_m: float = 0.0) -> dict:
+        """Which static-map classes lie under a body's footprint.
+
+        The oriented box (shrunk by ``inset_m`` on every side — a tolerance of
+        about one pixel for raster quantisation) is sampled on a regular metric
+        grid (corners and edges included) and every sample is looked up in the
+        class-id raster. Returns the fraction of samples on blocking
+        (non-drivable), off-road (sidewalk) and drivable classes; ``blocking``
+        is True as soon as one sample hits a blocking pixel (a bumper touching
+        a wall is a collision). Samples beyond the raster are clamped to the
+        border pixel (the map border is non-drivable, so leaving the map blocks
+        as well).
+        """
+        ids = self._static_ids
+        height, width = ids.shape
+        obb = body.obb()
+        uu, vv = self._footprint_sample_grid(
+            max(obb.half_length - inset_m, 0.05), max(obb.half_width - inset_m, 0.05)
+        )
+        c, s = math.cos(obb.yaw), math.sin(obb.yaw)
+        inv_mpp = 1.0 / self._units.metric.meters_per_pixel
+        xi = np.rint((obb.cx + uu * c - vv * s) * inv_mpp).astype(np.intp)
+        yi = np.rint((obb.cy + uu * s + vv * c) * inv_mpp).astype(np.intp)
+        np.clip(xi, 0, width - 1, out=xi)
+        np.clip(yi, 0, height - 1, out=yi)
+        classes = ids[yi, xi]
+        total = float(classes.size)
+        blocking = int(_CLASS_IS_BLOCKING[classes].sum())
+        offroad = int(_CLASS_IS_OFFROAD[classes].sum())
+        drivable = int(_CLASS_IS_DRIVABLE[classes].sum())
+        return {
+            "blocking": blocking > 0,
+            "blocking_fraction": blocking / total,
+            "offroad_fraction": offroad / total,
+            "drivable_fraction": drivable / total,
+            "samples": int(total),
+        }
 
     def semantic_class_at(self, position):
         return semantic_class_from_id(self.semantic_id_at(position))

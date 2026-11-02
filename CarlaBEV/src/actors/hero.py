@@ -33,6 +33,7 @@ class BaseAgent(Controller):
         drivable_mask=None,
         units: UnitContract | None = None,
         dt=None,
+        spawn_jitter_m=None,
     ):
         units = units if units is not None else DEFAULT_UNIT_CONTRACT
         ego = units.ego
@@ -88,7 +89,16 @@ class BaseAgent(Controller):
         }
         self.drivable_mask = drivable_mask
 
-        self.set_route(xs, ys, initial_speed, np_rng=np_rng, drivable_mask=self.drivable_mask)
+        # ``spawn_jitter_m``: resolved start offset replayed verbatim (scene
+        # cache / replay); otherwise the offset is drawn from ``np_rng``.
+        self.set_route(
+            xs,
+            ys,
+            initial_speed,
+            np_rng=np_rng,
+            drivable_mask=self.drivable_mask,
+            spawn_offset_m=spawn_jitter_m,
+        )
         
         # Initial control step to set target_idx
         _, self.target_idx = self.stanley_control()

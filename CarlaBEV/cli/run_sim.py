@@ -213,6 +213,19 @@ def _build_parser() -> argparse.ArgumentParser:
     group.add_argument(
         "--no-scene-library", action="store_true", help="Disable the SQLite scene cache"
     )
+    group.add_argument(
+        "--scene-library", default=None, metavar="PATH", help="Scene library path (default: EnvConfig default)"
+    )
+    group.add_argument(
+        "--scene-library-read-only",
+        action="store_true",
+        help="Open the library read-only (no schema/counter writes; file must exist)",
+    )
+    group.add_argument(
+        "--scene-library-require-hit",
+        action="store_true",
+        help="Strict corpus replay: a random-scene reset not in the library is an error",
+    )
     # --- output
     group = parser.add_argument_group("output")
     group.add_argument(
@@ -259,7 +272,11 @@ def _build_run_config(args, render_mode: str) -> RunConfig:
         traffic_signals_enabled=not args.no_signals,
         junction_right_of_way_enabled=not args.no_right_of_way,
         scene_library_enabled=not args.no_scene_library,
+        scene_library_read_only=args.scene_library_read_only,
+        scene_library_require_hit=args.scene_library_require_hit,
     )
+    if args.scene_library is not None:
+        env_kwargs["scene_library_path"] = args.scene_library
     if args.max_episode_duration_s is not None:
         env_kwargs["max_episode_duration_s"] = args.max_episode_duration_s
     run_kwargs = dict(

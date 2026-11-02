@@ -11,11 +11,13 @@ USAGE = """Usage:
   carlabev scene design [ARGS...]
   carlabev scene build-library [ARGS...]
   carlabev scene analyze-library [ARGS...]
+  carlabev scene verify-library [ARGS...]   # regenerate cached scenes here, compare spec digests
   carlabev scene analyze-routes [ARGS...]
   carlabev graph build-town01-canonical [ARGS...]
   carlabev graph visualize-town01-canonical [ARGS...]
   carlabev graph validate-town01-joins [ARGS...]
   carlabev validate simulator-semantics [ARGS...]
+  carlabev validate replay [ARGS...]       # N isolated runs, same seed + actions, identical state at every step
   carlabev benchmark run|compare|baseline [ARGS...]
   carlabev viz semantic-channels [ARGS...]
   carlabev viz vehicle-temporal-fusion [ARGS...]
@@ -70,6 +72,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return int(
                 _invoke_module_main("CarlaBEV.tools.analyze_scene_library", tokens) or 0
             )
+        if command == "verify-library":
+            from CarlaBEV.tools import verify_scene_library
+
+            return int(verify_scene_library.main(tokens) or 0)
         if command == "analyze-routes":
             return int(
                 _invoke_module_main(
@@ -109,6 +115,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
                 or 0
             )
+        if command == "replay":
+            from CarlaBEV.tools import validate_replay
+
+            return int(validate_replay.main(tokens) or 0)
     elif group == "benchmark":
         from CarlaBEV.tools.benchmark import runner
 

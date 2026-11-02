@@ -46,6 +46,9 @@ class RandomNavigationReset(BaseModel):
     route_seed: int | None = None
     traffic_seed: int | None = None
     scenario_seed: int | None = None
+    # Variation layer: seeded perturbation of the cached scene (None = frozen realization).
+    variation_seed: int | None = None
+    variation_profile: str | None = None
 
 class ScenarioPresetReset(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
@@ -251,6 +254,10 @@ def build_random_navigation_options(
         options["traffic_seed"] = int(request.traffic_seed)
     if request.scenario_seed is not None:
         options["scenario_seed"] = int(request.scenario_seed)
+    if request.variation_seed is not None:
+        options["variation_seed"] = int(request.variation_seed)
+    if request.variation_profile is not None:
+        options["variation_profile"] = str(request.variation_profile)
     return _attach_reset_mask(options, reset_mask)
 
 

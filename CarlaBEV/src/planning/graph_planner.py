@@ -20,8 +20,51 @@ class GraphPlanner(MapGraph):
             for _, _, data in self._G.edges(data=True)
         )
 
+    # Memoised shortest paths: identical by construction (same query, same
+    # function) — the generator issues hundreds of (start, end) queries per
+    # scene and library builds repeat pairs across scenes. Bounded LRU.
+    _SHORTEST_PATH_CACHE_SIZE = 4096
+
+    def reachable_nodes(self, start) -> frozenset:
+        """Nodes reachable from ``start`` in the directed lane graph (cached per source)."""
+        cache = self.__dict__.setdefault("_reachable_cache", {})
+        reach = cache.get(start)
+        if reach is None:
+            reach = frozenset(nx.descendants(self._G, start))
+            cache[start] = reach
+        return reach
+
+    def node_out_direction(self, node_id):
+        """Unit travel direction at a lane node (towards its first successor), raw frame; None at dead ends."""
+        cache = self.__dict__.setdefault("_out_dir_cache", {})
+        if node_id in cache:
+            return cache[node_id]
+        direction = None
+        for successor in self._G.successors(node_id):
+            vec = self.get_node_pos(successor).astype(float) - self.get_node_pos(node_id).astype(float)
+            norm = float(np.linalg.norm(vec))
+            if norm > 1e-9:
+                direction = vec / norm
+                break
+        cache[node_id] = direction
+        return direction
+
     def shortest_path_nodes(self, start, end):
-        return nx.shortest_path(self._G, start, end, weight=self._edge_weight)
+        cache = self.__dict__.get("_shortest_path_cache")
+        if cache is None:
+            from collections import OrderedDict
+
+            cache = self._shortest_path_cache = OrderedDict()
+        key = (start, end)
+        path = cache.get(key)
+        if path is None:
+            path = nx.shortest_path(self._G, start, end, weight=self._edge_weight)
+            cache[key] = path
+            if len(cache) > self._SHORTEST_PATH_CACHE_SIZE:
+                cache.popitem(last=False)
+        else:
+            cache.move_to_end(key)
+        return list(path)
 
     def compute_path_route_metrics(self, path_ids):
         if path_ids is None or len(path_ids) < 2:

@@ -5,6 +5,8 @@ expose ``body()``/``semantic_class`` for the renderer and the collision system
 and never touch pygame; drawing is the renderer's job.
 """
 
+import math
+
 import numpy as np
 
 from CarlaBEV.src.control.stanley_controller import Controller
@@ -118,7 +120,11 @@ class Actor:
         self._initial_rx = list(self.rx)
         self._initial_ry = list(self.ry)
         #
-        self.path = []
+        # Route waypoints as graph references; ``path`` materialises GUI ``Node``
+        # objects lazily (the scene designer is the only consumer, and the
+        # generator builds hundreds of candidate routes per scene).
+        self._path_waypoints = []
+        self._path_nodes = None
         self.selected = False
         self.behavior_state = "idle"
         self.target_speed = 0.0
@@ -142,6 +148,18 @@ class Actor:
         self.length_m = self.footprint.length_m
         self.width_m = self.footprint.width_m
         self.np_rng = np_rng
+        # Static-map clearance transform (px), bound by the ActorManager like drivable_mask.
+        self.blocking_clearance_px = None
+        # --- Replayable NPC identity (see docs/replay_and_scene_cache_plan.md) ---
+        # ``npc_id``: stable, scene-scoped id ("vehicle:003"); ``runtime_seed``:
+        # per-NPC seed for every random draw made *after* spawn (recycle jitter);
+        # ``spawn_jitter_m``: the resolved start offset, drawn once at scene
+        # generation and replayed verbatim by reset(). ``None`` = legacy
+        # behaviour (draw at reset time from ``np_rng``).
+        self.npc_id = None
+        self.npc_uid = None
+        self.runtime_seed = None
+        self.spawn_jitter_m = None
         # Lifecycle: procedurally generated, behaviour-free traffic may be recycled
         # onto a new route once it finishes (see managers/traffic_lifecycle.py).
         self.recyclable = False
@@ -163,8 +181,21 @@ class Actor:
     def set_route_wp(self, node_id, x, y):
         self.rx.append(x)
         self.ry.append(y)
-        pos = np.array([x, y])
-        self.path.append(Node(node_id, pos))
+        self._path_waypoints.append((node_id, x, y))
+        self._path_nodes = None
+
+    @property
+    def path(self):
+        """Route waypoints as GUI :class:`Node` objects (built on first access)."""
+        if self._path_nodes is None:
+            self._path_nodes = [Node(node_id, np.array([x, y])) for node_id, x, y in self._path_waypoints]
+        return self._path_nodes
+
+    @path.setter
+    def path(self, nodes):
+        nodes = list(nodes or [])
+        self._path_nodes = nodes
+        self._path_waypoints = [(node.id, node._x, node._y) for node in nodes]
 
     def reset(self):
         if not self._initial_rx or not self._initial_ry:
@@ -184,6 +215,8 @@ class Actor:
         self.behavior_state = "idle"
         self._prev_nominal_target_speed_mps = None
         self._yield_wait_s = 0.0
+        self._prev_curve_cap_mps = None
+        self._curve_cap_ramp_mps2 = 0.0
 
         # Behaviours reset first so they can define the spawn state (e.g. a
         # waiting pedestrian starts at rest) before the controller is built.
@@ -203,15 +236,44 @@ class Actor:
             metric=self.units.metric,
         )
         self._controller.set_target_speed(self.target_speed, update_speed_limit=False)
+        # A resolved spawn offset replays verbatim; otherwise draw one now
+        # (legacy: a fresh draw on every reset, unseeded when np_rng is None).
+        spawn_offset_m = self.spawn_jitter_m
+        if spawn_offset_m is None:
+            spawn_offset_m = Controller.draw_spawn_jitter_m(self.np_rng)
+        motion = getattr(self.units, "npc_motion", None)
+        # Feasible-fillet geometry applies to vehicles; pedestrian routes are
+        # short crossings whose authored geometry must be kept verbatim.
+        geometry = getattr(motion, "route_geometry", "legacy") if self.kind == "vehicle" else "legacy"
         self._controller.set_route(
             self.rx,
             self.ry,
             v0=self.initial_speed,
-            np_rng=self.np_rng,
+            jitter_start=False,
+            spawn_offset_m=spawn_offset_m,
             drivable_mask=self.drivable_mask,
+            geometry=geometry,
+            motion=motion,
+            inner_clearance_m=0.5 * float(self.width_m),
+            blocking_clearance_px=getattr(self, "blocking_clearance_px", None),
         )
 
         self.rect = None  # legacy; surface rects are derived on demand (surface_rect)
+
+    # --- replayable identity -------------------------------------------------
+    def set_runtime_seed(self, seed):
+        """Bind the per-NPC runtime RNG (recycle jitter, future behaviour noise)."""
+        self.runtime_seed = int(seed)
+        self.np_rng = np.random.default_rng(self.runtime_seed)
+
+    def resolve_spawn_jitter(self, np_rng=None):
+        """Draw the start offset once and freeze it so every reset() replays it."""
+        self.spawn_jitter_m = Controller.draw_spawn_jitter_m(np_rng)
+        return self.spawn_jitter_m
+
+    def clear_spawn_jitter(self):
+        """Forget the frozen start offset (a re-dispatch draws a new one from ``np_rng``)."""
+        self.spawn_jitter_m = None
 
     def set_time_config(self, time_config):
         """Bind the simulation clock description used to build the controller."""
@@ -309,12 +371,15 @@ class Actor:
                 "safe_target_speed_mps": nominal_target_speed_mps,
             }
 
-        controller_target_mps = self._startup_capped_target_speed_mps(safe_target_speed_mps)
+        controller_target_mps = self._curve_capped_target_speed_mps(
+            self._startup_capped_target_speed_mps(safe_target_speed_mps)
+        )
         self.last_traffic_policy["safe_target_speed_mps"] = float(controller_target_mps)
         # The startup ramp / traffic policy may cap the request; a cap below the
-        # nominal target must not receive positive feed-forward.
+        # nominal target must not receive positive feed-forward. A decreasing
+        # curvature cap feeds its ramp forward instead.
         if controller_target_mps < nominal_target_speed_mps - 1e-9:
-            target_accel_ff_mps2 = min(target_accel_ff_mps2, 0.0)
+            target_accel_ff_mps2 = min(target_accel_ff_mps2, 0.0, self._curve_cap_ramp_mps2)
         self._controller.set_target_speed(
             self.units.metric.speed_mps_to_surface(controller_target_mps),
             update_speed_limit=False,
@@ -335,9 +400,11 @@ class Actor:
         """
         ctrl = self._controller
         v = float(ctrl.v_mps)
-        controller_target_mps = self._startup_capped_target_speed_mps(nominal_target_speed_mps)
+        controller_target_mps = self._curve_capped_target_speed_mps(
+            self._startup_capped_target_speed_mps(nominal_target_speed_mps)
+        )
         if controller_target_mps < nominal_target_speed_mps - 1e-9:
-            target_accel_ff_mps2 = min(target_accel_ff_mps2, 0.0)
+            target_accel_ff_mps2 = min(target_accel_ff_mps2, 0.0, self._curve_cap_ramp_mps2)
         behaviour_accel = self.traffic_speed_kp * (controller_target_mps - v) + target_accel_ff_mps2
         accel_cmd, debug = compute_traffic_command(
             self,
@@ -421,6 +488,30 @@ class Actor:
             self.cruise_speed_mps - self.initial_speed_mps
         ) * ramp_progress
         return min(target_speed_mps, startup_cap_mps)
+
+    def _curve_capped_target_speed_mps(self, target_speed_mps):
+        """Curvature speed cap of the route geometry (``fillet_v1``); no-op for legacy paths.
+
+        Also records the cap's ramp rate (``_curve_cap_ramp_mps2``, <= 0) so the
+        step feeds it forward: a P-only speed loop lags a ramp by rate/Kp
+        (finding S-01), which would carry the vehicle into the curve far above
+        the cap.
+        """
+        controller = getattr(self, "_controller", None)
+        self._curve_cap_ramp_mps2 = 0.0
+        if controller is None:
+            return target_speed_mps
+        cap = controller.curve_speed_cap_mps()
+        prev = getattr(self, "_prev_curve_cap_mps", None)
+        if cap < float(target_speed_mps) - 1e-9:
+            if prev is not None and math.isfinite(prev):
+                self._curve_cap_ramp_mps2 = float(
+                    np.clip((cap - prev) / self.physics_dt_s, -self.traffic_max_decel_mps2, 0.0)
+                )
+            self._prev_curve_cap_mps = cap
+            return cap
+        self._prev_curve_cap_mps = cap if math.isfinite(cap) else None
+        return float(target_speed_mps)
 
     def set_route_surface(self, route_x, route_y, initial_speed_surface=None, jitter_start=False):
         self.rx = list(route_x)

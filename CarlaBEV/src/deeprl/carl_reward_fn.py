@@ -182,8 +182,8 @@ class CaRLRewardFn:
         # -------------------------
         # 1. Hard terminations
         # -------------------------
-        # collision by map tile
-        if tile_class in BLOCKING_CLASSES:
+        # collision by map (footprint or legacy centre pixel; see Scene._attach_map_contact)
+        if self._map_blocking(info["collision"], tile_class):
             info["reward"]["cause"] = "collision"
             info["reward"]["reward"] = self.terminal_penalty
             return self.terminal_penalty, True, "collision", info
@@ -258,7 +258,7 @@ class CaRLRewardFn:
 
         # 3.2 off-lane
         far_from_route = dist_m > (1.5 * lane_half_width_m)
-        off_lane = self._is_off_lane(tile_class) or far_from_route
+        off_lane = self._map_offroad(info["collision"], tile_class) or far_from_route
         p_factors["off_lane"] = self.off_lane_penalty if off_lane else 1.0
 
         # 3.3 speeding
@@ -357,6 +357,14 @@ class CaRLRewardFn:
 
     def _is_off_lane(self, tile_class):
         return tile_class in OFFROAD_CLASSES
+
+    def _map_blocking(self, collision_info, tile_class):
+        flag = collision_info.get("map_blocking")
+        return bool(flag) if flag is not None else tile_class in BLOCKING_CLASSES
+
+    def _map_offroad(self, collision_info, tile_class):
+        flag = collision_info.get("map_offroad")
+        return bool(flag) if flag is not None else self._is_off_lane(tile_class)
 
     # -----------------------------------------------------
     # kinematic metrics (for comfort)

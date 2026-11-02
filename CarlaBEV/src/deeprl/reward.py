@@ -22,6 +22,17 @@ checkpoint/terminal rewards are not scaled. At ``dt = 0.1`` the factor is 1.
 """
 
 
+def _map_blocking(collision_info, tile_class):
+    """Authoritative map-collision flag (Scene._attach_map_contact); legacy tile test as fallback."""
+    flag = collision_info.get("map_blocking")
+    return bool(flag) if flag is not None else tile_class in BLOCKING_CLASSES
+
+
+def _map_offroad(collision_info, tile_class):
+    flag = collision_info.get("map_offroad")
+    return bool(flag) if flag is not None else tile_class in OFFROAD_CLASSES
+
+
 class RewardFn(object):
     def __init__(
         self,
@@ -126,8 +137,8 @@ class RewardFn(object):
             # slightly harsher and at a bit larger distance
             reward, terminated, cause = -1.0, True, "out_of_bounds"
 
-        # --- collision by map tile ---
-        elif tile_class in BLOCKING_CLASSES:
+        # --- collision by map (footprint or legacy centre pixel) ---
+        elif _map_blocking(info["collision"], tile_class):
             reward, terminated, cause = -1.0, True, "collision"
 
         # --- collision by dynamic actor ---
@@ -140,7 +151,7 @@ class RewardFn(object):
             # -------------------------------
             # OFFROAD / SIDEWALK HANDLING
             # -------------------------------
-            on_sidewalk = tile_class in OFFROAD_CLASSES
+            on_sidewalk = _map_offroad(info["collision"], tile_class)
 
             if on_sidewalk:
                 self._consecutive_offroad += 1

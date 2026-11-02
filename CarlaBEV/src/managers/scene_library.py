@@ -1,14 +1,29 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from CarlaBEV.src.actors.pedestrian import Pedestrian
-from CarlaBEV.src.actors.vehicle import Vehicle
+from CarlaBEV.src.scenes.scene_spec import (
+    ACTOR_PAYLOAD_SCHEMA_VERSION,
+    SceneSpec,
+    capture_scene,
+    identity_options,
+    instantiate_scene,
+    npc_uid_for,
+    scene_identity_key,
+)
+
+__all__ = [
+    "ACTOR_PAYLOAD_SCHEMA_VERSION",
+    "SceneLibrary",
+    "SceneLibraryError",
+    "SceneLibraryMissError",
+    "deserialize_scene_payload",
+    "serialize_scene_payload",
+]
 
 
 ROLE_COLUMN_MAP = {
@@ -43,110 +58,92 @@ def _normalize_jsonable(value: Any) -> Any:
 
 
 def serialize_scene_payload(actors: dict[str, Any], *, surface_size: int | None = None) -> dict[str, Any]:
-    """Serialize scene actors. Coordinates are surface px of ``surface_size`` (recorded in the payload)."""
-    payload: dict[str, Any] = {
-        "frame": {"kind": "surface", "size": int(surface_size) if surface_size is not None else 128},
-        "agent": None,
-        "vehicle": [],
-        "pedestrian": [],
-        "target": [],
-        "traffic_light": [],
-    }
-    agent = actors.get("agent")
-    if agent is not None:
-        route_x, route_y, initial_speed_mps, target_speed_mps = agent
-        payload["agent"] = {
-            "route_x": [float(x) for x in route_x],
-            "route_y": [float(y) for y in route_y],
-            "initial_speed_mps": float(initial_speed_mps),
-            "target_speed_mps": float(target_speed_mps),
-        }
-
-    for key, actor_cls in (("vehicle", Vehicle), ("pedestrian", Pedestrian)):
-        serialized = []
-        for actor in actors.get(key, []):
-            serialized.append(
-                {
-                    "route_x": [float(x) for x in getattr(actor, "rx", [])],
-                    "route_y": [float(y) for y in getattr(actor, "ry", [])],
-                    "traffic_role": str(getattr(actor, "traffic_role", "unassigned")),
-                    "speed_class": str(getattr(actor, "speed_class", "medium")),
-                    "speed_multiplier": float(getattr(actor, "speed_multiplier", 1.0)),
-                    "speed_jitter": float(getattr(actor, "speed_jitter", 1.0)),
-                    "initial_speed_mps": float(getattr(actor, "initial_speed_mps", 0.0) or 0.0),
-                    "cruise_speed_mps": float(getattr(actor, "cruise_speed_mps", 0.0) or 0.0),
-                    "startup_ramp_duration_s": float(getattr(actor, "startup_ramp_duration_s", 0.0) or 0.0),
-                    "recyclable": bool(getattr(actor, "recyclable", False)),
-                    "lane": getattr(actor, "lane", None),
-                }
-            )
-        payload[key] = serialized
-    return payload
+    """Serialize scene actors (spec layer, inline NPCs). Coordinates are surface px of ``surface_size``."""
+    return capture_scene(actors, surface_size=int(surface_size) if surface_size is not None else 128).to_payload()
 
 
 def deserialize_scene_payload(payload: dict[str, Any], *, map_size: int, units=None) -> dict[str, Any]:
     """Rebuild scene actors from a payload expressed at ``map_size`` surface px.
 
-    A payload recorded at a different surface scale is a contract violation
-    (the cache key includes the surface size), so it is rejected explicitly.
+    A payload recorded at a different surface scale or schema is a contract
+    violation (the cache key includes both), so it is rejected explicitly.
     """
+    from CarlaBEV.src.units import DEFAULT_UNIT_CONTRACT
+
     payload_size = int((payload.get("frame") or {}).get("size", 128))
     if payload_size != int(map_size):
         raise ValueError(
             f"Scene payload recorded at surface size {payload_size} cannot be loaded at size {map_size}."
         )
-    actors = {
-        "agent": None,
-        "vehicle": [],
-        "pedestrian": [],
-        "target": [],
-        "traffic_light": [],
-    }
-    agent = payload.get("agent")
-    if agent is not None:
-        actors["agent"] = (
-            [float(x) for x in agent["route_x"]],
-            [float(y) for y in agent["route_y"]],
-            float(agent["initial_speed_mps"]),
-            float(agent["target_speed_mps"]),
+    spec = SceneSpec.from_payload(payload)
+    return instantiate_scene(spec, units=units if units is not None else DEFAULT_UNIT_CONTRACT, map_size=int(map_size))
+
+
+class SceneLibraryError(RuntimeError):
+    """Base class for scene-library contract violations."""
+
+
+class SceneLibraryMissError(SceneLibraryError):
+    """A required cache hit did not happen (``scene_library_require_hit=True``)."""
+
+    def __init__(self, scene_key: str, *, reason: str, seeds: dict[str, Any] | None = None, options=None):
+        self.scene_key = scene_key
+        self.reason = reason
+        self.seeds = dict(seeds or {})
+        self.options = dict(options or {})
+        super().__init__(
+            f"scene_library_require_hit: {reason} for scene {scene_key} "
+            f"(seeds={self.seeds}); the library does not contain this scene and regeneration is disabled."
         )
 
-    for key, actor_cls in (("vehicle", Vehicle), ("pedestrian", Pedestrian)):
-        for actor_payload in payload.get(key, []):
-            actor = actor_cls(
-                map_size=map_size,
-                routeX=[float(x) for x in actor_payload["route_x"]],
-                routeY=[float(y) for y in actor_payload["route_y"]],
-                target_speed=float(actor_payload.get("cruise_speed_mps", 0.0)),
-                units=units,
-            )
-            actor.traffic_role = str(actor_payload.get("traffic_role", "unassigned"))
-            actor.speed_class = str(actor_payload.get("speed_class", "medium"))
-            actor.speed_multiplier = float(actor_payload.get("speed_multiplier", 1.0))
-            actor.speed_jitter = float(actor_payload.get("speed_jitter", 1.0))
-            actor.set_initial_speed_mps(float(actor_payload.get("initial_speed_mps", 0.0)))
-            actor.set_startup_ramp_duration(float(actor_payload.get("startup_ramp_duration_s", 0.0)))
-            actor.recyclable = bool(actor_payload.get("recyclable", actor.traffic_role not in {"unassigned"}))
-            actor.lane = actor_payload.get("lane")
-            actors[key].append(actor)
-    return actors
+
+REQUIRED_TABLES = ("scenes", "npcs")
 
 
 class SceneLibrary:
+    """SQLite scene corpus.
+
+    ``read_only=True`` opens the database with SQLite's ``mode=ro`` (no write
+    of any kind: no schema migration, no usage counters, no insert/delete) and
+    requires the file and its schema to exist already — an immutable corpus.
+    """
+
     def __init__(self, db_path: str, *, generator_version: str, read_only: bool = False) -> None:
         self.db_path = str(db_path)
         self.generator_version = str(generator_version)
         self.read_only = bool(read_only)
-        self._ensure_parent_dir()
-        self.ensure_schema()
+        if self.read_only:
+            if not Path(self.db_path).is_file():
+                raise FileNotFoundError(
+                    f"Read-only scene library not found: {self.db_path} (build it first with 'carlabev scene build-library')."
+                )
+            self.verify_schema()
+        else:
+            self._ensure_parent_dir()
+            self.ensure_schema()
 
     def _ensure_parent_dir(self) -> None:
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
+        if self.read_only:
+            uri = f"file:{Path(self.db_path).resolve().as_posix()}?mode=ro"
+            conn = sqlite3.connect(uri, uri=True)
+        else:
+            conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
+
+    def verify_schema(self) -> None:
+        """Read-only check that the corpus carries the current schema (no migration attempted)."""
+        with self._connect() as conn:
+            tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        missing = [name for name in REQUIRED_TABLES if name not in tables]
+        if missing:
+            raise SceneLibraryError(
+                f"Scene library {self.db_path} lacks required table(s) {missing}; "
+                "it predates the spec-layer schema. Rebuild it (read-only mode never migrates)."
+            )
 
     def ensure_schema(self) -> None:
         with self._connect() as conn:
@@ -223,24 +220,38 @@ class SceneLibrary:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_scenes_role_route ON scenes(main_actor_role, route_profile)"
             )
+            # Layer 1: one row per NPC definition; the scene row references them in order.
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS npcs (
+                    npc_uid TEXT PRIMARY KEY,
+                    scene_key TEXT NOT NULL,
+                    ordinal INTEGER NOT NULL,
+                    npc_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    traffic_role TEXT,
+                    behavior_type TEXT,
+                    cruise_speed_mps REAL,
+                    route_len INTEGER,
+                    recyclable INTEGER NOT NULL DEFAULT 0,
+                    runtime_seed INTEGER,
+                    spec_json TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_npcs_scene ON npcs(scene_key, ordinal);
+                CREATE INDEX IF NOT EXISTS idx_npcs_role ON npcs(traffic_role);
+                CREATE INDEX IF NOT EXISTS idx_npcs_kind ON npcs(kind);
+                """
+            )
 
     def build_scene_key(
         self, resolved_options: dict[str, Any], seeds: dict[str, Any], *, surface_size: int | None = None
     ) -> str:
-        payload = {
-            "generator_version": self.generator_version,
-            # Cached coordinates are surface px: scenes are only valid at their own scale.
-            "surface_size": int(surface_size) if surface_size is not None else 128,
-            "options": _normalize_jsonable(
-                {
-                    key: value
-                    for key, value in resolved_options.items()
-                    if key != "reset_mask"
-                }
-            ),
-            "seeds": _normalize_jsonable(seeds),
-        }
-        return hashlib.sha256(_json_dumps(payload).encode("utf-8")).hexdigest()
+        return scene_identity_key(
+            generator_version=self.generator_version,
+            surface_size=int(surface_size) if surface_size is not None else 128,
+            options=resolved_options,
+            seeds=seeds,
+        )
 
     def get_scene_by_key(self, scene_key: str) -> dict[str, Any] | None:
         with self._connect() as conn:
@@ -314,6 +325,34 @@ class SceneLibrary:
         descriptor = dict(scene_descriptor)
         role_counts = descriptor.get("spawned_role_counts", {}) or {}
         now = utc_now_iso()
+        actors_payload = dict(actors_payload or {})
+        npc_dicts = actors_payload.pop("npcs", None)
+        npc_rows = []
+        if npc_dicts is not None:
+            uids = []
+            for ordinal, npc in enumerate(npc_dicts):
+                npc = dict(npc)
+                npc_uid = npc.get("npc_uid") or npc_uid_for(str(scene_key), str(npc["npc_id"]))
+                npc["npc_uid"] = npc_uid
+                uids.append(npc_uid)
+                behavior = npc.get("behavior") or {}
+                npc_rows.append(
+                    {
+                        "npc_uid": npc_uid,
+                        "scene_key": str(scene_key),
+                        "ordinal": int(ordinal),
+                        "npc_id": str(npc["npc_id"]),
+                        "kind": str(npc.get("kind", "vehicle")),
+                        "traffic_role": npc.get("traffic_role"),
+                        "behavior_type": behavior.get("type") if isinstance(behavior, dict) else None,
+                        "cruise_speed_mps": npc.get("cruise_speed_mps"),
+                        "route_len": len(npc.get("route_x") or []),
+                        "recyclable": int(bool(npc.get("recyclable", False))),
+                        "runtime_seed": npc.get("runtime_seed"),
+                        "spec_json": _json_dumps(_normalize_jsonable(npc)),
+                    }
+                )
+            actors_payload["npc_uids"] = uids
         fields = {
             "scene_key": str(scene_key),
             "generator_version": self.generator_version,
@@ -355,30 +394,80 @@ class SceneLibrary:
             "spawn_validation_json": (
                 _json_dumps(_normalize_jsonable(spawn_validation)) if spawn_validation is not None else None
             ),
-            "resolved_options_json": _json_dumps(
-                _normalize_jsonable(
-                    {
-                        key: value
-                        for key, value in resolved_options.items()
-                        if key != "reset_mask"
-                    }
-                )
-            ),
+            "resolved_options_json": _json_dumps(_normalize_jsonable(identity_options(resolved_options))),
         }
         columns = ", ".join(fields.keys())
         placeholders = ", ".join("?" for _ in fields)
         with self._connect() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 f"INSERT OR IGNORE INTO scenes ({columns}) VALUES ({placeholders})",
                 tuple(fields.values()),
             )
+            if cursor.rowcount and npc_rows:
+                npc_columns = ", ".join(npc_rows[0].keys())
+                npc_placeholders = ", ".join("?" for _ in npc_rows[0])
+                conn.executemany(
+                    f"INSERT OR REPLACE INTO npcs ({npc_columns}) VALUES ({npc_placeholders})",
+                    [tuple(row.values()) for row in npc_rows],
+                )
             row = conn.execute(
                 "SELECT scene_id FROM scenes WHERE scene_key = ?",
                 (scene_key,),
             ).fetchone()
             return None if row is None else int(row["scene_id"])
 
+    def get_npcs_for_scene(self, scene_key: str) -> list[dict[str, Any]]:
+        """Ordered NPC specs (dicts) of a scene."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT spec_json FROM npcs WHERE scene_key = ? ORDER BY ordinal",
+                (str(scene_key),),
+            ).fetchall()
+        return [json.loads(row["spec_json"]) for row in rows]
+
+    def get_npcs_by_filters(
+        self,
+        *,
+        kind: str | None = None,
+        traffic_role: str | None = None,
+        behavior_type: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        where, params = [], []
+        if kind is not None:
+            where.append("kind = ?")
+            params.append(str(kind))
+        if traffic_role is not None:
+            where.append("traffic_role = ?")
+            params.append(str(traffic_role))
+        if behavior_type is not None:
+            where.append("behavior_type = ?")
+            params.append(str(behavior_type))
+        sql = "SELECT * FROM npcs"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY scene_key, ordinal LIMIT ?"
+        params.append(int(limit))
+        with self._connect() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        records = []
+        for row in rows:
+            record = dict(row)
+            record["spec"] = json.loads(record.pop("spec_json"))
+            records.append(record)
+        return records
+
+    def npc_counts(self, *, by: str = "traffic_role") -> dict[str, int]:
+        column = {"traffic_role": "traffic_role", "kind": "kind", "behavior_type": "behavior_type"}[by]
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT COALESCE(CAST({column} AS TEXT), 'null') AS label, COUNT(*) AS count FROM npcs GROUP BY label ORDER BY count DESC"
+            ).fetchall()
+        return {str(row["label"]): int(row["count"]) for row in rows}
+
     def touch_scene(self, scene_key: str) -> None:
+        if self.read_only:
+            return  # usage counters are writes; an immutable corpus keeps none
         with self._connect() as conn:
             conn.execute(
                 """
@@ -395,13 +484,16 @@ class SceneLibrary:
             return
         with self._connect() as conn:
             conn.execute("DELETE FROM scenes WHERE scene_key = ?", (scene_key,))
+            conn.execute("DELETE FROM npcs WHERE scene_key = ?", (scene_key,))
 
-    @staticmethod
-    def _row_to_record(row: sqlite3.Row) -> dict[str, Any]:
+    def _row_to_record(self, row: sqlite3.Row) -> dict[str, Any]:
         record = dict(row)
         record["scene_descriptor"] = json.loads(record.pop("scene_descriptor_json"))
         record["scenario_context"] = json.loads(record.pop("scenario_context_json"))
         record["actors_payload"] = json.loads(record.pop("actors_json"))
+        payload = record["actors_payload"]
+        if isinstance(payload, dict) and "npcs" not in payload and payload.get("npc_uids") is not None:
+            payload["npcs"] = self.get_npcs_for_scene(str(record["scene_key"]))
         record["resolved_options"] = json.loads(record.pop("resolved_options_json"))
         spawn_json = record.pop("spawn_validation_json")
         record["spawn_validation"] = json.loads(spawn_json) if spawn_json is not None else None

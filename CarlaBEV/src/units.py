@@ -229,6 +229,36 @@ class SceneUnits:
 
 
 @dataclass(frozen=True)
+class NpcMotion:
+    """Background-actor path geometry and curvature handling (Stage 7, finding V-03).
+
+    ``route_geometry="fillet_v1"``: sharp route vertices are replaced by
+    circular arcs (as large as the legs and the drivable mask allow, never
+    below the bicycle's minimum turning radius unless nothing else fits) and
+    the path is resampled at ``sample_spacing_m``; the actor's target speed is
+    capped to ``sqrt(curve_lat_accel_mps2 / |curvature|)`` with a backward
+    deceleration pass. ``"legacy"`` keeps the historical Savitzky-Golay
+    smoothing with raw-route fallback and no curvature awareness.
+    """
+
+    route_geometry: str = "fillet_v1"
+    fillet_target_radius_m: float = 6.0
+    sample_spacing_m: float = 1.0
+    curve_lat_accel_mps2: float = 2.5
+    curve_decel_mps2: float = 2.0
+    edge_margin_m: float = 0.3
+    """Extra clearance (beyond half the body width) kept from blocking pixels by the path nudge."""
+    edge_max_shift_m: float = 0.6
+    """Largest lateral shift the nudge may apply to a path point."""
+
+    def __post_init__(self):
+        if self.route_geometry not in ("fillet_v1", "legacy"):
+            raise ValueError(f"route_geometry must be 'fillet_v1' or 'legacy', got {self.route_geometry!r}")
+        for name in ("fillet_target_radius_m", "sample_spacing_m", "curve_lat_accel_mps2", "curve_decel_mps2"):
+            _require_positive(name, getattr(self, name))
+
+
+@dataclass(frozen=True)
 class TrafficRules:
     """Background-traffic rules (SI). Defaults are the realistic rule set.
 
@@ -272,6 +302,7 @@ class UnitContract:
     time: TimeConfig = field(default_factory=TimeConfig)
     ego: EgoPhysics = field(default_factory=EgoPhysics)
     footprints: ActorFootprints = field(default_factory=lambda: ActorFootprints.from_profile(DEFAULT_GEOMETRY_PROFILE))
+    npc_motion: NpcMotion = field(default_factory=NpcMotion)
     scene: SceneUnits = field(default_factory=SceneUnits)
     horizon: EpisodeHorizon = field(default_factory=EpisodeHorizon)
     rules: TrafficRules = field(default_factory=TrafficRules)
@@ -367,6 +398,12 @@ class UnitContract:
             ),
             junction_radius_m=float(get("junction_radius_m", rules_defaults.junction_radius_m)),
         )
+        motion_defaults = NpcMotion()
+        npc_motion = NpcMotion(
+            route_geometry=str(get("npc_route_geometry", motion_defaults.route_geometry)),
+            fillet_target_radius_m=float(get("npc_fillet_target_radius_m", motion_defaults.fillet_target_radius_m)),
+            curve_lat_accel_mps2=float(get("npc_curve_lat_accel_mps2", motion_defaults.curve_lat_accel_mps2)),
+        )
         return cls(
             metric=metric,
             time=time,
@@ -375,6 +412,7 @@ class UnitContract:
             scene=scene,
             horizon=horizon,
             rules=rules,
+            npc_motion=npc_motion,
         )
 
     @property

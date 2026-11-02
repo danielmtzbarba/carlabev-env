@@ -26,6 +26,10 @@ class EpisodeStats:
         self.comfort_values = {key: [] for key in COMFORT_KEYS}
         self.comfort_step_violations = []
         self.harsh_brake_flags = []
+        # NPC body contact with the static map (moving NPC-steps).
+        self.npc_moving_steps = 0
+        self.npc_blocking_contact_steps = 0
+        self.npc_offroad_contact_steps = 0
 
     @staticmethod
     def _progress_from_scene(info):
@@ -61,6 +65,12 @@ class EpisodeStats:
         comfort_metrics = {key: float(hero.get(key, 0.0)) for key in COMFORT_KEYS}
         for key, value in comfort_metrics.items():
             self.comfort_values[key].append(abs(value))
+
+        npc_contact = info.get("scene", {}).get("npc_map_contact")
+        if npc_contact:
+            self.npc_moving_steps += int(npc_contact.get("moving", 0))
+            self.npc_blocking_contact_steps += int(npc_contact.get("blocking", 0))
+            self.npc_offroad_contact_steps += int(npc_contact.get("offroad", 0))
 
         violations, _ = count_comfort_violations(comfort_metrics, DEFAULT_COMFORT_BOUNDS)
         self.comfort_step_violations.append(1.0 if violations > 0 else 0.0)
@@ -99,6 +109,14 @@ class EpisodeStats:
     @property
     def harsh_brake_rate(self):
         return float(np.mean(self.harsh_brake_flags)) if self.harsh_brake_flags else 0.0
+
+    @property
+    def npc_nondrivable_contact_fraction(self):
+        return self.npc_blocking_contact_steps / self.npc_moving_steps if self.npc_moving_steps else 0.0
+
+    @property
+    def npc_sidewalk_contact_fraction(self):
+        return self.npc_offroad_contact_steps / self.npc_moving_steps if self.npc_moving_steps else 0.0
 
 
 class Stats:
@@ -163,6 +181,9 @@ class Stats:
             "mean_abs_yaw_acc": self.current.mean_abs_metric("yaw_acc"),
             "comfort_violation_rate": self.current.comfort_violation_rate,
             "harsh_brake_rate": self.current.harsh_brake_rate,
+            "npc_nondrivable_contact_fraction": self.current.npc_nondrivable_contact_fraction,
+            "npc_sidewalk_contact_fraction": self.current.npc_sidewalk_contact_fraction,
+            "npc_moving_steps": self.current.npc_moving_steps,
         }
 
     def export(self, path="runs/episodes.json"):

@@ -31,6 +31,7 @@ class Scene:
         self.action_space = action_space
         self.surface_frame = SurfaceFrame()
         self.drivable_mask = None
+        self.blocking_clearance_px = None
 
         # --- Unit contract & simulation clock (single source of truth) ---
         if units is None:
@@ -64,6 +65,11 @@ class Scene:
         self.render_frame = render_frame if render_frame is not None else self.surface_frame
         # Semantic tile queries are answered by the map (set by BaseMap).
         self.tile_provider = None
+        # Static-map contact semantics (set by BaseMap from EnvConfig; see docs/actor_geometry.md).
+        self.map_collision_mode = "footprint"
+        self.map_offroad_footprint_fraction = 0.5
+        self.map_contact_inset_m = 0.3
+        self.npc_map_contact_metrics_enabled = True
 
     @property
     def agent_tile(self):
@@ -107,7 +113,7 @@ class Scene:
     # =====================================================
     # --- Scene lifecycle
     # =====================================================
-    def reset_scene(self, actors=None, hero_np_rng=None):
+    def reset_scene(self, actors=None, hero_np_rng=None, *, copy_actors=True):
         """Reset the scene with optional actor data."""
         self._idx = 0
         self.clock.reset()
@@ -116,7 +122,7 @@ class Scene:
         self._signal_gap_m = None
         self._red_light_violations = 0
         if actors:
-            self.load_scene(actors, hero_np_rng=hero_np_rng)
+            self.load_scene(actors, hero_np_rng=hero_np_rng, copy_actors=copy_actors)
         else:
             self.actor_manager.reset_all()
 
@@ -132,18 +138,20 @@ class Scene:
             self._dist2goal = 0.0
             self._dist2wp_1 = 0.0
 
-    def load_scene(self, actors, hero_np_rng=None):
+    def load_scene(self, actors, hero_np_rng=None, *, copy_actors=True):
         if self.drivable_mask is not None:
-            self.actor_manager.set_drivable_mask(self.drivable_mask)
-        self.actor_manager.load(actors)
+            self.actor_manager.set_drivable_mask(self.drivable_mask, blocking_clearance_px=self.blocking_clearance_px)
+        self.actor_manager.load(actors, copy_actors=copy_actors)
         if self.actor_manager.actors.get("agent"):
             cx, cy, initial_speed_mps, target_speed_mps = self.agent_route
             self.route = (cx, cy)
+            self._ego_spawn_jitter_m = self.agent_spawn_jitter_m
             self.hero = self.actor_manager.spawn_hero(
                 route=(cx, cy),
                 initial_speed_mps=initial_speed_mps,
                 target_speed_mps=target_speed_mps,
                 np_rng=hero_np_rng,
+                spawn_jitter_m=self._ego_spawn_jitter_m,
             )
             self._actors = set_targets(
                 self.actor_manager.actors, self.hero.cx, self.hero.cy, units=self.units
@@ -172,7 +180,13 @@ class Scene:
             finished = self.actor_manager.step_all(t, self.clock.dt_s)
         if self.traffic_lifecycle is not None and finished:
             with profiling.phase("scene.traffic_lifecycle"):
-                self.traffic_lifecycle.step(finished, self.hero, t)
+                others = [
+                    actor
+                    for key in ("vehicle", "pedestrian")
+                    for actor in self.actor_manager.actors.get(key, [])
+                    if self.actor_manager._has_valid_route(actor)
+                ]
+                self.traffic_lifecycle.step(finished, self.hero, t, others=others)
 
         self._track_ego_signal_compliance()
 
@@ -235,6 +249,7 @@ class Scene:
         collision_system = CollisionSystem(proximity_radius_m=proximity_m)
         result = None
         coll_id = None
+        coll_npc_id = None
         collision_class = None
         actors_state = []
         contacts = []
@@ -261,6 +276,7 @@ class Scene:
                             metric.distance_surface_to_meters(avy),
                         )
                         entry = {
+                            "npc_id": getattr(actor, "npc_id", None),
                             "pos": (ax, ay),
                             "vel": (avx, avy),
                             "pos_m": (float(pos_m[0]), float(pos_m[1])),
@@ -271,6 +287,7 @@ class Scene:
                     if contact.overlapping and result is None:
                         result = id_type
                         coll_id = actor.id
+                        coll_npc_id = getattr(actor, "npc_id", None)
                         collision_class = contact.classification
                 else:
                     actor_id, collision = actor.trigger(hero_rect)
@@ -281,12 +298,63 @@ class Scene:
         self._last_contacts = contacts
         info["collision"]["collided"] = result
         info["collision"]["actor_id"] = coll_id
+        info["collision"]["npc_id"] = coll_npc_id
         info["collision"]["classification"] = collision_class
         info["collision"]["actors_state"] = actors_state
         info["collision"]["min_gap_m"] = min((c.gap_m for c in contacts), default=None)
         info["collision"]["min_ttc_s"] = min((c.ttc_s for c in contacts), default=None)
+        self._attach_map_contact(info, ego_body)
 
         return info
+
+    # =====================================================
+    # --- Static-map contact (footprint vs class raster)
+    # =====================================================
+    def _attach_map_contact(self, info, ego_body):
+        """Ego-vs-map semantics and NPC contact tallies (consumed by the reward functions and stats).
+
+        ``map_blocking`` / ``map_offroad`` are the authoritative flags:
+
+        * ``footprint`` mode — the oriented body is sampled against the class
+          raster; any blocking sample is a collision, and the ego is off-road
+          when at least ``map_offroad_footprint_fraction`` of the footprint is
+          off the drivable classes;
+        * ``center`` mode — legacy single pixel under the state point.
+        """
+        from CarlaBEV.semantics import BLOCKING_CLASSES, OFFROAD_CLASSES
+
+        collision = info["collision"]
+        tile_class = collision.get("tile_class")
+        mode = str(getattr(self, "map_collision_mode", "footprint"))
+        provider = self.tile_provider
+        inset_m = float(getattr(self, "map_contact_inset_m", 0.3))
+        if mode == "footprint" and provider is not None and hasattr(provider, "body_map_contact"):
+            contact = provider.body_map_contact(ego_body, inset_m=inset_m)
+            collision["map_contact"] = contact
+            collision["map_blocking"] = bool(contact["blocking"])
+            collision["map_offroad"] = bool(
+                (1.0 - contact["drivable_fraction"]) >= float(getattr(self, "map_offroad_footprint_fraction", 0.5))
+            )
+        else:
+            collision["map_contact"] = None
+            collision["map_blocking"] = tile_class is not None and int(tile_class) in {int(c) for c in BLOCKING_CLASSES}
+            collision["map_offroad"] = tile_class is not None and int(tile_class) in {int(c) for c in OFFROAD_CLASSES}
+        collision["map_collision_mode"] = mode
+
+        npc_contact = {"moving": 0, "blocking": 0, "offroad": 0}
+        if getattr(self, "npc_map_contact_metrics_enabled", True) and provider is not None and hasattr(provider, "bodies_map_contact"):
+            moving = [
+                actor
+                for key in ("vehicle", "pedestrian")
+                for actor in self.actor_manager.actors.get(key, [])
+                if hasattr(actor, "body") and self.actor_manager._has_valid_route(actor) and actor.state[3] > 0.0
+            ]
+            if moving:
+                for entry in provider.bodies_map_contact([actor.body() for actor in moving], inset_m=inset_m):
+                    npc_contact["moving"] += 1
+                    npc_contact["blocking"] += int(entry["blocking"])
+                    npc_contact["offroad"] += int(entry["offroad_fraction"] > 0.0)
+        info["scene"]["npc_map_contact"] = npc_contact
 
     def spawn_validation_info(self):
         if self.hero is None:
@@ -300,6 +368,22 @@ class Scene:
                 "reason": "hero_on_obstacle",
                 "tile": hero_tile.tolist(),
             }
+        # Footprint mode: the whole (inset) body must be clear of blocking pixels,
+        # otherwise the episode would end in a collision on its first step.
+        provider = self.tile_provider
+        if (
+            str(getattr(self, "map_collision_mode", "footprint")) == "footprint"
+            and provider is not None
+            and hasattr(provider, "body_map_contact")
+        ):
+            contact = provider.body_map_contact(self.hero.body(), inset_m=float(getattr(self, "map_contact_inset_m", 0.3)))
+            if contact["blocking"]:
+                return {
+                    "valid": False,
+                    "reason": "hero_footprint_on_obstacle",
+                    "tile": hero_tile.tolist(),
+                    "map_contact": contact,
+                }
 
         ego_body = self.hero.body()
         for id_type, actor_list in self.actor_manager.actors.items():
@@ -314,6 +398,7 @@ class Scene:
                         "reason": "hero_overlaps_actor",
                         "actor_type": id_type,
                         "actor_id": getattr(actor, "id", None),
+                        "npc_id": getattr(actor, "npc_id", None),
                     }
 
         return {"valid": True, "reason": "ok", "tile": hero_tile.tolist()}
@@ -327,14 +412,19 @@ class Scene:
 
     @property
     def agent_route(self):
-        """Return hero route as (cx, cy)."""
+        """Return hero route as (cx, cy, initial_speed_mps, target_speed_mps).
+
+        Agent entries are ``(rx, ry, speed)``, ``(rx, ry, v0, v_target)`` or
+        ``(rx, ry, v0, v_target, spawn_jitter_m)``; the optional fifth element
+        is the resolved ego start offset (see :attr:`agent_spawn_jitter_m`).
+        """
         agent = self.actor_manager.actors["agent"]
         if len(agent) == 3:
             cx, cy, speed = agent
             initial_speed = speed
             target_speed = speed
-        elif len(agent) == 4:
-            cx, cy, initial_speed, target_speed = agent
+        elif len(agent) in (4, 5):
+            cx, cy, initial_speed, target_speed = agent[:4]
         else:
             raise ValueError(f"Unsupported agent route format: {agent}")
         return (
@@ -343,6 +433,20 @@ class Scene:
             float(initial_speed),
             float(target_speed),
         )
+
+    @property
+    def agent_spawn_jitter_m(self):
+        """Resolved ego start offset (metres) carried by the scene, else ``None``.
+
+        Read from the agent tuple before the hero is spawned; afterwards the
+        value captured at load time is returned.
+        """
+        agent = self.actor_manager.actors["agent"]
+        if isinstance(agent, (tuple, list)):
+            if len(agent) < 5 or agent[4] is None:
+                return None
+            return (float(agent[4][0]), float(agent[4][1]))
+        return getattr(self, "_ego_spawn_jitter_m", None)
 
     @property
     def curr_actors(self):

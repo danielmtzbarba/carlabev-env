@@ -85,8 +85,18 @@ They are translated into `env.reset(options=...)` dictionaries, which are then c
 | `route_direction_metrics_enabled` | `bool = False` | `CarlaBEV.reset()` | When enabled, adds smoothed route left/right/straight fractions to scenario metadata after spawn. |
 | `scene_library_enabled` | `bool = True` | `CarlaBEV.reset()` | Enables the SQLite scene-library cache for random-scene replay and metadata lookup. |
 | `scene_library_path` | `str = "CarlaBEV/assets/scenes/scene_library.db"` | `SceneLibrary` | Filesystem path for the scene-library SQLite database. |
-| `scene_library_read_only` | `bool = False` | `SceneLibrary` | Suppresses scene insertion/deletion. Schema and usage-counter writes still occur; misses may generate scenes. |
-| `scene_library_generator_version` | `str = "role_traffic_v1"` | `SceneLibrary` | Version string incorporated into the scene cache key so generator changes invalidate stale entries. |
+| `scene_library_read_only` | `bool = False` | `SceneLibrary` | Opens the library with SQLite `mode=ro`: no schema migration, no usage counters, no insert/delete. The file and its schema must exist (`FileNotFoundError` / `SceneLibraryError` otherwise). A miss still generates (but never stores) unless `scene_library_require_hit` is set. |
+| `scene_library_require_hit` | `bool = False` | `CarlaBEV.reset()` | Strict corpus replay: a random-navigation reset whose scene is not in the library (or whose stored entry is not replayable) raises `SceneLibraryMissError` instead of generating. Scenario/authored resets never use the library and are unaffected. Requires `scene_library_enabled=True`. |
+| `scene_library_generator_version` | `str = "role_traffic_v3"` | `SceneLibrary`, `SceneGenerator.policy` | Scene cache key namespace **and** generation policy: `role_traffic_v3` (spawn occupancy, role-pool fixes, reachable end nodes, no U-turn routes), `role_traffic_v2` (pre-Stage-7 generator, for existing libraries/goldens); `v1` libraries are never served. |
+| `map_collision_mode` | `"footprint" \| "center" = "footprint"` | `Scene.collision_check` | Static-map contact semantics: oriented body sampled against the class raster (collision at first blocking sample, off-road at `map_offroad_footprint_fraction`), or the legacy centre pixel. See [actor_geometry.md](actor_geometry.md). |
+| `map_offroad_footprint_fraction` | `float = 0.5` | `Scene.collision_check` | Footprint mode: fraction of the body off the drivable classes from which the ego is off-road. |
+| `map_contact_inset_m` | `float = 0.3` | `BaseMap.body_map_contact` | Raster tolerance: the sampled footprint is shrunk by this much on every side (~1 px at 128 px). |
+| `npc_map_contact_metrics_enabled` | `bool = True` | `Scene.collision_check` | Tally NPC-body contact with sidewalk / non-drivable pixels (`episode_info` `npc_*_contact_fraction`). |
+| `npc_route_geometry` | `"fillet_v1" \| "legacy" = "fillet_v1"` | `Controller.set_route` (vehicles) | Feasible fillets + 1 m resampling + curvature speed caps + off-road nudge, or the historical Savitzky–Golay paths. See [traffic_rules_and_behaviors.md](traffic_rules_and_behaviors.md). |
+| `npc_fillet_target_radius_m` | `float = 6.0` | `NpcMotion` | Preferred fillet radius (reduced to what the legs / mask allow, never below the minimum turning radius). |
+| `npc_curve_lat_accel_mps2` | `float = 2.5` | `NpcMotion` | Lateral-acceleration limit behind the curvature speed cap. |
+| `variation_policy` | `"frozen" \| "per_reset" = "frozen"` | `CarlaBEV.reset()` | `frozen`: a reset without `variation_seed` replays the scene's frozen realization (evaluation, replay). `per_reset`: derive a variation seed from `(scene_seed, reset index)` for training diversity; the seed is recorded in `scene_descriptor.variation_seed` and must be passed explicitly to replay that episode. |
+| `variation_profile` | `str = "spawn_phase_v1"` | `CarlaBEV.reset()` | Default variation profile when a variation seed is in effect (`spawn_v1`: legacy ±1-step start offsets only; `spawn_phase_v1`: + ego start progress, NPC route phase, initial-speed/ramp jitter, bounded lateral offset). |
 
 ### Observation And Wrapper Fields
 
@@ -205,8 +215,16 @@ Current axis expansions:
 | `route_seed` | `int \| None` | Explicit route sampler seed. |
 | `traffic_seed` | `int \| None` | Explicit traffic sampler seed. |
 | `scenario_seed` | `int \| None` | Explicit scenario sampler seed for non-random scenarios. |
+| `variation_seed` | `int \| None` | Variation layer: seeded, instantiation-time perturbation of the (cached) scene. `None` = frozen realization. Never part of the scene identity / cache key. |
+| `variation_profile` | `str \| None` | Variation profile for this reset (`spawn_v1`, `spawn_phase_v1`); defaults to `EnvConfig.variation_profile`. |
 
 If omitted, [CarlaBEV.reset()](../envs/carlabev.py) resolves missing seeds from the incoming `seed` argument and the config seed.
+
+The replay contract is `state(k) = f(EnvConfig, scene identity, variation_seed, actions)`:
+the same seeds and options yield the same `scene_descriptor.scene_key`; a cache hit
+instantiates the stored spec through the same path as the miss; a variation seed
+changes the spawn state of that scene but not its identity. See
+[Replay Determinism And Scene-Cache Plan](replay_and_scene_cache_plan.md).
 
 ### Random Traffic Role Model
 
@@ -399,7 +417,7 @@ options = build_random_navigation_options(
 
 ## Known Gaps
 
-- Read-only scene-library mode is not filesystem read-only, does not enforce cache hits, and cannot guarantee an immutable prepared corpus. No public require-hit option is implemented.
+- A strict corpus replay requires `scene_library_read_only=True` **and** `scene_library_require_hit=True`; read-only alone still generates (without storing) on a miss.
 - Per-step hero/reward telemetry is internal. Public ongoing step info is empty; terminal info contains episode summaries. See [Public Integration API](downstream_integration_api.md).
 
 - `EnvConfig.scenes_path` is accepted for compatibility, but the active runtime path does not read it.

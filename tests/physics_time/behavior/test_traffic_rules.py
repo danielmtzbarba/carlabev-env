@@ -40,6 +40,10 @@ BRAKE = np.array([0.0, 0.0, 1.0], dtype=np.float32)
 
 
 def _units(**env_kwargs) -> UnitContract:
+    # Rule attribution tests compare speeds against the unconstrained cruise
+    # speed; the legacy route geometry has no curvature speed cap (Stage 7's
+    # ``fillet_v1`` slows the red-light runner for its turn through the junction).
+    env_kwargs.setdefault("npc_route_geometry", "legacy")
     return UnitContract.from_env_config(
         EnvConfig(render_mode="rgb_array", **env_kwargs)
     )

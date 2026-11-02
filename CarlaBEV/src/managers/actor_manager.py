@@ -6,6 +6,11 @@ from CarlaBEV.src.sim_time import TimeConfig
 from CarlaBEV.src.units import UnitContract
 
 
+def npc_id_for(kind: str, ordinal: int) -> str:
+    """Scene-scoped NPC id: ``"<kind>:<ordinal:03d>"``, ordinal over vehicles then pedestrians."""
+    return f"{kind}:{int(ordinal):03d}"
+
+
 def compute_route_length(route, metric=None):
     """Compute route length in meters from surface/world route coordinates."""
     from CarlaBEV.envs.geometry import DEFAULT_METRIC_FRAME
@@ -41,6 +46,7 @@ class ActorManager:
         """Reset actor registry to empty."""
         self.route_length = 0.0
         self.drivable_mask = None
+        self.blocking_clearance_px = getattr(self, "blocking_clearance_px", None)
         self.junctions = getattr(self, "junctions", None)
         self.actors = {
             "agent": None,
@@ -53,30 +59,25 @@ class ActorManager:
     # ======================================================
     # --- Creation ---
     # ======================================================
-    def spawn_hero(self, route, initial_speed_mps, target_speed_mps, np_rng=None):
-        """Spawn the main agent (hero vehicle)."""
+    def spawn_hero(self, route, initial_speed_mps, target_speed_mps, np_rng=None, spawn_jitter_m=None):
+        """Spawn the main agent (hero vehicle).
+
+        ``spawn_jitter_m`` replays a resolved start offset; ``np_rng`` draws one
+        otherwise.
+        """
         initial_speed = self.units.metric.speed_mps_to_surface(initial_speed_mps)
         target_speed = self.units.metric.speed_mps_to_surface(target_speed_mps)
-        if self.action_space == "continuous":
-             hero = ContinuousAgent(
-                window_size=self.size,
-                route=route,
-                initial_speed=initial_speed,
-                target_speed=target_speed,
-                np_rng=np_rng,
-                drivable_mask=self.drivable_mask,
-                units=self.units,
-            )
-        else:
-            hero = DiscreteAgent(
-                window_size=self.size,
-                route=route,
-                initial_speed=initial_speed,
-                target_speed=target_speed,
-                np_rng=np_rng,
-                drivable_mask=self.drivable_mask,
-                units=self.units,
-            )
+        agent_cls = ContinuousAgent if self.action_space == "continuous" else DiscreteAgent
+        hero = agent_cls(
+            window_size=self.size,
+            route=route,
+            initial_speed=initial_speed,
+            target_speed=target_speed,
+            np_rng=np_rng,
+            drivable_mask=self.drivable_mask,
+            units=self.units,
+            spawn_jitter_m=spawn_jitter_m,
+        )
         hero.initial_speed_mps = float(initial_speed_mps)
         hero.target_speed_mps = float(target_speed_mps)
         self.route_length = compute_route_length(route, self.units.metric)
@@ -107,18 +108,40 @@ class ActorManager:
         self.actors["pedestrian"].append(p)
         return p
 
-    def load(self, actors_dict):
-        """Load actors from a prebuilt dictionary (used when loading from CSV)."""
+    def load(self, actors_dict, *, copy_actors=True):
+        """Load actors from a prebuilt dictionary.
+
+        ``copy_actors=False`` adopts the objects as they are (the environment
+        instantiates fresh actors from a scene spec on every reset, so copying
+        is pure overhead there); the default deep copy protects callers that
+        keep and reuse their own actor objects.
+        """
         drivable_mask = self.drivable_mask
         self.clear()
-        for key, value in copy.deepcopy(actors_dict).items():
+        source = copy.deepcopy(actors_dict) if copy_actors else actors_dict
+        for key, value in source.items():
             if key in {"vehicle", "pedestrian"}:
                 self.actors[key] = [actor for actor in value if self._has_valid_route(actor)]
             else:
                 self.actors[key] = value
+        self._assign_missing_npc_ids()
         self.set_drivable_mask(drivable_mask)
         self._bind_time_config()
         self.set_junctions(self.junctions)
+
+    def _assign_missing_npc_ids(self):
+        """Give every traffic actor a stable, scene-scoped id (``"vehicle:003"``).
+
+        Generated scenes assign ids at generation time (and persist them); this
+        fallback covers scenario/authored actors so telemetry and replay
+        validation can always address an NPC.
+        """
+        ordinal = 0
+        for key in ("vehicle", "pedestrian"):
+            for actor in self.actors.get(key, []):
+                if getattr(actor, "npc_id", None) is None:
+                    actor.npc_id = npc_id_for(key, ordinal)
+                ordinal += 1
 
     def _bind_time_config(self):
         """Propagate the shared unit contract (incl. clock) to every actor."""
@@ -136,11 +159,15 @@ class ActorManager:
             for actor in self.actors.get(key, []):
                 actor.junctions = junctions
 
-    def set_drivable_mask(self, drivable_mask):
+    def set_drivable_mask(self, drivable_mask, blocking_clearance_px=None):
         self.drivable_mask = drivable_mask
+        if blocking_clearance_px is not None:
+            self.blocking_clearance_px = blocking_clearance_px
+        clearance = getattr(self, "blocking_clearance_px", None)
         for key in ("vehicle", "pedestrian"):
             for actor in self.actors.get(key, []):
                 actor.drivable_mask = drivable_mask
+                actor.blocking_clearance_px = clearance
         if self.actors.get("agent") is not None and hasattr(self.actors["agent"], "drivable_mask"):
             self.actors["agent"].drivable_mask = drivable_mask
 

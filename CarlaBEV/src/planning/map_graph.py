@@ -77,10 +77,24 @@ class MapGraph(object):
         return rng.choice(self._nodes[node_cls])
 
     def get_node_pos(self, node_id):
-        return self._node_pos(self._G.nodes[node_id])
+        """Raw-frame node position (cached, read-only array; identical values to a fresh conversion)."""
+        cache = self.__dict__.setdefault("_pos_cache", {})
+        pos = cache.get(node_id)
+        if pos is None:
+            pos = self._node_pos(self._G.nodes[node_id])
+            pos.setflags(write=False)
+            cache[node_id] = pos
+        return pos
 
     def get_node_pos_surface(self, node_id):
-        return self.metric.raw_to_surface(self.get_node_pos(node_id))
+        """Surface-frame node position (cached, read-only array)."""
+        cache = self.__dict__.setdefault("_pos_surface_cache", {})
+        pos = cache.get(node_id)
+        if pos is None:
+            pos = np.asarray(self.metric.raw_to_surface(self.get_node_pos(node_id)))
+            pos.setflags(write=False)
+            cache[node_id] = pos
+        return pos
 
     def get_node_pos_meters(self, node_id):
         return self.metric.raw_to_meters(self.get_node_pos(node_id))

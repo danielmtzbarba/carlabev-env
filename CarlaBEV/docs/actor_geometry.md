@@ -55,6 +55,28 @@ keep their rectangle trigger semantics against the ego's surface AABB.
 `proximity_radius_m` — so `actors_state` membership is unchanged; the gap is
 reported in addition.
 
+## Static-map contact (Stage 7, finding V-02)
+
+Dynamic-actor collisions have always used the oriented bodies above, but the
+*static map* was tested with a single pixel under the state point — the rear
+axle with the realistic footprint, 3.7 m behind the front bumper — so the ego
+penetrated walls for 0.5–0.8 s before a collision registered.
+`EnvConfig.map_collision_mode`:
+
+| Mode | Collision | Off-road | Notes |
+| --- | --- | --- | --- |
+| `footprint` (default) | any sample of the oriented body on a blocking class | `>= map_offroad_footprint_fraction` (0.5) of the footprint off the drivable classes | `BaseMap.body_map_contact(body, inset_m)` samples the box on a 0.3 m metric grid (corners and edges included), shrunk by `map_contact_inset_m` (0.3 m ≈ 1 px: the graph's lane centrelines run ~0.94 m from 1-px curb lines, less than half a car width). Spawn validation applies the same test (`hero_footprint_on_obstacle`). |
+| `center` | centre pixel in `BLOCKING_CLASSES` | centre pixel in `OFFROAD_CLASSES` | legacy; bit-identical to the pre-Stage-7 behaviour |
+
+`info["collision"]` carries `map_blocking`, `map_offroad`, `map_collision_mode`
+and (footprint mode) `map_contact = {blocking, blocking_fraction,
+offroad_fraction, drivable_fraction, samples}`; both reward families consume
+the flags. NPC bodies are tallied the same way
+(`npc_map_contact_metrics_enabled`): `episode_info` reports
+`npc_nondrivable_contact_fraction`, `npc_sidewalk_contact_fraction` and
+`npc_moving_steps` (fractions of moving NPC-steps with a body sample on the
+respective class).
+
 ## Rewards (slice 2.4)
 
 `reward_signals.compute_ttc` and `compute_ttc_raw` (CaRL) consume the shape TTC

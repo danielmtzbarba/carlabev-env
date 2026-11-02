@@ -131,6 +131,51 @@ modelled): turns across oncoming traffic, lane-level conflict matrices.
 red_light_violations}` and `episode_info["red_light_violations"]` (count of red
 stop lines the ego crossed; never enforced).
 
+## NPC route geometry and spawn policy (Stage 7, findings V-01 / V-03)
+
+**Route geometry** (`UnitContract.npc_motion`, `EnvConfig.npc_route_geometry`).
+Graph routes sample roads every ~4.3 m, so a 90° junction is a single vertex
+with a three-point radius of ~2.5 m — far below the bicycle's minimum turning
+radius `L / tan(max_steer)` ≈ 5.0 m. 60 % of NPC routes contained such a
+corner; Stanley overshot by up to 7 m and bodies swept through the inner
+corner. `fillet_v1` (default) builds the controller path as follows:
+straight runs are merged, junction connector chains (2–3 diagonal legs of
+2–8 m) are replaced by the corner of the two approach legs, every corner gets
+a circular fillet as large as the legs and the drivable mask allow (inner edge
+of the body checked; never below the minimum radius), the path is resampled
+at 1 m with a proper curvature array, and it is nudged away from off-road
+pixels where the lane centreline lies closer than half a body width + 0.3 m
+(bounded to 0.6 m). The actor's target speed is capped to
+`sqrt(curve_lat_accel_mps2 / |k|)` with a backward deceleration pass, and the
+cap's ramp is fed forward to the speed loop (S-01). Routes with a dead-end
+turnaround (heading reversal within 12 m) are not given to background actors.
+Pedestrians keep their authored geometry. `legacy` reproduces the historical
+Savitzky–Golay paths without curvature awareness.
+
+Measured on identical scenes (6 medium scenes × 150 steps): NPC cross-track
+error p95 2.1 m → 0.5 m (max 7.6 → 0.8 m); body samples on non-drivable
+pixels 4.25 % → 0.6 % of moving NPC-steps, on sidewalks 57 % → 10 % (the
+remainder is raster quantisation: lanes are ~1.9 m wide in the 128-px raster
+against a 1.8 m body).
+
+**Spawn policy** (`GenerationPolicy`, selected by
+`scene_library_generator_version`). `role_traffic_v3` (default): spawn
+occupancy (a candidate whose body overlaps or keeps less than 2 m bumper gap
+to an already placed body is rejected; lifecycle respawns apply the same
+check), unique start nodes per scene, end nodes drawn among nodes reachable
+from the start (legacy: ~60 % of attempts had no route), the `rear` pool
+measured from the ego start heading in metres (the legacy window was in
+pixels and practically empty), `cross_path` candidates starting 8–35 m
+upstream of a junction on the ego route and recognised when they turn through
+the ego lane (|cos| ≤ 0.7 within 12 m, up to 60 m ahead — Town01 junctions
+are T-junctions), `opposite_lane` candidates that start heading against the
+ego. `role_traffic_v2` reproduces the pre-Stage-7 generator for existing
+libraries and goldens. Measured over 18 scenes: overlapping spawns 24 → 0,
+requested density met exactly, realised roles over 12 medium scenes
+lead/rear/cross/opposite 19/6/3/5 (was 48/1/4/16 over 28).
+`guaranteed_candidate_role="cross_path"` needs a junction on the ego route
+(`intersection_required=True`).
+
 ## Executable checks
 
 `tests/physics_time/behavior/test_behavior_framework.py` (8) and

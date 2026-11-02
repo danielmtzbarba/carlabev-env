@@ -10,12 +10,20 @@ Ref:
 
 """
 
+import math
+
 import numpy as np
 
 from CarlaBEV.envs.geometry import MetricFrame
 from CarlaBEV.src.control.utils import angle_mod, smooth_and_compute
 from CarlaBEV.src.control.state import State
 from CarlaBEV.src.sim_time import DEFAULT_PHYSICS_DT_S
+
+
+def _default_npc_motion():
+    from CarlaBEV.src.units import NpcMotion
+
+    return NpcMotion()
 
 
 class Controller(State):
@@ -77,35 +85,136 @@ class Controller(State):
         if update_speed_limit:
             self._speed_limit_mps = self._target_speed_mps
 
-    def set_route(self, ax, ay, v0=0.0, jitter_start=True, np_rng=None, drivable_mask=None):
-        """Stanley steering control on a cubic spline."""
+    @property
+    def min_turn_radius_m(self) -> float:
+        """Smallest radius the kinematic bicycle can follow at full steer: ``L / tan(max_steer)``."""
+        return float(self.L / max(math.tan(self.max_steer), 1e-9))
+
+    def curve_speed_cap_mps(self, lookahead_m: float = 0.0) -> float:
+        """Curvature speed cap at the current target index (``inf`` without a curvature profile)."""
+        cap = getattr(self, "curve_speed_cap", None)
+        if cap is None or len(cap) == 0:
+            return float("inf")
+        idx = int(min(max(getattr(self, "target_idx", 0), 0), len(cap) - 1))
+        return float(cap[idx])
+
+    @classmethod
+    def draw_spawn_jitter_m(cls, np_rng=None) -> tuple[float, float]:
+        """Sample the route-start jitter: one step of ``route_start_jitter_m`` in {-1, 0, +1} per axis.
+
+        Callers that need a replayable spawn resolve this once (seeded) and pass
+        the result to :meth:`set_route` as ``spawn_offset_m``; an unseeded draw is
+        only a fallback for stand-alone actors.
+        """
+        if np_rng is None:
+            np_rng = np.random.default_rng()
+        jitter_x_m = int(np_rng.integers(-1, 2)) * cls.route_start_jitter_m
+        jitter_y_m = int(np_rng.integers(-1, 2)) * cls.route_start_jitter_m
+        return float(jitter_x_m), float(jitter_y_m)
+
+    def set_route(
+        self,
+        ax,
+        ay,
+        v0=0.0,
+        jitter_start=True,
+        np_rng=None,
+        drivable_mask=None,
+        spawn_offset_m=None,
+        geometry="legacy",
+        motion=None,
+        inner_clearance_m=0.0,
+        blocking_clearance_px=None,
+    ):
+        """Build the controller path from surface-px waypoints.
+
+        ``geometry="legacy"``: Savitzky-Golay smoothing with raw-route fallback
+        (no curvature). ``geometry="fillet_v1"``: feasible fillets + 1 m
+        resampling + curvature (``motion`` is an ``NpcMotion``; ``inner_clearance_m``
+        keeps the inner edge of the body on the drivable mask).
+
+        ``spawn_offset_m`` is an explicit, already-resolved start offset (metres);
+        when given it is applied verbatim and no random draw happens. Otherwise
+        ``jitter_start`` draws one from ``np_rng`` (legacy behaviour).
+        """
         ax = np.asarray(ax, dtype=float)
         ay = np.asarray(ay, dtype=float)
         mpp = self.metric.meters_per_pixel
         ax_m = ax * mpp
         ay_m = ay * mpp
-        raw_route = self._build_raw_controller_path(ax_m, ay_m)
-        smoothed_route = smooth_and_compute(ax_m, ay_m, window=11, poly=3)
-        offroad_points, offroad_fraction = self._route_offroad_stats(smoothed_route, drivable_mask)
-        if self._should_fallback_to_raw(offroad_points, offroad_fraction):
-            cx_m, cy_m, cyaw, ck, s = raw_route
-            self.route_smoothing_mode = "raw_fallback"
+        self.curve_speed_cap = None
+        if geometry == "fillet_v1":
+            from CarlaBEV.src.control.route_geometry import curvature_speed_profile, fillet_route
+
+            motion = motion if motion is not None else _default_npc_motion()
+            is_drivable = None
+            if drivable_mask is not None:
+                height, width = drivable_mask.shape
+
+                def is_drivable(x_m, y_m, _mask=drivable_mask, _h=height, _w=width, _mpp=mpp):
+                    xi = int(round(x_m / _mpp))
+                    yi = int(round(y_m / _mpp))
+                    return 0 <= xi < _w and 0 <= yi < _h and bool(_mask[yi, xi])
+
+            cx_m, cy_m, cyaw, ck, s = fillet_route(
+                ax_m,
+                ay_m,
+                target_radius_m=float(motion.fillet_target_radius_m),
+                min_radius_m=self.min_turn_radius_m,
+                sample_spacing_m=float(motion.sample_spacing_m),
+                inner_clearance_m=float(inner_clearance_m),
+                is_drivable=is_drivable,
+            )
+            if blocking_clearance_px is not None and inner_clearance_m > 0.0:
+                from CarlaBEV.src.control.route_geometry import nudge_from_blocking
+
+                cx_m, cy_m = nudge_from_blocking(
+                    cx_m,
+                    cy_m,
+                    blocking_clearance_px,
+                    mpp,
+                    target_clearance_m=float(inner_clearance_m) + float(motion.edge_margin_m),
+                    max_shift_m=float(motion.edge_max_shift_m),
+                    is_drivable=is_drivable,
+                )
+                dx = np.where(np.abs(np.gradient(cx_m)) < 1e-9, 0.0, np.gradient(cx_m))
+                dy = np.where(np.abs(np.gradient(cy_m)) < 1e-9, 0.0, np.gradient(cy_m))
+                cyaw = np.arctan2(dy, dx)
+                s = np.concatenate(([0.0], np.cumsum(np.hypot(np.diff(cx_m), np.diff(cy_m)))))
+            offroad_points, offroad_fraction = self._route_offroad_stats((cx_m, cy_m), drivable_mask)
+            self.route_smoothing_mode = "fillet_v1"
+            self.curve_speed_cap = curvature_speed_profile(
+                ck,
+                s,
+                lat_accel_mps2=float(motion.curve_lat_accel_mps2),
+                decel_mps2=float(motion.curve_decel_mps2),
+                v_max_mps=max(self._speed_limit_mps, 1e-3),
+            )
         else:
-            cx_m, cy_m, cyaw, ck, s = smoothed_route
-            self.route_smoothing_mode = "smoothed"
+            raw_route = self._build_raw_controller_path(ax_m, ay_m)
+            smoothed_route = smooth_and_compute(ax_m, ay_m, window=11, poly=3)
+            offroad_points, offroad_fraction = self._route_offroad_stats(smoothed_route, drivable_mask)
+            if self._should_fallback_to_raw(offroad_points, offroad_fraction):
+                cx_m, cy_m, cyaw, ck, s = raw_route
+                self.route_smoothing_mode = "raw_fallback"
+            else:
+                cx_m, cy_m, cyaw, ck, s = smoothed_route
+                self.route_smoothing_mode = "smoothed"
+        self.ck = np.asarray(ck, dtype=float)
         self.cs_m = np.asarray(s, dtype=float)
         self.route_offroad_points = int(offroad_points)
         self.route_offroad_fraction = float(offroad_fraction)
 
-        if jitter_start:
-            if np_rng is None:
-                np_rng = np.random.default_rng()
-            jitter_x_m = int(np_rng.integers(-1, 2)) * self.route_start_jitter_m
-            jitter_y_m = int(np_rng.integers(-1, 2)) * self.route_start_jitter_m
-            self.x_m = cx_m[0] + jitter_x_m
-            self.y_m = cy_m[0] + jitter_y_m
+        if spawn_offset_m is not None:
+            jitter_x_m, jitter_y_m = float(spawn_offset_m[0]), float(spawn_offset_m[1])
+        elif jitter_start:
+            jitter_x_m, jitter_y_m = self.draw_spawn_jitter_m(np_rng)
         else:
-            self.x_m, self.y_m = cx_m[0], cy_m[0]
+            jitter_x_m, jitter_y_m = 0.0, 0.0
+        # Realised start offset (metres), recorded so a scene can be persisted/replayed.
+        self.spawn_jitter_m = (jitter_x_m, jitter_y_m)
+        self.x_m = cx_m[0] + jitter_x_m
+        self.y_m = cy_m[0] + jitter_y_m
         self.cx_m, self.cy_m = cx_m, cy_m
         self.cx = cx_m / mpp
         self.cy = cy_m / mpp
@@ -139,17 +248,18 @@ class Controller(State):
         if drivable_mask is None:
             return 0, 0.0
         cx_m, cy_m, *_ = route
-        offroad_points = 0
         total_points = len(cx_m)
         height, width = drivable_mask.shape
         mpp = self.metric.meters_per_pixel
-        for x_m, y_m in zip(cx_m, cy_m):
-            x = x_m / mpp
-            y = y_m / mpp
-            xi = int(round(float(x)))
-            yi = int(round(float(y)))
-            if not (0 <= xi < width and 0 <= yi < height) or not bool(drivable_mask[yi, xi]):
-                offroad_points += 1
+        # Vectorised equivalent of the per-point loop (Python round() == rint for .5 ties on floats).
+        xs = np.asarray(cx_m, dtype=float) / mpp
+        ys = np.asarray(cy_m, dtype=float) / mpp
+        xi = np.array([int(round(float(v))) for v in xs]) if total_points < 8 else np.rint(xs).astype(int)
+        yi = np.array([int(round(float(v))) for v in ys]) if total_points < 8 else np.rint(ys).astype(int)
+        inside = (xi >= 0) & (xi < width) & (yi >= 0) & (yi < height)
+        on_road = np.zeros(total_points, dtype=bool)
+        on_road[inside] = drivable_mask[yi[inside], xi[inside]]
+        offroad_points = int(np.count_nonzero(~on_road))
         if total_points <= 0:
             return 0, 0.0
         return offroad_points, offroad_points / total_points

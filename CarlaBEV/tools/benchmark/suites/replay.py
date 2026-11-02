@@ -1,4 +1,4 @@
-"""REPLAY suite: golden-snapshot fidelity, same-machine determinism, cross-size agreement."""
+"""REPLAY suite: golden-snapshot fidelity, same-machine/cross-process determinism, cross-size agreement."""
 
 from __future__ import annotations
 
@@ -22,7 +22,15 @@ from CarlaBEV.tools.benchmark.suites.common import (
     make_env,
 )
 
-LEGACY = {"geometry_profile": "legacy"}  # snapshots of the historical footprints (see tests/.../regression)
+# Pre-Stage-7 traffic behaviour: generation policy v2, Savitzky-Golay NPC paths without curvature caps,
+# centre-pixel map collision. The existing snapshots describe exactly this (see tests/.../regression).
+LEGACY_TRAFFIC = {
+    "scene_library_generator_version": "role_traffic_v2",
+    "npc_route_geometry": "legacy",
+    "map_collision_mode": "center",
+}
+LEGACY = {"geometry_profile": "legacy", **LEGACY_TRAFFIC}  # + the historical 1.25 m square footprints
+REALISTIC = {"geometry_profile": "realistic", **LEGACY_TRAFFIC}
 GOLDEN_CASES = {
     "lead_brake_l1_ongrid": {
         "options": {
@@ -42,8 +50,11 @@ GOLDEN_CASES = {
         "env": LEGACY,
     },
     "random_nav_easy": {"options": RANDOM_NAV_OPTIONS, "num_steps": 60, "env": LEGACY},
-    "lead_brake_l1_offgrid_realistic": {"options": OFFGRID_LEAD_BRAKE, "num_steps": 100},
-    "random_nav_easy_realistic": {"options": RANDOM_NAV_OPTIONS, "num_steps": 60},
+    "lead_brake_l1_offgrid_realistic": {"options": OFFGRID_LEAD_BRAKE, "num_steps": 100, "env": REALISTIC},
+    "random_nav_easy_realistic": {"options": RANDOM_NAV_OPTIONS, "num_steps": 60, "env": REALISTIC},
+    # Stage 7 defaults: generation policy v3, fillet_v1 NPC geometry, footprint map collision.
+    "lead_brake_l1_offgrid_v3": {"options": OFFGRID_LEAD_BRAKE, "num_steps": 100},
+    "random_nav_easy_v3": {"options": RANDOM_NAV_OPTIONS, "num_steps": 60},
 }
 
 
@@ -148,6 +159,51 @@ def run(profile: dict) -> Section:
         Metric.boolean(
             "same_process_repeat_bitwise_identical",
             trajectory_digest(a) == trajectory_digest(b),
+        )
+    )
+
+    # 2b. Cross-process determinism (fresh interpreters, distinct PYTHONHASHSEED;
+    #     random traffic through a lifecycle recycle, miss then cache hit).
+    from CarlaBEV.tools.validate_replay import ReplaySpec, build_action_sequence, run_validation
+
+    cross_spec = ReplaySpec(
+        env={
+            "map_name": "Town01",
+            "render_mode": "rgb_array",
+            "obs_mode": "bev_rgb",
+            "action_mode": "continuous",
+            "size": 128,
+            "max_episode_duration_s": 120.0,
+            "scene_library_enabled": False,
+        },
+        seed=3,
+        options={**RANDOM_NAV_OPTIONS, "num_vehicles": 6},
+        actions=build_action_sequence("brake", steps=150, action_mode="continuous", action_seed=3),
+        include_obs=True,
+        label={"reset_mode": "random", "policy": "brake"},
+    )
+    cross = run_validation(cross_spec, runs=2, isolation="process", vary_hash_seed=True, cache_mode="off")
+    cross_result = cross["results"][1]["comparison"] or {}
+    sec.tables["cross_process"] = [
+        {
+            "run": r["run"],
+            "python_hash_seed": r["python_hash_seed"],
+            "steps": r["steps"],
+            "recycled": r["recycled"],
+            "digest": r["digest"],
+            "identical_to_run0": None if r["comparison"] is None else r["comparison"]["identical"],
+        }
+        for r in cross["results"]
+    ]
+    sec.add(
+        Metric.boolean(
+            "cross_process_bitwise_identical",
+            bool(cross["all_identical"]),
+            detail=(
+                f"2 interpreters, {cross['results'][0]['steps']} steps, "
+                f"{cross['results'][0]['recycled']} recycles"
+                + ("" if cross["all_identical"] else f"; first divergence {cross_result.get('first_divergence')}")
+            ),
         )
     )
 

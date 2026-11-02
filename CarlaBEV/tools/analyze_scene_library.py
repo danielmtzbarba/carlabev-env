@@ -103,6 +103,16 @@ def _build_parser() -> argparse.ArgumentParser:
         query_parser.add_argument(f"--{flag}", type=int, default=None)
     query_parser.add_argument("--limit", type=int, default=20)
     query_parser.set_defaults(mode="query")
+
+    npcs_parser = subparsers.add_parser(
+        "npcs", help="NPC-layer breakdown (npcs table): counts by kind/role/behaviour, per-scene distribution.",
+        parents=[shared],
+    )
+    npcs_parser.add_argument("--kind", default=None, choices=("vehicle", "pedestrian"))
+    npcs_parser.add_argument("--role", default=None, help="Filter listed NPCs by traffic role")
+    npcs_parser.add_argument("--behavior", default=None, help="Filter listed NPCs by behaviour type")
+    npcs_parser.add_argument("--limit", type=int, default=10, help="Rows to list")
+    npcs_parser.set_defaults(mode="npcs")
     return parser
 
 
@@ -506,6 +516,89 @@ def collect_scene_library_query(
         conn.close()
 
 
+def collect_scene_library_npcs(
+    db_path: str,
+    *,
+    kind: str | None = None,
+    traffic_role: str | None = None,
+    behavior_type: str | None = None,
+    limit: int = 10,
+) -> dict[str, Any]:
+    """NPC-layer statistics from the ``npcs`` table (scene cache schema v2)."""
+    with _open_conn(db_path) as conn:
+        tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
+        if "npcs" not in tables:
+            return {"total_npcs": 0, "scenes_with_npcs": 0, "by_kind": {}, "by_role": {}, "by_behavior": {}, "npcs_per_scene": {}, "rows": []}
+        total = int(conn.execute("SELECT COUNT(*) AS count FROM npcs").fetchone()["count"])
+        scenes = int(conn.execute("SELECT COUNT(DISTINCT scene_key) AS count FROM npcs").fetchone()["count"])
+
+        def group(column):
+            rows = conn.execute(
+                f"SELECT COALESCE(CAST({column} AS TEXT), 'null') AS label, COUNT(*) AS count FROM npcs GROUP BY label ORDER BY count DESC"
+            ).fetchall()
+            return {str(r["label"]): int(r["count"]) for r in rows}
+
+        per_scene = conn.execute(
+            "SELECT MIN(n) AS min_n, AVG(n) AS mean_n, MAX(n) AS max_n FROM (SELECT COUNT(*) AS n FROM npcs GROUP BY scene_key)"
+        ).fetchone()
+        speeds = conn.execute(
+            "SELECT MIN(cruise_speed_mps) AS min_v, AVG(cruise_speed_mps) AS mean_v, MAX(cruise_speed_mps) AS max_v FROM npcs"
+        ).fetchone()
+        recyclable = int(conn.execute("SELECT COUNT(*) AS count FROM npcs WHERE recyclable = 1").fetchone()["count"])
+        where, params = [], []
+        for column, value in (("kind", kind), ("traffic_role", traffic_role), ("behavior_type", behavior_type)):
+            if value:
+                where.append(f"{column} = ?")
+                params.append(value)
+        sql = "SELECT npc_uid, scene_key, ordinal, npc_id, kind, traffic_role, behavior_type, cruise_speed_mps, route_len, recyclable, runtime_seed FROM npcs"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY scene_key, ordinal LIMIT ?"
+        params.append(int(limit))
+        rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    return {
+        "total_npcs": total,
+        "scenes_with_npcs": scenes,
+        "by_kind": group("kind"),
+        "by_role": group("traffic_role"),
+        "by_behavior": group("behavior_type"),
+        "npcs_per_scene": {
+            "min": None if per_scene["min_n"] is None else int(per_scene["min_n"]),
+            "mean": None if per_scene["mean_n"] is None else float(per_scene["mean_n"]),
+            "max": None if per_scene["max_n"] is None else int(per_scene["max_n"]),
+        },
+        "cruise_speed_mps": {
+            "min": None if speeds["min_v"] is None else float(speeds["min_v"]),
+            "mean": None if speeds["mean_v"] is None else float(speeds["mean_v"]),
+            "max": None if speeds["max_v"] is None else float(speeds["max_v"]),
+        },
+        "recyclable_fraction": (recyclable / total) if total else 0.0,
+        "rows": rows,
+    }
+
+
+def _render_npcs(console: Console, payload: dict[str, Any]) -> None:
+    console.print(
+        f"[bold]NPC layer[/bold]  total={payload['total_npcs']}  scenes={payload['scenes_with_npcs']}  "
+        f"per_scene={payload['npcs_per_scene']}  cruise_speed_mps={payload['cruise_speed_mps']}  "
+        f"recyclable={payload['recyclable_fraction']:.2f}"
+    )
+    _render_counts(console, "By kind", payload["by_kind"])
+    _render_counts(console, "By traffic role", payload["by_role"])
+    _render_counts(console, "By behaviour", payload["by_behavior"])
+    if payload["rows"]:
+        table = Table(title="NPCs")
+        for column in ("npc_uid", "scene_key", "npc_id", "kind", "traffic_role", "behavior_type", "cruise_speed_mps", "route_len", "recyclable"):
+            table.add_column(column)
+        for row in payload["rows"]:
+            table.add_row(
+                str(row["npc_uid"]), str(row["scene_key"])[:12] + "…", str(row["npc_id"]), str(row["kind"]),
+                str(row["traffic_role"]), str(row["behavior_type"]), f"{float(row['cruise_speed_mps'] or 0):.2f}",
+                str(row["route_len"]), str(bool(row["recyclable"])),
+            )
+        console.print(table)
+
+
 def collect_scene_library_stats(db_path: str, *, filters: dict[str, Any] | None = None) -> dict[str, Any]:
     return collect_scene_library_summary(db_path, filters=filters)
 
@@ -661,6 +754,14 @@ def main() -> int:
             role_mins=role_mins,
             limit=args.limit,
         )
+    elif mode == "npcs":
+        payload = collect_scene_library_npcs(
+            args.scene_library_path,
+            kind=args.kind,
+            traffic_role=args.role,
+            behavior_type=args.behavior,
+            limit=args.limit,
+        )
     else:
         raise SystemExit(f"Unsupported mode: {mode}")
 
@@ -676,6 +777,8 @@ def main() -> int:
             _render_breakdown(console, payload)
         elif mode == "query":
             _render_query(console, payload)
+        elif mode == "npcs":
+            _render_npcs(console, payload)
     return 0
 
 

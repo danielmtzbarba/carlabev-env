@@ -17,12 +17,17 @@ from CarlaBEV.src.control.route_metrics import (
 
 from CarlaBEV.src.managers.scene_generator import SceneGenerator
 from CarlaBEV.src.managers.traffic_lifecycle import TrafficLifecycle
-from CarlaBEV.src.managers.scene_library import (
-    SceneLibrary,
-    deserialize_scene_payload,
-    serialize_scene_payload,
+from CarlaBEV.src.managers.scene_library import SceneLibrary, SceneLibraryMissError
+from CarlaBEV.src.scenes.scene_spec import (
+    DEFAULT_VARIATION_PROFILE,
+    SceneSpec,
+    VariationRequest,
+    apply_variation,
+    capture_scene,
+    instantiate_scene,
+    scene_identity_key,
 )
-from CarlaBEV.src.randomness import build_rng_bundle
+from CarlaBEV.src.randomness import build_rng_bundle, derive_seed
 from CarlaBEV.src.diagnostics import profiling
 from CarlaBEV.src.sim_time import TimeConfig
 from CarlaBEV.src.units import UnitContract
@@ -161,7 +166,7 @@ class CarlaBEV(gym.Env):
             return None
         return SceneLibrary(
             getattr(self.cfg, "scene_library_path", "CarlaBEV/assets/scenes/scene_library.db"),
-            generator_version=getattr(self.cfg, "scene_library_generator_version", "role_traffic_v1"),
+            generator_version=getattr(self.cfg, "scene_library_generator_version", "role_traffic_v3"),
             read_only=getattr(self.cfg, "scene_library_read_only", False),
         )
 
@@ -179,6 +184,8 @@ class CarlaBEV(gym.Env):
             info["scene_descriptor"] = dict(self._scene_descriptor)
         if hasattr(self, "_scene_cache_info") and self._scene_cache_info:
             info["scene_cache"] = dict(self._scene_cache_info)
+        if getattr(self, "_variation_report", None):
+            info["variation"] = dict(self._variation_report)
         return info
 
     def _resolve_rng_bundle(self, seed: int | None, options: dict) -> tuple[int, object]:
@@ -198,7 +205,22 @@ class CarlaBEV(gym.Env):
         with profiling.phase("env.reset"):
             return self._reset(seed=seed, options=options)
 
+    # Generation attempts on a cache miss and variation attempts before falling back.
+    DEFAULT_MAX_RESET_ATTEMPTS = 10
+    MAX_VARIATION_ATTEMPTS = 5
+
     def _reset(self, seed=0, options=None):
+        """Reset flow (see docs/replay_and_scene_cache_plan.md):
+
+        1. resolve seeds and the scene identity key;
+        2. obtain a :class:`SceneSpec` — from the scene library (random scenes
+           only) or by generating + capturing one (validated, then stored);
+        3. optionally apply a seeded variation to a copy of the spec;
+        4. instantiate fresh actors from the (varied) spec and load the map.
+
+        Step 4 is the single build path for misses and hits, so a hit is a
+        replay of the miss by construction.
+        """
         options = {} if options is None else dict(options)
         scene_seed, rng_bundle = self._resolve_rng_bundle(seed, options)
         super().reset(seed=scene_seed)
@@ -212,61 +234,38 @@ class CarlaBEV(gym.Env):
         self._scenario_context = {}
         self._scene_descriptor = {}
         self._scene_cache_info = {}
-        max_reset_attempts = options.get("max_reset_attempts", 10)
-        last_spawn_info = None
-        scene_key = self._scene_cache_key(options, rng_bundle)
-        cached_scene = self._load_cached_scene(scene_key)
-        if cached_scene is not None:
+        self._variation_report = None
+        reset_index = getattr(self, "_reset_index", -1) + 1
+        self._reset_index = reset_index
+
+        scene_key = self._scene_identity_key(options)
+        spec, record = self._load_cached_spec(scene_key, options)
+        frozen_loaded = False
+        if spec is not None:
+            self._scenario_context = dict(record["scenario_context"])
+            self._scene_descriptor = dict(record["scene_descriptor"])
             self._scene_cache_info = {
                 "enabled": True,
                 "hit": True,
                 "scene_key": scene_key,
+                "read_only": bool(getattr(self.scene_library, "read_only", False)),
+                "require_hit": self._require_hit,
             }
-            actors = cached_scene["actors"]
-            len_route = self._route_length_from_cached_actors(actors)
-            self._scenario_context = dict(cached_scene["scenario_context"])
-            self._scene_descriptor = dict(cached_scene["scene_descriptor"])
-            last_spawn_info = self._reset_map_and_validate(actors, rng_bundle)
-            if last_spawn_info and not last_spawn_info.get("valid", False):
-                if self.scene_library is not None and not getattr(self.scene_library, "read_only", False):
-                    self.scene_library.delete_scene(scene_key)
-                    cached_scene = None
-                    self._scene_cache_info = {
-                        "enabled": True,
-                        "hit": False,
-                        "scene_key": scene_key,
-                        "evicted_invalid_cache": True,
-                    }
-                else:
-                    raise RuntimeError(
-                        f"Cached scene {scene_key} failed spawn validation: {last_spawn_info}"
-                    )
-        if cached_scene is None:
-            self._scene_cache_info = {
-                **self._scene_cache_info,
-                "enabled": bool(self.scene_library is not None),
-                "hit": False,
-                "scene_key": scene_key,
-            }
-            for _ in range(max_reset_attempts):
-                with profiling.phase("reset.scene_generation"):
-                    actors, len_route = self.scene_generator.build_scene(
-                        options,
-                        rng_bundle=rng_bundle,
-                    )
-                self._scenario_context = self._extract_scenario_context(options)
-                self._scenario_context.update(getattr(self.scene_generator, "last_scene_context", {}) or {})
-                self._scene_descriptor = self._build_scene_descriptor()
-                last_spawn_info = self._reset_map_and_validate(actors, rng_bundle)
-                if last_spawn_info["valid"]:
-                    break
-            else:
-                raise RuntimeError(
-                    f"Failed to reset into a valid initial state after {max_reset_attempts} attempts: {last_spawn_info}"
-                )
-            self._store_cached_scene(scene_key, options, actors, last_spawn_info)
+            last_spawn_info = record.get("spawn_validation") or {"valid": True, "reason": "cached"}
+        else:
+            # Leaves the validated frozen realization loaded in the map.
+            spec, last_spawn_info = self._generate_spec(options, rng_bundle, scene_key)
+            self._store_cached_spec(scene_key, options, spec, last_spawn_info)
+            frozen_loaded = True
+        self._scene_spec = spec
+        self._scene_descriptor["scene_key"] = scene_key
 
-        self.len_ego_route = len_route
+        variation = self._resolve_variation(options, scene_seed, reset_index)
+        actors, last_spawn_info = self._instantiate_and_load(
+            spec, rng_bundle, variation, last_spawn_info, frozen_loaded=frozen_loaded
+        )
+
+        self.len_ego_route = self._route_length_from_spec(spec)
         self.num_vehicles = len(actors["vehicle"])
         self._configure_traffic_lifecycle(options, rng_bundle)
 
@@ -287,6 +286,214 @@ class CarlaBEV(gym.Env):
             info["spawn_validation"] = last_spawn_info
         return self._get_obs(), info
 
+    # --- scene identity / cache ------------------------------------------------
+    @property
+    def scene_spec(self):
+        """The identity-layer :class:`SceneSpec` of the current episode (before variation)."""
+        return getattr(self, "_scene_spec", None)
+
+    @property
+    def variation_report(self):
+        """Realised variation of the current episode (``None`` = frozen realization)."""
+        return getattr(self, "_variation_report", None)
+
+    @staticmethod
+    def _is_cacheable_scene(options) -> bool:
+        """Only procedurally generated random-navigation scenes are cached (decision 2).
+
+        Scenario and authored scenes are cheap to regenerate and bypass the
+        library; they still go through the same spec/instantiate path.
+        """
+        scene = options.get("scene", "rdm")
+        return scene == "rdm" and not options.get("config_file")
+
+    def _generator_version(self) -> str:
+        if self.scene_library is not None:
+            return self.scene_library.generator_version
+        return str(getattr(self.cfg, "scene_library_generator_version", "role_traffic_v3"))
+
+    def _scene_seeds(self, options) -> dict:
+        return {
+            key: options.get(key)
+            for key in ("scene_seed", "route_seed", "traffic_seed", "scenario_seed")
+        }
+
+    def _scene_identity_key(self, options) -> str:
+        """Identity of the requested scene; computed whether or not a library is attached."""
+        return scene_identity_key(
+            generator_version=self._generator_version(),
+            surface_size=self.units.metric.surface_size,
+            options=options,
+            seeds=self._scene_seeds(options),
+        )
+
+    def _scene_cache_key(self, options, rng_bundle=None):
+        """Cache key for the library (``None`` when the scene is not cacheable / no library)."""
+        if self.scene_library is None or not self._is_cacheable_scene(options):
+            return None
+        return self._scene_identity_key(options)
+
+    @property
+    def _require_hit(self) -> bool:
+        return bool(getattr(self.cfg, "scene_library_require_hit", False)) and self.scene_library is not None
+
+    def _load_cached_spec(self, scene_key, options):
+        if self.scene_library is None:
+            return None, None
+        if not self._is_cacheable_scene(options):
+            self._scene_cache_info = {"enabled": True, "hit": False, "scene_key": None, "bypassed": "non_random_scene"}
+            return None, None
+        record = self.scene_library.get_scene_by_key(scene_key)
+        if record is None:
+            if self._require_hit:
+                raise SceneLibraryMissError(
+                    scene_key, reason="scene not in library", seeds=self._scene_seeds(options), options=options
+                )
+            return None, None
+        try:
+            spec = SceneSpec.from_payload(record["actors_payload"])
+            if spec.surface_size != int(self.units.metric.surface_size):
+                raise ValueError("surface size mismatch")
+        except (ValueError, KeyError, TypeError) as exc:
+            if self._require_hit:
+                raise SceneLibraryMissError(
+                    scene_key, reason=f"stored scene is not replayable ({exc})", seeds=self._scene_seeds(options), options=options
+                ) from exc
+            # Stale or unreadable entry: evict and regenerate (never serve a non-replayable scene).
+            if not getattr(self.scene_library, "read_only", False):
+                self.scene_library.delete_scene(scene_key)
+            self._scene_cache_info = {"enabled": True, "hit": False, "scene_key": scene_key, "evicted_invalid_cache": str(exc)}
+            return None, None
+        self.scene_library.touch_scene(scene_key)
+        return spec, record
+
+    def _generate_spec(self, options, rng_bundle, scene_key):
+        """Generate a scene, capture its spec and validate the frozen realization."""
+        max_reset_attempts = int(options.get("max_reset_attempts", self.DEFAULT_MAX_RESET_ATTEMPTS))
+        self._scene_cache_info = {
+            **self._scene_cache_info,
+            "enabled": bool(self.scene_library is not None),
+            "hit": False,
+            "scene_key": scene_key if self._is_cacheable_scene(options) else None,
+        }
+        if self.scene_library is not None and not self._is_cacheable_scene(options):
+            self._scene_cache_info["bypassed"] = "non_random_scene"
+        last_spawn_info = None
+        for _ in range(max_reset_attempts):
+            with profiling.phase("reset.scene_generation"):
+                actors, _len_route = self.scene_generator.build_scene(options, rng_bundle=rng_bundle)
+            self._scenario_context = self._extract_scenario_context(options)
+            self._scenario_context.update(getattr(self.scene_generator, "last_scene_context", {}) or {})
+            self._scene_descriptor = self._build_scene_descriptor()
+            spec = capture_scene(
+                actors,
+                surface_size=self.units.metric.surface_size,
+                scene_key=scene_key,
+                generator_version=self._generator_version(),
+                seeds=self._scene_seeds(options),
+                identity={
+                    "map_name": str(getattr(self.cfg, "map_name", "Town01")),
+                    "geometry_profile": str(getattr(self.cfg, "geometry_profile", "realistic")),
+                    "scene": str(options.get("scene", "rdm")),
+                },
+            )
+            # Validate the frozen realization through the same path a hit takes.
+            last_spawn_info = self._reset_map_and_validate(instantiate_scene(spec, units=self.units), rng_bundle)
+            if last_spawn_info["valid"]:
+                return spec, last_spawn_info
+        raise RuntimeError(
+            f"Failed to reset into a valid initial state after {max_reset_attempts} attempts: {last_spawn_info}"
+        )
+
+    def _store_cached_spec(self, scene_key, options, spec, spawn_validation):
+        if self.scene_library is None or not self._is_cacheable_scene(options):
+            return
+        if not spawn_validation.get("valid", False):
+            return
+        self.scene_library.insert_scene(
+            scene_key=scene_key,
+            scene_descriptor=self._scene_descriptor,
+            scenario_context=self._scenario_context,
+            actors_payload=spec.to_payload(),
+            spawn_validation=spawn_validation,
+            resolved_options=options,
+        )
+
+    # --- variation (Layer 3) ---------------------------------------------------
+    def _resolve_variation(self, options, scene_seed, reset_index):
+        seed = options.get("variation_seed")
+        profile = options.get("variation_profile")
+        if seed is None:
+            policy = str(getattr(self.cfg, "variation_policy", "frozen"))
+            if policy == "per_reset":
+                seed = derive_seed(int(scene_seed), "reset", int(reset_index))
+            else:
+                return None
+        if profile is None:
+            profile = str(getattr(self.cfg, "variation_profile", DEFAULT_VARIATION_PROFILE))
+        return VariationRequest(seed=int(seed), profile=str(profile))
+
+    def _instantiate_and_load(self, spec, rng_bundle, variation, frozen_spawn_info, *, frozen_loaded=False):
+        """Instantiate the (possibly varied) spec and load the map; fall back to the frozen scene.
+
+        ``frozen_loaded`` means the map already holds the validated frozen
+        realization (a cache miss validates it through this very path), so a
+        frozen reset needs no second instantiation.
+        """
+        if variation is None:
+            if frozen_loaded:
+                actors, spawn_info = self.map.actor_manager.actors, frozen_spawn_info
+            else:
+                actors = instantiate_scene(spec, units=self.units)
+                spawn_info = self._reset_map_and_validate(actors, rng_bundle)
+            self._variation_report = None
+            self._scene_descriptor["variation_seed"] = None
+            self._scene_descriptor["variation_applied"] = False
+            return actors, spawn_info
+
+        attempts = 0
+        request = variation
+        while attempts < self.MAX_VARIATION_ATTEMPTS:
+            varied_spec, report = apply_variation(
+                spec, request, metric=self.units.metric, drivable_mask=self.map._drivable_mask
+            )
+            actors = instantiate_scene(varied_spec, units=self.units)
+            spawn_info = self._reset_map_and_validate(actors, rng_bundle)
+            attempts += 1
+            if spawn_info["valid"]:
+                report["variation_applied"] = True
+                report["variation_attempts"] = attempts
+                self._variation_report = report
+                self._scene_descriptor.update(
+                    {
+                        "variation_seed": int(variation.seed),
+                        "variation_profile": variation.profile,
+                        "variation_applied": True,
+                        "variation_attempts": attempts,
+                    }
+                )
+                return actors, spawn_info
+            request = VariationRequest(seed=request.seed, profile=request.profile, attempt=request.attempt + 1)
+
+        # Every variant failed spawn validation: use the frozen realization (always valid).
+        actors = instantiate_scene(spec, units=self.units)
+        spawn_info = self._reset_map_and_validate(actors, rng_bundle)
+        self._variation_report = {
+            "variation_seed": int(variation.seed),
+            "variation_profile": variation.profile,
+            "variation_applied": False,
+            "variation_attempts": attempts,
+        }
+        self._scene_descriptor.update(
+            {
+                "variation_seed": int(variation.seed),
+                "variation_profile": variation.profile,
+                "variation_applied": False,
+                "variation_attempts": attempts,
+            }
+        )
+        return actors, spawn_info
+
     def _configure_traffic_lifecycle(self, options, rng_bundle):
         """Recycle finished background traffic onto new out-of-view routes (random navigation)."""
         enabled = bool(getattr(self.cfg, "traffic_lifecycle_enabled", True))
@@ -302,6 +509,8 @@ class CarlaBEV(gym.Env):
             fov_radius_m=fov_radius_m,
             margin_m=float(getattr(self.cfg, "traffic_respawn_margin_m", 10.0)),
             startup_sampler=self.scene_generator._sample_vehicle_startup,
+            min_spawn_gap_m=float(self.scene_generator.policy.min_spawn_gap_m),
+            reject_uturn_routes=bool(self.scene_generator.policy.reject_uturn_routes),
         )
 
     def _reset_map_and_validate(self, actors, rng_bundle):
@@ -309,56 +518,17 @@ class CarlaBEV(gym.Env):
             return self._reset_map_and_validate_impl(actors, rng_bundle)
 
     def _reset_map_and_validate_impl(self, actors, rng_bundle):
-        self.map.reset(actors, hero_np_rng=rng_bundle.route_np_rng)
+        # Actors are freshly instantiated from a spec: adopt them without copying.
+        self.map.reset(actors, hero_np_rng=rng_bundle.route_np_rng, copy_actors=False)
         if actors and actors.get("agent") is not None:
             self._maybe_attach_route_direction_metrics()
             return self.map.spawn_validation_info()
         return {"valid": True, "reason": "no_agent"}
 
-    def _scene_cache_key(self, options, rng_bundle):
-        if self.scene_library is None:
-            return None
-        seeds = {
-            "scene_seed": options.get("scene_seed"),
-            "route_seed": options.get("route_seed", rng_bundle.route_seed),
-            "traffic_seed": options.get("traffic_seed", rng_bundle.traffic_seed),
-            "scenario_seed": options.get("scenario_seed", rng_bundle.scenario_seed),
-        }
-        return self.scene_library.build_scene_key(options, seeds, surface_size=self.units.metric.surface_size)
-
-    def _load_cached_scene(self, scene_key):
-        if self.scene_library is None or scene_key is None:
-            return None
-        record = self.scene_library.get_scene_by_key(scene_key)
-        if record is None:
-            return None
-        self.scene_library.touch_scene(scene_key)
-        return {
-            "actors": deserialize_scene_payload(record["actors_payload"], map_size=self.size, units=self.units),
-            "scene_descriptor": record["scene_descriptor"],
-            "scenario_context": record["scenario_context"],
-        }
-
-    def _store_cached_scene(self, scene_key, options, actors, spawn_validation):
-        if self.scene_library is None or scene_key is None:
-            return
-        if not spawn_validation.get("valid", False):
-            return
-        self.scene_library.insert_scene(
-            scene_key=scene_key,
-            scene_descriptor=self._scene_descriptor,
-            scenario_context=self._scenario_context,
-            actors_payload=serialize_scene_payload(actors, surface_size=self.units.metric.surface_size),
-            spawn_validation=spawn_validation,
-            resolved_options=options,
-        )
-
-    def _route_length_from_cached_actors(self, actors):
-        agent = actors.get("agent")
-        if agent is None:
+    def _route_length_from_spec(self, spec):
+        if spec is None or spec.agent is None:
             return 0.0
-        route_x, route_y, _, _ = agent
-        return self.units.metric.route_length_meters(route_x, route_y)
+        return self.units.metric.route_length_meters(spec.agent.route_x, spec.agent.route_y)
 
     def _maybe_attach_route_direction_metrics(self):
         if not getattr(self.cfg, "route_direction_metrics_enabled", False):

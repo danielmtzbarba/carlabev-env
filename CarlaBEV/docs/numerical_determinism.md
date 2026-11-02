@@ -11,6 +11,8 @@ golden snapshots or adding bit-exact assertions.
 | --- | --- | --- |
 | Same machine, same environment | A seeded episode is **bit-identical** across runs, across `fps` values and across `render_mode` (rendering is a pure observer). | `tests/physics_time/rendering/test_fps_independence.py` (SHA-256 digest equality), `carlabev validate simulator-semantics` → `render_fps_independence` |
 | Across machines / OS / CPU | A seeded episode is **physically identical within tolerance**: positions within `1e-7 m`, speeds within `1e-7 m/s`, headings equal modulo 2π, same termination, same scenario events. Bit-exact equality is *not* guaranteed. | `tests/physics_time/regression/test_golden_trajectory.py` (`atol = 1e-7`, angular comparison) |
+| Same machine, independent processes | A seeded episode is **bit-identical** across fresh interpreters (different `PYTHONHASHSEED`), across scene-library misses and hits, and through traffic-lifecycle recycles. State is `f(EnvConfig, scene identity, variation_seed, actions)`. | `tests/physics_time/regression/test_replay_determinism.py`, `carlabev validate replay` (default: subprocess isolation, varied hash seeds), `carlabev benchmark run` → `cross_process_bitwise_identical` |
+| Scene generation across machines | **Not guaranteed.** Generation decisions consume BLAS `dot`/`norm` and libm `pow` roundings, so a *miss* on another OS/CPU may realise a different, equally valid scene for the same seed. A scene served from a **library** replays identically everywhere (within the 1e-7 physics tolerance) because a hit never re-runs generation. The library is the cross-machine reproducibility mechanism; `verify-library` measures the drift. | `carlabev scene verify-library`, `carlabev validate replay --cache-mode hit-only --atol 1e-7` |
 | Across `physics_dt` | Same physical outcome within first-order (Euler) discretisation error at equal simulated time. | `tests/physics_time/clock/test_dt_convergence.py`, `dt_convergence` check |
 | Across raster `size` | Same physical world within sub-pixel quantisation of integer surface routes. | `tests/physics_time/units/test_multi_resolution.py`, `multi_resolution_consistency` check |
 
@@ -66,6 +68,43 @@ decimals flips whenever a value sits on a rounding boundary.
    platform-specific digest while agreeing within `1e-7` — the irreducible
    residual.
 
+## Incidents R-01..R-03 — replay determinism (fixed, Stage 2 of the replay plan)
+
+Found while building `carlabev validate replay`; see
+[replay_and_scene_cache_plan.md](replay_and_scene_cache_plan.md) for the
+full analysis and the design that fixed them.
+
+| ID | Symptom | Cause | Fix |
+| --- | --- | --- | --- |
+| R-01 | With the scene library enabled (the default), NPC spawn poses differed by ±0.3125 m on every run; miss ≠ hit ≠ hit. For seeds needing a generation retry the *ego* spawn also differed between miss and hit. | Cache hits rebuilt actors without their seeded RNG, so `Controller.set_route` drew the start jitter from an unseeded `np.random.default_rng()`; the ego used the 1st vs 2nd draw of `route_np_rng`. | Spawn offsets (NPC and ego) are resolved at generation time in the legacy draw order, persisted in the scene spec and replayed verbatim; every reset instantiates from the spec (`instantiate_scene`). |
+| R-02 | Two independent interpreters agreed for 76 steps and diverged at step 77 = the first lifecycle recycle. | `TrafficLifecycle.np_rng = default_rng(abs(hash(("traffic-lifecycle", seed))))` — string hashing is randomized per process. | `derive_seed(traffic_seed, "traffic-lifecycle")`; recycle jitter from the NPC's own `runtime_seed`. |
+| R-03 | A cached `lead_brake` scene replayed as plain traffic (`LeadBrakeBehavior → None`). | The cached payload dropped behaviours, signals and rule flags. | Spec layer serialises them; the cache serves random-navigation scenes only (`scene_cache.bypassed`). |
+
+Stage 4 (generation performance) is worth recording as a non-incident: BLAS
+`ddot` on 2-vectors and NumPy scalar `**` are not bit-identical to explicit
+vector arithmetic (FMA contraction; 8–26 % of random samples differ in the last
+ulp), so the projection code was *not* vectorised naively — a vectorised
+pre-pass only locates candidate segments and the exact legacy scalar code is
+evaluated on those (`tests/test_generation_projection.py` asserts bit identity
+against a verbatim copy of the old loop; a 28-scene seed sweep kept identical
+`SceneSpec` digests).
+
+## Findings V-01..V-03 — traffic realism (Stage 7)
+
+Reported after visual validation; all three reproduced byte-identically on the
+baseline commit (pre-existing, not regressions). Fixed under versioned
+switches so every earlier realization stays reproducible:
+`scene_library_generator_version="role_traffic_v2"`,
+`npc_route_geometry="legacy"`, `map_collision_mode="center"` (the eight
+original golden snapshots are pinned to exactly this and were byte-identical
+after the change; three new snapshots describe the Stage 7 defaults).
+
+| ID | Symptom | Cause | Fix |
+| --- | --- | --- | --- |
+| V-01 | NPCs spawn overlapped / too close (24 overlapping pairs in 18 scenes). | Role sampler drew start nodes with replacement from 3–7-node pools (10/15 overlaps were the *same node*), adjacent nodes are 4.3 m apart (< 4.5 m car), no NPC–NPC spawn validation; `rear` pool empty and measured in pixels. | Generation policy v3: spawn occupancy, unique start nodes, reachable end nodes, role pools in metres / upstream of junctions. |
+| V-02 | Ego collides with walls only when its centre reaches the pixel. | Single pixel under the state point (rear axle with the realistic footprint; 3.7 m behind the bumper). | Footprint map contact with a 1-px inset; footprint-consistent spawn validation. |
+| V-03 | NPC bodies cross invalid areas. | 60 % of routes contain a junction vertex of ~2.5 m radius (< 5.0 m minimum turning radius); no curvature-aware speed; dead-end U-turn connectors; lane centrelines 0.94 m from curbs in the raster. | `fillet_v1` geometry (feasible arcs, connector merging, nudge), curvature speed caps with feed-forward, U-turn routes rejected. |
+
 ## Diagnosing a reproducibility failure
 
 1. **Read the failing key.** A `yaw` mismatch of ≈ 2π is a representative flip,
@@ -90,7 +129,16 @@ decimals flips whenever a value sits on a rounding boundary.
 4. **Reproduce locally without the env**: call `smooth_and_compute` (or the
    suspect function) on the exact inputs and print the residue
    (`cy - cy.mean()`), as done in the P-01 investigation.
-5. **Regenerate goldens only after attributing the diff**
+5. **Cross-process or cache-related divergence** → run
+   `carlabev validate replay` (fresh interpreters, varied `PYTHONHASHSEED`,
+   `--cache-mode miss-then-hit`); it reports the first divergent step, actor and
+   key. A divergence at reset is a scene-identity/spec problem; one at a recycle
+   step points at the lifecycle RNGs; `--variation-independence` separates the
+   variation layer from the identity layer.
+6. **Library regenerates differently on another machine** → expected for
+   generation (see Guarantees); `carlabev scene verify-library` quantifies it.
+   Replays of the *stored* scenes must still agree within 1e-7.
+7. **Regenerate goldens only after attributing the diff**
    (`CARLABEV_REGEN_GOLDEN=1 uv run pytest tests/physics_time/regression`) and
    record the reason in `tests/physics_time/README.md`.
 
@@ -103,6 +151,17 @@ decimals flips whenever a value sits on a rounding boundary.
   flag inside one test), never for committed cross-machine fixtures.
 - Seed every RNG, including `np_rng` for stand-alone actors (`set_route` jitters
   the start position from an unseeded generator otherwise).
+- Never derive a seed from `hash(...)` of a string or tuple: Python randomizes
+  string hashing per process (`PYTHONHASHSEED`), so the value differs between
+  independent runs. Use `CarlaBEV.src.randomness.derive_seed` (SHA-256). The
+  traffic lifecycle did this before Stage 2 of the replay plan and diverged at
+  the first recycle event across processes; `carlabev validate replay` runs
+  each replay in a fresh interpreter with a distinct `PYTHONHASHSEED` to catch
+  regressions of this kind.
+- Anything drawn at *load* time that defines the initial state (spawn offsets)
+  must be resolved at *generation* time and persisted with the scene, otherwise
+  a scene-library hit is not a replay of the miss. See
+  [replay_and_scene_cache_plan.md](replay_and_scene_cache_plan.md).
 - When a test depends on a route that is exactly axis-aligned, remember that it
   is a degenerate case for any tangent computation; prefer a slightly oblique
   route unless the straight case is what is under test.

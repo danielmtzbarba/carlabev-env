@@ -180,3 +180,15 @@ pyrightconfig.json
 
 # benchmark run outputs (committed baselines live under CarlaBEV/assets/benchmarks)
 runs/bench/
+
+# Upload workspace: generated simulator artifacts
+runs/
+results/
+datasets/
+videos/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*

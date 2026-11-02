@@ -167,3 +167,49 @@ def build_behavior(actor_type: str, behavior):
             dec_rate=params.get("decel_mps2", 1.0),
         ), normalized
     return None, normalized
+
+
+def behavior_to_spec(behavior) -> dict | None:
+    """Serializable spec of a behaviour instance (inverse of :func:`build_behavior`).
+
+    Registry behaviours round-trip through their constructor parameters (the
+    class carries scripted logic a plain FSM spec cannot express); any other
+    :class:`Behavior` round-trips through its declarative FSM spec.
+    """
+    if behavior is None:
+        return None
+    if isinstance(behavior, LeadBrakeBehavior):
+        return {
+            "type": "timed_brake",
+            "params": {"start_brake_t": behavior.start_brake_t, "decel_mps2": behavior.dec_rate},
+        }
+    if isinstance(behavior, StopReturnBehavior):
+        return {
+            "type": "yield_return",
+            "params": {
+                "start_delay": behavior.start_delay,
+                "yield_duration": float(behavior.stop_duration if behavior.stop_duration is not None else 1.0),
+                "gap_accept_s": float(behavior.gap_accept_s or 0.0),
+            },
+        }
+    if isinstance(behavior, StopMidBehavior):
+        return {
+            "type": "stop_mid",
+            "params": {"start_delay": behavior.start_delay, "gap_accept_s": float(behavior.gap_accept_s or 0.0)},
+        }
+    if isinstance(behavior, CrossBehavior):
+        return {
+            "type": "cross",
+            "params": {"start_delay": behavior.start_delay, "gap_accept_s": float(behavior.gap_accept_s or 0.0)},
+        }
+    if isinstance(behavior, Behavior):
+        return {"type": FSM_SPEC_TYPE, "params": {}, "spec": behavior.to_spec()}
+    raise TypeError(f"Cannot serialize behaviour of type {type(behavior).__name__}")
+
+
+def behavior_from_spec(actor_type: str, spec):
+    """Rebuild a behaviour from :func:`behavior_to_spec` output (``None`` -> no behaviour)."""
+    if spec is None:
+        return None
+    behavior, _ = build_behavior(actor_type, spec)
+    return behavior

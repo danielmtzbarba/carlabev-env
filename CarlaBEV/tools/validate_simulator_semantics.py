@@ -376,9 +376,13 @@ def check_semantic_temporal_fusion_modes() -> CheckResult:
 
 
 def check_scene_generator_exception_visibility() -> CheckResult:
+    import re
+
     path = REPO_ROOT / "CarlaBEV" / "src" / "managers" / "scene_generator.py"
     text = path.read_text(encoding="utf-8")
-    if "except Exception" in text and "pass" in text:
+    # A broad handler whose body is a bare ``pass`` (silently swallowed failure).
+    silent_handler = re.compile(r"except Exception[^\n]*:\s*\n\s*pass\b")
+    if silent_handler.search(text):
         return warn_result(
             "scene_generator_exception_visibility",
             "Scene generation still contains a broad exception path that suppresses route-generation failures.",
@@ -959,6 +963,63 @@ def check_known_clock_unit_inconsistencies() -> CheckResult:
     )
 
 
+def check_traffic_realism() -> CheckResult:
+    """Stage 7 (findings V-01..V-03): no overlapping spawns, NPC bodies stay on the carriageway,
+    the ego collides with the map at first (inset) body contact."""
+    from CarlaBEV.config import RandomNavigationReset, build_random_navigation_options
+    from CarlaBEV.src.geometry.collision import bodies_overlap
+
+    env = CarlaBEV(EnvConfig(render_mode="rgb_array", obs_mode="bev_rgb", action_mode="continuous", size=128,
+                             scene_library_enabled=False, max_episode_duration_s=60.0))
+    try:
+        overlaps = 0
+        moving = blocking = sidewalk = 0
+        for seed in range(3):
+            env.reset(seed=seed, options=build_random_navigation_options(
+                RandomNavigationReset(difficulty_preset_id="medium", scene_seed=seed)))
+            npcs = env.map.actor_manager.actors["vehicle"]
+            overlaps += sum(
+                bodies_overlap(npcs[i].body(), npcs[j].body()) for i in range(len(npcs)) for j in range(i + 1, len(npcs))
+            )
+            for k in range(120):
+                _, _, term, trunc, info = env.step(np.array([0.0, 0.0, 1.0], dtype=np.float32))
+                if term or trunc:
+                    break
+            summary = env.stats.current
+            moving += summary.npc_moving_steps
+            blocking += summary.npc_blocking_contact_steps
+            sidewalk += summary.npc_offroad_contact_steps
+        # Footprint map collision: drive into a wall; termination within 2 steps of the first raw corner contact.
+        env.reset(seed=100, options=build_random_navigation_options(
+            RandomNavigationReset(difficulty_preset_id="no_traffic", scene_seed=100, num_vehicles=0)))
+        metric, ids = env.units.metric, env.map._static_ids
+        first_corner = end = None
+        for k in range(400):
+            _, _, term, trunc, _ = env.step(np.array([0.6, -0.8, 0.0], dtype=np.float32))
+            hero = env.map.hero
+            if first_corner is None and any(
+                ids[int(round(y)), int(round(x))] == 0 for x, y in (metric.meters_to_surface(c) for c in hero.body().corners())
+            ):
+                first_corner = k
+            if term or trunc:
+                end = (k, env.current_info["reward"]["cause"])
+                break
+    finally:
+        env.close()
+    nd_frac = blocking / moving if moving else 0.0
+    sw_frac = sidewalk / moving if moving else 0.0
+    late = end is None or first_corner is None or end[1] != "collision" or end[0] - first_corner > 2
+    message = (
+        f"spawn overlaps {overlaps} (3 medium scenes); NPC body on non-drivable {100 * nd_frac:.2f}% / "
+        f"sidewalk {100 * sw_frac:.1f}% of moving NPC-steps; wall collision at step {end} vs first corner contact {first_corner}"
+    )
+    if overlaps > 0 or nd_frac > 0.03 or late:
+        return fail_result("traffic_realism", message)
+    if nd_frac > 0.015 or sw_frac > 0.2:
+        return warn_result("traffic_realism", message)
+    return pass_result("traffic_realism", message)
+
+
 def main() -> int:
     checks = [
         run_check("bicycle_yaw_update", check_bicycle_yaw_update),
@@ -987,6 +1048,7 @@ def main() -> int:
         run_check("action_repeat_consistency", check_action_repeat_consistency),
         run_check("multi_resolution_consistency", check_multi_resolution_consistency),
         run_check("known_clock_unit_inconsistencies", check_known_clock_unit_inconsistencies),
+        run_check("traffic_realism", check_traffic_realism),
     ]
 
     width = max(len(result.name) for result in checks)

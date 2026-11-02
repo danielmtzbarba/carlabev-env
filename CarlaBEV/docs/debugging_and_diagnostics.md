@@ -189,10 +189,10 @@ uv run carlabev scene build-library --episodes 100
 
 This command is intended for ahead-of-time corpus preparation. A common
 downstream pattern is to build one library per benchmark, study, or protocol,
-then point training at that library. Current read-only mode only suppresses
-scene insertion/deletion: cache usage counters and schema initialization can
-still write, and misses can generate uncached scenes. Strict prepared-only
-execution is not currently enforced.
+then point training at that library. For evaluation corpora, open the library
+with `scene_library_read_only=True` (SQLite `mode=ro`, no writes of any kind)
+and `scene_library_require_hit=True` (a miss raises `SceneLibraryMissError`
+instead of generating): the corpus is then immutable and strictly replayed.
 
 For study-driven corpus preparation, prefer the structured seed mode instead of
 the older flat `--seed-offset` convention. Example:
@@ -225,12 +225,12 @@ recommended pattern is:
 2. merge those shard databases downstream into one canonical benchmark DB
 3. replay against the merged database with matching resolved options and seeds
 
-Read-only/require-hit replay is the intended final contract, not an implemented
-guarantee. `scene_library_require_hit` is not a public configuration field. The
-cache key includes all resolved options except `reset_mask`, so added protocol
-metadata can change identity even when the seeds match. Callers must reproduce
-the builder's component-seed schedule as well as its options; otherwise a reset
-can miss and regenerate a scene. See [Public Integration API](downstream_integration_api.md).
+The cache key includes all resolved options except `reset_mask` and the
+variation fields, so added protocol metadata can change identity even when the
+seeds match. Callers must reproduce the builder's component-seed schedule as
+well as its options; in strict mode a mismatch surfaces as a
+`SceneLibraryMissError` carrying the key, seeds and options of the miss
+(instead of a silent regeneration). See [Public Integration API](downstream_integration_api.md).
 
 The key metadata fields that let downstream tools safely merge and analyze those
 corpora are:
@@ -251,6 +251,9 @@ uv run carlabev scene analyze-library quality --json
 ```
 
 `carlabev scene analyze-library` without a subcommand defaults to `summary`.
+Variation seeds never change scene identity: the cache key excludes
+`variation_seed` / `variation_profile`, so one cached scene serves every
+training variant (see the README "Variation Layer" section).
 
 Available analysis modes:
 
@@ -258,6 +261,9 @@ Available analysis modes:
 - `breakdown`: grouped counts by metadata dimensions such as benchmark, profile, split, difficulty, route profile, and main role
 - `quality`: spawn usefulness metrics such as zero-near-ego rate and requested-traffic fulfillment
 - `query`: filtered row listing for targeted inspection
+- `npcs`: NPC-layer breakdown from the `npcs` table (counts by kind / traffic
+  role / behaviour type, NPCs per scene, cruise speeds, recyclable fraction,
+  row listing with `--kind`, `--role`, `--behavior`)
 
 The scene-library analysis reports and exposes:
 
@@ -270,6 +276,51 @@ The scene-library analysis reports and exposes:
 - near-ego presence rate
 - role presence rates
 
+### Verifying a library on this machine
+
+Random-scene generation is deterministic on one machine, but its decisions
+depend on the platform's floating-point rounding (BLAS `dot`/`norm`, libm
+`pow`), so the same seed may realise a different — equally valid — scene on
+another OS/CPU. The library is the portability mechanism: a cached scene
+replays identically everywhere because a hit never re-runs generation.
+
+```bash
+uv run carlabev scene verify-library --scene-library-path runs/lib.db            # all scenes
+uv run carlabev scene verify-library --scene-library-path runs/lib.db --sample 20 --seed 0 --json
+```
+
+`verify-library` regenerates cached scenes from their stored seeds and options
+and compares the resulting spec digests with the stored ones (first differing
+field on mismatch; exit code 1). Run it in CI on every supported platform
+(platform drift) and after any generator change (an intended decision change
+must bump `scene_library_generator_version`; an unintended one shows up here).
+
+## Replay Validation
+
+```bash
+uv run carlabev validate replay                                       # 3 isolated interpreters, seed 0, medium traffic
+uv run carlabev validate replay --seed 11 --runs 4 --steps 300 --policy random --action-seed 7
+uv run carlabev validate replay --cache-mode miss-then-hit            # run 0 populates a temp library, runs 1.. replay hits
+uv run carlabev validate replay --cache-mode hit-only --scene-library runs/lib.db
+uv run carlabev validate replay --reset-mode scenario --scenario-id red_light_runner --scenario-level 2
+uv run carlabev validate replay --variation-seed 7 --variation-independence
+uv run carlabev validate replay --isolation in-process                # debugging only: cannot detect hash() seeding
+```
+
+Each run is a fresh interpreter with a distinct `PYTHONHASHSEED`; the tool
+fingerprints the reset (scene key, seeds, ego spawn and route, checkpoints,
+every NPC by `npc_id`, signals) and every step (ego and NPC poses/speeds/
+behaviour states/recycle counts, signal states, reward, termination cause,
+observation hash) and reports the first divergence (step, key, values, Δ).
+`--atol 0` (default) asserts bit identity on one machine; use `--atol 1e-7`
+across machines. `--variation-seed N` replays a specific variant;
+`--variation-independence` adds a run with another seed that must keep the
+scene identity while changing the spawn state. `--report FILE.json
+[--save-traces]` writes the artefact; exit codes 0 / 1 (divergence) / 2
+(worker error). See [numerical_determinism.md](numerical_determinism.md) for
+the contract and [replay_and_scene_cache_plan.md](replay_and_scene_cache_plan.md)
+for the design.
+
 ## Recommended Local Checks
 
 For planning and random-scene work, a practical validation sequence is:
@@ -279,6 +330,7 @@ uv run carlabev graph build-town01-canonical
 uv run carlabev graph validate-town01-joins
 uv run carlabev scene analyze-routes --episodes 100 --min-turns 1
 uv run carlabev validate simulator-semantics
+uv run carlabev validate replay --cache-mode miss-then-hit
 uv run carlabev run interactive
 ```
 

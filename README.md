@@ -1,655 +1,92 @@
-<div align="center">
-
 # CarlaBEV
 
-**A bird's-eye-view simulator for vision-based autonomous-driving reinforcement learning**
+A lightweight bird’s-eye-view driving simulator for reinforcement-learning research, with a Gymnasium API, procedural traffic, and repeatable scenarios on Town01. It uses simplified vehicle dynamics for fast experimentation.
 
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
-[![Gymnasium](https://img.shields.io/badge/gymnasium-API-brightgreen)](https://gymnasium.farama.org/)
-[![PyGame](https://img.shields.io/badge/pygame-2.1.3-yellow)](https://www.pygame.org/)
+![CarlaBEV random traffic rendered at 512 × 512](CarlaBEV/assets/images/carlabev-sim-512.png)
 
-</div>
+*Random Town01 traffic, rendered at 512 × 512: ego in cyan, traffic in blue, and route checkpoints in green.*
 
+## Install and run
 
-> Upload snapshot: simulator source, tests, documentation, and required map assets
-> are included. Agent guidance, Git history, CI/pre-commit configuration, local
-> environments, and generated scene databases are omitted from this bundle.
-> Git clone, release automation, and hook-setup instructions below describe the
-> full development repository, not files included in this upload.
-
-## Overview
-
-`CarlaBEV` is a lightweight BEV simulator for autonomous-driving research. It is designed for rapid iteration on:
-
-- vision-based DRL training
-- route-following and avoidance behavior
-- procedurally generated traffic scenes
-- edge-case scenario design and evaluation
-
-The simulator uses a Gymnasium-compatible API, a 2D raster BEV pipeline, explicit route and actor management, and a growing set of scenario generators for structured safety-critical evaluation.
-
-It is not a full dynamic clone of CARLA. The project is best understood as a fast research simulator for BEV decision-making and control experiments.
-
-<div align="center">
-  <img src="CarlaBEV/assets/images/carlabev_hero_banner.png" alt="CarlaBEV Hero Banner" width="800">
-</div>
-
-## Current Status
-
-The project currently supports:
-
-- Gymnasium vectorized environment usage
-- direct RGB/vector observations and wrapped grayscale or semantic-mask stacks
-- discrete or continuous ego actions
-- route-following ego dynamics with a kinematic bicycle update
-- explicit camera/FOV centering on the true ego start state
-- synchronized rendering, collision, semantic tile lookup, and checkpoint detection
-- random scene generation
-- predefined edge-case scenarios including:
-  - `lead_brake`
-  - `jaywalk`
-  - `red_light_runner`
-
-Recent simulator hardening work also introduced:
-
-- explicit geometry conversion utilities across raw asset, runtime, and metric frames
-- deterministic seeded scene generation for fair study reruns
-- padded render surfaces so `center` and `lookahead_75` share the same world spawn
-- reset-time spawn validation for valid ego initialization
-- stronger steering authority for meaningful turns and avoidance
-- executable simulator validity checks
-- internal per-step comfort signals and public episode-level comfort summaries
-- an explicit simulation clock (`EnvConfig.physics_dt`, default 0.1 s) shared by
-  ego and NPC integration, scenario timers, reward derivatives and video metadata
-- a unit contract (`UnitContract`) making every physical parameter SI and raster
-  independent, with rendering as a pure observer of the simulation
-- metric actor geometry (oriented 4.5 × 1.8 m cars and pedestrian circles by
-  default; SAT collisions, shape gaps and swept TTC), a class-id renderer with
-  dirty rects, a declarative behaviour framework and traffic rules (IDM car
-  following, traffic signals, junction right-of-way)
-- a multi-rate loop: `action_repeat` physics sub-steps per decision with
-  summed, step-normalised rewards, and an interpolated real-time viewer
-  (`display_fps`) that cannot influence the simulation
-
-## Key Features
-
-- **Gymnasium-compatible API** for training with standard RL tooling.
-- **BEV observation pipeline** with optional semantic masking and frame stacking.
-- **Scenario generation** for both random traffic scenes and structured edge cases.
-- **Configurable ego control** with discrete and continuous actions.
-- **Semantic map awareness** for drivable-space checks, collision logic, and route progress.
-- **Debug tooling** for manual inspection of environment behavior.
-- **Technical documentation** covering kinematics, geometry, control, and coordinate conventions.
-
-## Documentation
-
-Project documentation lives in `CarlaBEV/docs/`:
-
-- [Ego Kinematics](CarlaBEV/docs/ego_kinematics.md)
-- [Geometry And Metric Frame](CarlaBEV/docs/geometry_and_metric_frame.md)
-- [Control And Actions](CarlaBEV/docs/control_and_actions.md)
-- [Coordinate Conventions](CarlaBEV/docs/coordinate_conventions.md)
-- [Scenario Specifications](CarlaBEV/docs/scenario_specifications.md)
-- [Configuration Reference](CarlaBEV/docs/config_reference.md)
-- [Route Generation And Planning](CarlaBEV/docs/route_generation_and_planning.md)
-- [Debugging And Diagnostics](CarlaBEV/docs/debugging_and_diagnostics.md)
-- [Simulation Clock And Unit Contract](CarlaBEV/docs/simulation_clock_and_units.md)
-- [Numerical Determinism And Reproducibility](CarlaBEV/docs/numerical_determinism.md)
-- [Benchmarking And Instrumentation](CarlaBEV/docs/benchmarking.md)
-- [Actor Geometry And Collision](CarlaBEV/docs/actor_geometry.md)
-- [Rendering Architecture](CarlaBEV/docs/rendering_architecture.md)
-- [Traffic Rules And Actor Behaviours](CarlaBEV/docs/traffic_rules_and_behaviors.md)
-- [Multi-Rate Architecture Proposal](CarlaBEV/docs/multi_rate_architecture.md) (design, not implemented)
-- [Public Integration API](CarlaBEV/docs/downstream_integration_api.md)
-- [Licensing and Attribution](CarlaBEV/docs/licensing.md)
-
-These pages describe the current implementation. Historical design context:
-
-- [Town01 Canonical Graph Migration Plan](CarlaBEV/docs/town01_canonical_graph_plan.md)
-- [Downstream API Proposal](CarlaBEV/docs/history/downstream_integration_api_proposal.md)
-
-## Repository Layout
-
-`CarlaBEV/` is organized into a few main layers:
-
-- `CarlaBEV/envs/`
-  Core environment, rendering, camera, transforms, spaces, and wrappers entrypoint.
-
-- `CarlaBEV/src/actors/`
-  Ego, vehicle, pedestrian, traffic-light, and actor behavior logic.
-
-- `CarlaBEV/src/control/`
-  Vehicle state integration, Stanley tracking, and control utilities.
-
-- `CarlaBEV/src/scenes/`
-  Scene orchestration, targets, utilities, and predefined scenarios.
-
-- `CarlaBEV/src/managers/`
-  Actor management, scene generation, and serialization.
-
-- `CarlaBEV/src/deeprl/`
-  Reward functions, reward signals, stats, and logging helpers.
-
-- `CarlaBEV/tools/`
-  Debug scripts, scene tools, and validation utilities.
-
-## Installation
-
-Using [`uv`](https://github.com/astral-sh/uv) is recommended.
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone https://github.com/danielmtzbarba/carlabev-env.git
+git clone --branch alignerr https://github.com/danielmtzbarba/carlabev-env.git
 cd carlabev-env
 uv sync
+uv run carlabev run sim --size 512
 ```
 
-If you want to consume a tagged release from another project instead of a local
-editable checkout, install from GitHub by tag:
+Drive with the arrow keys; press **Q** to quit. For a smoother display:
 
 ```bash
-uv add "CarlaBEV @ git+https://github.com/danielmtzbarba/carlabev-env.git@v0.1.0"
+uv run carlabev run sim --size 512 --display-fps 60
 ```
 
-Once PyPI publishing is enabled, downstream projects will also be able to use:
+Run headless episodes or change traffic difficulty:
 
 ```bash
-uv add CarlaBEV
+uv run carlabev run sim --control random --episodes 5
+uv run carlabev run sim --size 512 --difficulty-preset-id hard --seed 1
 ```
 
-## Running The Simulator
+## Settings
 
-### CLI
+| Option | Purpose |
+| --- | --- |
+| `--size 256` or `--size 512` | Native raster resolution; the physical field of view stays the same. |
+| `--control manual\|random\|idle\|forward` | Select keyboard or automatic actions. |
+| `--difficulty-preset-id easy\|medium\|hard` | Choose random-scene traffic difficulty. |
+| `--physics-dt 0.05` | Set physics time per substep, in seconds; default is `0.1`. |
+| `--action-repeat 2` | Hold each action for two physics substeps. |
+| `--seed 5` | Set the base scene seed. |
+| `--record-video runs/videos` | Record episode videos. |
 
-CarlaBEV now ships with a packaged CLI:
+`--display-fps` changes presentation; `--physics-dt` changes simulation time. Use `uv run carlabev run sim --help` for all options, or see the [configuration reference](CarlaBEV/docs/config_reference.md) for Python configuration.
 
-```bash
-uv run carlabev --help
-```
+## Features
 
-Phase-1 command groups:
+- Gymnasium environments with discrete or continuous ego actions.
+- RGB and semantic BEV observations, frame stacking, and direct vector observations.
+- Random traffic with car following, signals, junction yielding, and vehicle recycling.
+- Authored scenes and `lead_brake`, `jaywalk`, and `red_light_runner` scenarios.
+- Metric actor footprints, collision detection, and curvature-aware NPC speed control.
+- Seeded scene generation, cached scene libraries, and replay validation.
 
-- `carlabev run sim`
-- `carlabev run interactive`
-- `carlabev scene design`
-- `carlabev scene build-library`
-- `carlabev scene analyze-library`
-- `carlabev scene verify-library`
-- `carlabev scene analyze-routes`
-- `carlabev graph build-town01-canonical`
-- `carlabev graph visualize-town01-canonical`
-- `carlabev graph validate-town01-joins`
-- `carlabev validate simulator-semantics`
-- `carlabev validate replay`
-- `carlabev benchmark run|compare|baseline`
-- `carlabev viz semantic-channels`
-- `carlabev viz vehicle-temporal-fusion`
+## Train a DRL agent
 
-`carlabev scene build-library` supports both a legacy flat `--seed-offset`
-workflow and a structured study-seed workflow. New downstream integrations
-should prefer:
-
-- `--study-id`
-- `--backbone-id`
-- `--study-seed`
-- `--episode-index-start`
-
-### Running The Simulator
-
-`carlabev run sim` runs the simulator with explicit rendering, clock, scene and
-control options (use `--help` for the full list):
-
-```bash
-uv run carlabev run sim                                        # pygame window, keyboard control, random traffic, real time
-uv run carlabev run sim --fps 30                               # same, 3x fast-forward (simulation result unchanged)
-uv run carlabev run sim --control random --episodes 20         # headless random-action rollouts
-uv run carlabev run sim --control random --physics-dt 0.05 --episodes 5 --no-traffic
-uv run carlabev run sim --reset-mode scenario --scenario-id lead_brake --scenario-level 3
-uv run carlabev run sim --reset-mode authored --scene-file CarlaBEV/assets/scenes/jaywalk-01.01.json
-uv run carlabev run sim --control random --record-video runs/videos --episodes 2
-uv run carlabev run sim --control random --episodes 5 --scene-library corpora/eval.db --scene-library-read-only --scene-library-require-hit
-```
-
-- `--render human|rgb_array` (default: `human` for manual control, headless otherwise), `--fps` (wall-clock cap; default real time = `1/control_dt`), `--display-fps 30|60` (interpolated real-time viewer)
-- `--physics-dt`, `--action-repeat` (sub-steps per decision), `--size`, `--geometry-profile realistic|legacy`, `--max-episode-duration-s`, `--seed`
-- `--car-following idm|legacy`, `--no-signals`, `--no-right-of-way` (traffic-rule attribution switches)
-- `--control manual|random|idle|forward` (manual = arrow keys, `Q` quits)
-- `--reset-mode random|authored|scenario|scenario-preset` with `--difficulty-preset-id`, `--num-vehicles`, `--no-traffic`, `--scene-file`, `--scenario-id/--scenario-level`, `--preset-id`
-- `--record-video DIR` (observation frames at `1/control_dt` fps), `--log-dir` (`episodes.jsonl`), `--no-log`
-
-Episodes are logged one line each (cause, return, steps, traffic, role, route,
-target speed, progress) followed by a run summary.
-
-### Debug Viewer
-
-The legacy manual viewer is still available:
-
-```bash
-uv run carlabev run interactive
-```
-
-This launches a `pygame` window, drives the ego vehicle with keyboard control,
-and resets through the random traffic generator. It is equivalent to
-`carlabev run sim --control manual`.
-
-You can switch the reset source without changing tools:
-
-```bash
-uv run carlabev run interactive --reset-mode random
-uv run carlabev run interactive --reset-mode authored --scene-file CarlaBEV/assets/scenes/leadbrake-01.01.json
-uv run carlabev run interactive --reset-mode scenario --scenario-id lead_brake
-```
-
-Scene-library analysis now supports focused subcommands:
-
-```bash
-uv run carlabev scene analyze-library
-uv run carlabev scene analyze-library summary
-uv run carlabev scene analyze-library breakdown --by difficulty --by route-profile
-uv run carlabev scene analyze-library quality
-uv run carlabev scene analyze-library query --limit 10
-uv run carlabev scene analyze-library npcs --role lead     # NPC layer (npcs table)
-```
-
-For the full set of debugging and route-diagnostics tools, see:
-
-- [Debugging And Diagnostics](CarlaBEV/docs/debugging_and_diagnostics.md)
-
-### Validity Checks
-
-The repository includes a simulator validation script:
-
-```bash
-uv run carlabev validate simulator-semantics
-```
-
-This checks core simulator contracts such as:
-
-- bicycle yaw update consistency
-- geometry conversion consistency
-- observation-shape correctness
-- valid scenario spawns
-- one physics step per `env.step()` for every actor
-- rendering FPS / render mode never changing the simulated outcome
-- the SI unit contract and dt-convergence of the dynamics
-
-### Replay Validation
-
-```bash
-uv run carlabev validate replay                                   # 3 isolated runs, seed 0, medium random traffic
-uv run carlabev validate replay --seed 11 --runs 4 --steps 300 --policy random --action-seed 7
-uv run carlabev validate replay --cache-mode miss-then-hit        # run 0 populates a fresh scene library, runs 1.. replay hits
-uv run carlabev validate replay --reset-mode scenario --scenario-id lead_brake --report runs/replay.json
-```
-
-`carlabev scene verify-library --scene-library-path runs/lib.db` regenerates
-cached scenes on the current machine and compares their spec digests with the
-library: generation is deterministic per machine but its decisions depend on
-platform floating-point rounding, so a prebuilt library — not regeneration —
-is the cross-machine reproducibility mechanism.
-
-`validate replay` runs the same seeded reset and the same action sequence in
-`N` **independent interpreters** (each with a different `PYTHONHASHSEED`) and
-asserts that the simulator state is identical at every step: ego and target
-spawn, ego and NPC routes, every NPC pose/speed/behavior state, signals,
-rewards, termination and the observation hash. The first divergence is
-reported (step, key, values, delta); exit code 1 on mismatch. Use
-`--cache-mode miss-then-hit|hit-only` to prove that scene-library hits are
-indistinguishable from the generated scene, and `--atol 1e-7` for
-cross-machine comparisons. See
-[Replay Determinism And Scene-Cache Plan](CarlaBEV/docs/replay_and_scene_cache_plan.md).
-
-The per-feature physics/time contract suite lives in `tests/physics_time`
-(`uv run pytest tests/physics_time`, documented in `tests/physics_time/README.md`).
-For explicit numbers (timer accuracy, convergence error, determinism, throughput
-and per-phase timing) and a comparison against the committed baseline:
-
-```bash
-uv run carlabev benchmark run
-```
-
-See [Benchmarking And Instrumentation](CarlaBEV/docs/benchmarking.md).
-
-## Release Workflow
-
-This repository is set up to publish package releases from Git tags.
-
-Typical release flow:
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-The GitHub Actions workflows will:
-
-- run tests and build validation on pushes and pull requests
-- build an sdist and wheel on version tags
-- publish the package to PyPI when the publish workflow is authorized
-
-Before the first publish, configure PyPI trusted publishing for this repository
-or add a `PYPI_API_TOKEN` secret if you prefer token-based publishing.
-
-## Configuration
-
-The supported integration surface is the public Pydantic-backed config facade:
+Use CarlaBEV through Gymnasium’s `reset()` and `step()` API. The environment factory adds observation resizing, semantic masks, frame stacking, and episode statistics:
 
 ```python
-from CarlaBEV.config import (
-    EnvConfig,
-    RunConfig,
-    validate_env_config,
-    validate_run_config,
-)
-```
-
-Common `EnvConfig` options include:
-
-- `map_name`
-- `obs_mode`: `bev_rgb`, `bev_semantic`, or direct-only `vector`
-  - direct image construction returns RGB
-  - `make_env()` converts RGB mode to grayscale stacks or semantic mode to mask stacks/fusion
-  - vector observations require direct `CarlaBEV(...)` construction
-- `action_profile_id`: action profile preset such as `discrete9_v1`, `discrete13_v1`, `continuous_gsb_v1`
-- `reward_profile_id`: reward profile preset such as `carl_base_v1`, `carl_safety_v1`, `shaping_base_v1`
-- `action_mode`: `discrete` or `continuous`
-- `reward_mode`: `shaping` or `carl`
-- `size`: base BEV size
-- `obs_size`: final resized observation size
-- `frame_stack`
-- `traffic_enabled`
-- `route_direction_metrics_enabled`: attach one-time smoothed-route fractions
-  (`straight_fraction`, `left_turn_fraction`, `right_turn_fraction`) to reset info
-- `semantic_mask_ch`: semantic channel layout used when
-  `obs_mode="bev_semantic"`
-  - `binary`: drivable
-  - `2-class`: drivable, route
-  - `4-class`: drivable, vehicle, pedestrian, route
-  - `5-class`: drivable, sidewalk, vehicle, pedestrian, route
-  - `6-class`: non_drivable, drivable, sidewalk, vehicle, pedestrian, route
-  - `7-class`: non_drivable, drivable, sidewalk, vehicle, pedestrian, route,
-    traffic_light_red
-
-Common random-navigation reset options include:
-
-- `scene_benchmark_id`: optional benchmark namespace for shared scene corpora
-- `difficulty_preset_id`: `no_traffic`, `easy`, `medium`, `hard`
-- `scene_profile_id`: optional study-facing profile label such as `medium`
-- `scene_split`: optional benchmark split label such as `train` or `eval`
-- `route_extent`: `short`, `medium`, or `large`
-- `traffic_density`: `none`, `low`, `medium`, or `dense`
-- `speed_profile`: `slow`, `medium`, or `fast`
-- role-aware traffic controls such as `num_vehicles_near_ego`,
-  `traffic_role_profile`, and `guaranteed_candidate_role`
-- direct overrides such as `num_vehicles`, `route_dist_range`,
-  `ego_target_speed`, and `vehicle_target_speed`
-
-Scene replay is now backed by a SQLite scene library by default. Repeated
-resets with the same resolved scene request can therefore reuse cached actor
-payloads instead of regenerating the full scene, and `debug_env.py` reports
-cache hits and misses on reset.
-
-The intended downstream workflow is:
-
-- prebuild benchmark- or study-specific scene libraries ahead of training
-- point downstream study configs at those `.db` files
-- point replay runs at the prepared library in strict mode
-
-`scene_library_read_only=True` opens the library with SQLite `mode=ro` (no
-schema, counter, insert or delete writes; the file must exist) and
-`scene_library_require_hit=True` makes a random-scene reset that is not in the
-corpus raise `SceneLibraryMissError` instead of generating — together they give
-an immutable, strictly replayed corpus. Builders and callers must agree on
-resolved options and seed schedules to obtain matching cache keys (the
-exception reports the key, seeds and options of the miss). See
-[Public Integration API](CarlaBEV/docs/downstream_integration_api.md).
-
-Common `RunConfig` options include:
-
-- `num_envs`
-- `capture_video`: enable wrapper-based RGB video recording
-- `capture_every`
-- `video_output_dir`: explicit video artifact directory for the current run
-- `video_episode_indices`: optional explicit episode ids to record
-- `video_name_prefix`: output filename prefix for recorded videos
-
-For the full list of accepted `EnvConfig`, `RunConfig`, and reset-builder fields,
-plus where each parameter is actually consumed in the runtime, see:
-
-- [Configuration Reference](CarlaBEV/docs/config_reference.md)
-
-Legacy names such as `obs_space`, `masked`, `action_space`, and `reward_type`
-are accepted for compatibility, but new integrations should use the canonical
-`*_mode` fields.
-
-Route-generation controls, canonical planner aliases, and ego turn constraints
-are documented in:
-
-- [Route Generation And Planning](CarlaBEV/docs/route_generation_and_planning.md)
-- [Public Integration API](CarlaBEV/docs/downstream_integration_api.md)
-- [Licensing and Attribution](CarlaBEV/docs/licensing.md)
-
-## Comfort Signals
-
-The control path computes the following signals internally for reward and
-statistics processing:
-
-- `accel_long`
-- `accel_lat`
-- `jerk_long`
-- `jerk_lat`
-- `yaw_rate`
-- `yaw_acc`
-- `cmd_gas`
-- `cmd_steer`
-- `cmd_brake`
-- `applied_delta`
-
-The public `step()` info is empty during ongoing episodes and exposes
-`episode_info` on termination. That summary includes comfort aggregates such as:
-
-- `mean_abs_accel_long`
-- `mean_abs_accel_lat`
-- `mean_abs_jerk_long`
-- `mean_abs_jerk_lat`
-- `mean_abs_yaw_rate`
-- `mean_abs_yaw_acc`
-- `comfort_violation_rate`
-- `harsh_brake_rate`
-
-Detailed per-step signals are retained in the unwrapped environment's internal
-`current_info`, but are not returned as public `info["hero"]` telemetry. Episode
-aggregates support downstream evaluation; they do not establish physically
-calibrated passenger comfort.
-
-## Example Reset
-
-```python
-from CarlaBEV.config import (
-    EnvConfig,
-    RunConfig,
-    RandomNavigationReset,
-    build_random_navigation_options,
-)
+from CarlaBEV.config import EnvConfig, RunConfig
 from CarlaBEV.envs import make_env
 
-cfg = RunConfig(
-    env=EnvConfig(
-        render_mode="rgb_array",
-        obs_mode="bev_semantic",
-        semantic_mask_ch="5-class",
-    ),
-    num_envs=1,
-)
-
-envs = make_env(cfg)
-
-obs, info = envs.reset(
-    options=build_random_navigation_options(
-        RandomNavigationReset(num_vehicles=10, route_dist_range=(30, 100)),
-        reset_mask=[True],
-    )
-)
+envs = make_env(RunConfig(
+    num_envs=8,
+    env=EnvConfig(render_mode="rgb_array", obs_mode="bev_semantic"),
+))
+observations, info = envs.reset(seed=42)
+try:
+    for _ in range(1_000):
+        actions = envs.action_space.sample()  # Replace with policy(observations).
+        next_observations, rewards, terminated, truncated, info = envs.step(actions)
+        # Store the transition and update your DRL algorithm here, before resets.
+        observations = next_observations
+        done = terminated | truncated
+        if done.any():
+            observations, info = envs.reset(options={"reset_mask": done})
+finally:
+    envs.close()
 ```
 
-## Reset Seeding Model
+The example samples random actions; replace that line with your policy. Actions and transitions are batched across environments. Autoreset is disabled, so reset completed environments using `reset_mask`. Keep `terminated` and `truncated` separate when computing learning targets. See the [training integration contract](CarlaBEV/docs/downstream_integration_api.md) for details.
 
-`CarlaBEV.reset()` still accepts the standard Gymnasium `seed=...` argument,
-but episode randomness is now handled through local RNG bundles instead of
-reseeded global Python or NumPy state.
+## Architecture
 
-This gives downstream code two stable behaviors:
+![CarlaBEV systems and DRL interaction](CarlaBEV/assets/images/carlabev-architecture.png)
 
-- Replaying the same reset seed schedule reproduces the same scene sequence.
-- Varying the reset seed across episodes gives deterministic diversity without
-  cross-episode RNG leakage.
+The simulation advances on an explicit clock. Rendering observes its state and does not control physics timing.
 
-For random-navigation resets, the public reset builder supports optional
-sub-seeds:
+[Python integration](CarlaBEV/docs/downstream_integration_api.md) · [Scenarios](CarlaBEV/docs/scenario_specifications.md) · [Diagnostics and validation](CarlaBEV/docs/debugging_and_diagnostics.md)
 
-- `scene_seed`
-- `route_seed`
-- `traffic_seed`
-- `scenario_seed`
-
-If only `scene_seed` is provided, the environment derives the other sub-seeds
-internally. If `route_seed` or `traffic_seed` are provided explicitly, those
-components become independently controllable.
-
-```python
-from CarlaBEV.config import RandomNavigationReset, build_random_navigation_options
-
-options = build_random_navigation_options(
-    RandomNavigationReset(
-        difficulty_preset_id="medium",
-        scene_seed=1000,
-        route_seed=2000,
-        traffic_seed=3000,
-    ),
-    reset_mask=[True],
-)
-
-obs, info = envs.reset(options=options)
-```
-
-Practical interpretation:
-
-- fixed scene schedule: reuse the same `scene_seed` every reset
-- deterministic diverse schedule: provide a different per-episode `scene_seed`
-- route-relative traffic perturbation: hold `traffic_seed` fixed and vary `route_seed`
-- traffic-only perturbation: hold `route_seed` fixed and vary `traffic_seed`
-
-## Variation Layer (Training Diversity vs. Replay)
-
-A cached scene is one frozen realization. Training diversity comes from a
-separate, seeded *variation* layer applied when the scene is instantiated —
-never stored in the library, never part of the cache key:
-
-```python
-# frozen realization (evaluation, replay, goldens)
-RandomNavigationReset(scene_seed=1000)
-# a specific, replayable variant of the same cached scene
-RandomNavigationReset(scene_seed=1000, variation_seed=7, variation_profile="spawn_phase_v1")
-# training loops: EnvConfig(variation_policy="per_reset") derives and records a seed per reset
-```
-
-Profiles: `spawn_v1` (legacy ±1-step start offsets) and `spawn_phase_v1`
-(ego start progress, NPC route phase, initial-speed/ramp jitter, bounded lateral
-offset; training default). The effective seed and realised perturbations are
-reported in `scene_descriptor` / `info["variation"]` and in `episode_info`;
-replay an episode by passing its recorded `variation_seed`. Details in
-[Replay Determinism And Scene-Cache Plan](CarlaBEV/docs/replay_and_scene_cache_plan.md).
-
-## Scene Descriptor
-
-Random-navigation resets and episode summaries now expose a `scene_descriptor`
-payload intended for analysis and dataset-style logging.
-
-The descriptor captures scene-level metadata such as:
-
-- `scene_key` (scene identity), `scene_seed`, `route_seed`, `traffic_seed`
-- `variation_seed`, `variation_profile`, `variation_applied`
-- `scene_benchmark_id`, `scene_profile_id`, `scene_split`
-- `num_vehicles_near_ego`
-- `traffic_role_profile`
-- `guaranteed_candidate_role`
-- `spawned_role_counts`
-- `actor_roles`
-- `main_actor_role`
-
-This lets downstream analysis separate scene description from episode outcome.
-
-Those same descriptor fields also support benchmark-owned scene corpora in
-downstream repos: shard builders can emit per-seed libraries tagged with
-`scene_benchmark_id`, `scene_profile_id`, and `scene_split`, then merge them
-into one canonical benchmark database for read-only experiment reuse.
-
-## Research Scope
-
-CarlaBEV is a strong fit for:
-
-- BEV policy learning
-- scenario-driven DRL benchmarking
-- failure analysis in edge-case traffic situations
-- rapid experimentation on observation design and reward shaping
-
-It is a weaker fit for:
-
-- high-fidelity vehicle dynamics
-- sensor-realism studies
-- direct simulation-to-real transfer claims without additional validation
-
-## Traffic Realism (Stage 7)
-
-- Static-map collision is footprint-based (`map_collision_mode="footprint"`):
-  the ego collides when any part of its oriented body touches a non-drivable
-  pixel (the legacy `center` mode tested one pixel under the rear axle, 3.7 m
-  behind the bumper). Spawn validation applies the same test.
-- Random traffic generation `role_traffic_v3`: no overlapping spawns (2 m
-  bumper gap, unique start nodes, lifecycle respawns included), exact requested
-  density, working `rear` / `cross_path` / `opposite_lane` role pools, no
-  dead-end U-turn routes. `role_traffic_v2` reproduces the previous generator.
-- NPC route geometry `fillet_v1`: kinematically feasible junction arcs,
-  curvature speed caps and an off-road nudge — NPC bodies on non-drivable
-  pixels 4.3 % → 0.6 % of moving steps, on sidewalks 57 % → 10 %; `legacy`
-  reproduces the previous paths. `episode_info` reports
-  `npc_nondrivable_contact_fraction` / `npc_sidewalk_contact_fraction`.
-- `carlabev validate simulator-semantics` → `traffic_realism` pins all three.
-  Details: [Actor Geometry](CarlaBEV/docs/actor_geometry.md),
-  [Traffic Rules And Behaviors](CarlaBEV/docs/traffic_rules_and_behaviors.md).
-
-## Known Modeling Boundaries
-
-- Ego dynamics use a simplified kinematic bicycle model.
-- Lanes are ~1.9 m wide in the 128-px raster against 1.8 m car bodies, so NPC
-  corners touch sidewalk pixels on a fraction of steps; map contact uses a
-  ~1 px inset as tolerance.
-- Some scenario anchors remain map-specific even though the geometry pipeline now exposes explicit metric conversions.
-- The simulator is optimized for research iteration speed, not photorealism or detailed physics.
-
-## Video Capture Contract
-
-`CarlaBEV` now supports explicit downstream-directed video capture through the public run config. The intended use is for study orchestration layers such as `carlabev-lab` to decide:
-
-- where videos should be written
-- which episode indices should be recorded
-- how training probe videos differ from evaluation videos
-
-The environment wrapper path accepts:
-
-- `capture_video`
-- `video_output_dir`
-- `video_episode_indices`
-- `video_name_prefix`
-
-When `video_episode_indices` is omitted, the legacy `capture_every` cadence is still supported as a fallback.
-
-## License
-
-CarlaBEV's original software and documentation are licensed under the
-[Apache License 2.0](LICENSE.md). See [NOTICE](NOTICE) for retained third-party
-attribution and [Licensing and Attribution](CarlaBEV/docs/licensing.md) for scope.
-
-PythonRobotics-derived code retains its MIT notice. Town01 map assets are derived
-from CARLA and retain upstream CC-BY obligations; the exact source release and
-asset-license version still need to be recorded. They are not relicensed by the
-software license.
+Original software and documentation are licensed under [Apache-2.0](LICENSE.md).

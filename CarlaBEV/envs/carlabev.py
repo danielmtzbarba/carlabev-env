@@ -17,7 +17,7 @@ from CarlaBEV.src.control.route_metrics import (
 
 from CarlaBEV.src.managers.scene_generator import SceneGenerator
 from CarlaBEV.src.managers.traffic_lifecycle import TrafficLifecycle
-from CarlaBEV.src.managers.scene_library import SceneLibrary, SceneLibraryMissError
+from CarlaBEV.src.managers.scene_library import SceneLibrary, SceneLibraryInvalidEntryError, SceneLibraryMissError
 from CarlaBEV.src.scenes.scene_identity import SceneGenerationConfig, SceneGenerationIdentity
 from CarlaBEV.src.scenes.scene_spec import (
     DEFAULT_VARIATION_PROFILE,
@@ -347,15 +347,15 @@ class CarlaBEV(gym.Env):
         if not self._is_cacheable_scene(options):
             self._scene_cache_info = {"enabled": True, "hit": False, "scene_key": None, "bypassed": "non_random_scene"}
             return None, None
-        record = self.scene_library.get_scene_by_key(scene_key)
-        if record is None:
-            if self._require_hit:
-                raise SceneLibraryMissError(
-                    scene_key, reason="scene not in library for generation identity v2; rebuild older corpora",
-                    seeds=self._scene_seeds(options), options=options
-                )
-            return None, None
         try:
+            record = self.scene_library.get_scene_by_key(scene_key)
+            if record is None:
+                if self._require_hit:
+                    raise SceneLibraryMissError(
+                        scene_key, reason="scene not in library for generation identity v2; rebuild older corpora",
+                        seeds=self._scene_seeds(options), options=options
+                    )
+                return None, None
             spec = SceneSpec.from_payload(record["actors_payload"])
             if spec.surface_size != int(self.units.metric.surface_size):
                 raise ValueError("surface size mismatch")
@@ -368,7 +368,7 @@ class CarlaBEV(gym.Env):
                 or spec.generator_version != requested_identity.generator_version
             ):
                 raise ValueError("scene generation identity mismatch; rebuild the scene library")
-        except (ValueError, KeyError, TypeError) as exc:
+        except (SceneLibraryInvalidEntryError, ValueError, KeyError, TypeError) as exc:
             if self._require_hit:
                 raise SceneLibraryMissError(
                     scene_key, reason=f"stored scene is not replayable ({exc})", seeds=self._scene_seeds(options), options=options

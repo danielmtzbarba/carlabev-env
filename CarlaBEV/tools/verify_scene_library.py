@@ -29,16 +29,19 @@ import random
 import sqlite3
 import sys
 import time
+from pathlib import Path
 from typing import Any
 
 from CarlaBEV.src.scenes.scene_spec import SceneSpec
 from CarlaBEV.src.scenes.scene_identity import SceneGenerationIdentity
+from CarlaBEV.src.managers.scene_library import SceneLibraryInvalidEntryError, load_scene_payload
 
 
 def _fetch_scene_rows(db_path: str, *, sample: int | None, seed: int) -> list[dict[str, Any]]:
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(f"{Path(db_path).resolve().as_uri()}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     try:
+        conn.execute("BEGIN")
         rows = conn.execute(
             "SELECT scene_key, generator_version, scene_kind, actors_json, resolved_options_json, scene_seed "
             "FROM scenes ORDER BY created_at, scene_id"
@@ -46,14 +49,11 @@ def _fetch_scene_rows(db_path: str, *, sample: int | None, seed: int) -> list[di
         records = []
         for row in rows:
             record = dict(row)
-            payload = json.loads(record.pop("actors_json"))
-            if "npcs" not in payload and payload.get("npc_uids") is not None:
-                npc_rows = conn.execute(
-                    "SELECT spec_json FROM npcs WHERE scene_key = ? ORDER BY ordinal", (record["scene_key"],)
-                ).fetchall()
-                payload["npcs"] = [json.loads(r["spec_json"]) for r in npc_rows]
-            record["actors_payload"] = payload
-            record["resolved_options"] = json.loads(record.pop("resolved_options_json"))
+            try:
+                record["actors_payload"] = load_scene_payload(conn, record["scene_key"], json.loads(record.pop("actors_json")))
+                record["resolved_options"] = json.loads(record.pop("resolved_options_json"))
+            except (SceneLibraryInvalidEntryError, ValueError, TypeError) as exc:
+                record["entry_error"] = str(exc)
             records.append(record)
     finally:
         conn.close()
@@ -104,6 +104,9 @@ def verify_scene_library(
     results = []
     try:
         for index, record in enumerate(records):
+            if "entry_error" in record:
+                results.append({"scene_key": record["scene_key"], "status": "unreadable", "detail": record["entry_error"]})
+                continue
             try:
                 stored = SceneSpec.from_payload(record["actors_payload"])
                 identity = SceneGenerationIdentity.model_validate(stored.identity.get("generation"))

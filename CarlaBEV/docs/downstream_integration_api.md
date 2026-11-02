@@ -307,6 +307,26 @@ EnvConfig(
   both flags; `carlabev run sim --scene-library FILE --scene-library-read-only
   --scene-library-require-hit` replays a corpus from the CLI.
 
+### NPC reference integrity
+
+Current scene rows store an explicit ordered `npc_uids` list, including `[]`
+for scenes without NPCs. Loading resolves that exact population from the `npcs`
+table in the same SQLite read snapshot as the scene row. Missing, unexpected,
+duplicated or reordered references are rejected, as are conflicting ordinals,
+row/spec identities, scene membership, malformed NPC specifications and invalid
+route lengths. Inline NPC data cannot bypass normalized reference validation.
+
+Low-level scene reads raise `SceneLibraryInvalidEntryError` for these structural
+inconsistencies. Required-hit resets wrap it in `SceneLibraryMissError` without
+generating, evicting or updating usage counters, even with a writable library.
+Ordinary writable caching evicts and regenerates the entry; non-strict read-only
+caching generates an uncached replacement while preserving the corpus.
+`verify-library` uses the same structural checks and reports affected scenes as
+`unreadable`, continuing to check other entries. Its regeneration comparison
+also detects content changes that preserve the reference structure.
+
+This does not change identity v2 keys or require rebuilding healthy v2 corpora.
+
 ## Known integration limitations
 
 - `EnvConfig.max_actions` is a legacy step-count alias; prefer

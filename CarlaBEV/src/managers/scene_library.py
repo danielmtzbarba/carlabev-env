@@ -10,6 +10,8 @@ from CarlaBEV.src.scenes.scene_identity import SceneGenerationConfig
 from CarlaBEV.src.scenes.scene_spec import (
     ACTOR_PAYLOAD_SCHEMA_VERSION,
     SceneSpec,
+    NpcSpec,
+    NPC_KINDS,
     capture_scene,
     identity_options,
     instantiate_scene,
@@ -22,6 +24,7 @@ __all__ = [
     "SceneLibrary",
     "SceneLibraryError",
     "SceneLibraryMissError",
+    "SceneLibraryInvalidEntryError",
     "deserialize_scene_payload",
     "serialize_scene_payload",
 ]
@@ -96,6 +99,75 @@ class SceneLibraryMissError(SceneLibraryError):
             f"scene_library_require_hit: {reason} for scene {scene_key} "
             f"(seeds={self.seeds}); the library does not contain this scene and regeneration is disabled."
         )
+
+
+class SceneLibraryInvalidEntryError(SceneLibraryError):
+    """A stored scene cannot be reconstructed from its recorded NPC references."""
+
+    def __init__(self, scene_key: str, reason: str):
+        self.scene_key = scene_key
+        self.reason = reason
+        super().__init__(f"Invalid cached scene {scene_key}: {reason}")
+
+
+def load_scene_payload(conn: sqlite3.Connection, scene_key: str, payload: Any) -> dict[str, Any]:
+    """Resolve and validate normalized NPC references in the caller's read snapshot.
+
+    Legacy payloads remain available to diagnostic readers; the environment's
+    SceneSpec schema check rejects them before replay. Current payloads must use
+    the normalized representation written by insert_scene, including zero-NPC
+    scenes with an explicit empty reference list.
+    """
+    def invalid(reason):
+        raise SceneLibraryInvalidEntryError(scene_key, reason)
+
+    if not isinstance(payload, dict):
+        invalid("actor payload must be an object")
+    if str(payload.get("schema_version")) != str(ACTOR_PAYLOAD_SCHEMA_VERSION) and "npc_uids" not in payload:
+        return payload
+    if "npcs" in payload:
+        invalid("inline NPCs cannot replace the normalized NPC references")
+    references = payload.get("npc_uids")
+    if not isinstance(references, list) or any(not isinstance(uid, str) or not uid for uid in references):
+        invalid("npc_uids must be an explicit ordered list of nonempty identities")
+    if len(set(references)) != len(references):
+        invalid("duplicate NPC references")
+    rows = conn.execute(
+        "SELECT npc_uid, scene_key, ordinal, npc_id, kind, spec_json FROM npcs WHERE scene_key = ?",
+        (scene_key,),
+    ).fetchall()
+    by_uid = {row["npc_uid"]: row for row in rows}
+    if len(rows) != len(references) or set(by_uid) != set(references):
+        invalid(f"NPC references do not match stored rows (expected {len(references)}, found {len(rows)})")
+    npcs, npc_ids = [], set()
+    for ordinal, uid in enumerate(references):
+        row = by_uid[uid]
+        if row["ordinal"] != ordinal:
+            invalid(f"NPC {uid} has ordinal {row['ordinal']}, expected {ordinal}")
+        try:
+            data = json.loads(row["spec_json"])
+            if not isinstance(data, dict):
+                invalid(f"NPC {uid} spec must be an object")
+            npc = NpcSpec.from_dict(data)
+        except (ValueError, KeyError, TypeError, IndexError) as exc:
+            invalid(f"NPC {uid} has an unreadable spec ({exc})")
+        if (
+            npc.npc_uid != uid
+            or npc.npc_id != row["npc_id"]
+            or npc.kind != row["kind"]
+            or npc.kind not in NPC_KINDS
+            or not isinstance(npc.npc_id, str)
+            or not npc.npc_id
+            or uid != npc_uid_for(scene_key, npc.npc_id)
+        ):
+            invalid(f"NPC {uid} identity disagrees with its row or scene")
+        if npc.npc_id in npc_ids:
+            invalid(f"duplicate scene-scoped NPC identity {npc.npc_id}")
+        if len(npc.route_x) < 2 or len(npc.route_x) != len(npc.route_y):
+            invalid(f"NPC {uid} has an invalid route")
+        npc_ids.add(npc.npc_id)
+        npcs.append(data)
+    return {**payload, "npcs": npcs}
 
 
 REQUIRED_TABLES = ("scenes", "npcs")
@@ -258,13 +330,14 @@ class SceneLibrary:
 
     def get_scene_by_key(self, scene_key: str) -> dict[str, Any] | None:
         with self._connect() as conn:
+            conn.execute("BEGIN")  # scene and NPC rows must come from one consistent snapshot
             row = conn.execute(
                 "SELECT * FROM scenes WHERE scene_key = ?",
                 (scene_key,),
             ).fetchone()
-        if row is None:
-            return None
-        return self._row_to_record(row)
+            if row is None:
+                return None
+            return self._row_to_record(row, conn=conn)
 
     def get_scene_by_filters(
         self,
@@ -310,8 +383,9 @@ class SceneLibrary:
         sql += " ORDER BY created_at DESC LIMIT ?"
         params.append(int(limit))
         with self._connect() as conn:
+            conn.execute("BEGIN")
             rows = conn.execute(sql, params).fetchall()
-        return [self._row_to_record(row) for row in rows]
+            return [self._row_to_record(row, conn=conn) for row in rows]
 
     def insert_scene(
         self,
@@ -489,15 +563,15 @@ class SceneLibrary:
             conn.execute("DELETE FROM scenes WHERE scene_key = ?", (scene_key,))
             conn.execute("DELETE FROM npcs WHERE scene_key = ?", (scene_key,))
 
-    def _row_to_record(self, row: sqlite3.Row) -> dict[str, Any]:
+    def _row_to_record(self, row: sqlite3.Row, *, conn: sqlite3.Connection) -> dict[str, Any]:
         record = dict(row)
-        record["scene_descriptor"] = json.loads(record.pop("scene_descriptor_json"))
-        record["scenario_context"] = json.loads(record.pop("scenario_context_json"))
-        record["actors_payload"] = json.loads(record.pop("actors_json"))
-        payload = record["actors_payload"]
-        if isinstance(payload, dict) and "npcs" not in payload and payload.get("npc_uids") is not None:
-            payload["npcs"] = self.get_npcs_for_scene(str(record["scene_key"]))
-        record["resolved_options"] = json.loads(record.pop("resolved_options_json"))
-        spawn_json = record.pop("spawn_validation_json")
-        record["spawn_validation"] = json.loads(spawn_json) if spawn_json is not None else None
+        try:
+            record["scene_descriptor"] = json.loads(record.pop("scene_descriptor_json"))
+            record["scenario_context"] = json.loads(record.pop("scenario_context_json"))
+            record["actors_payload"] = load_scene_payload(conn, str(record["scene_key"]), json.loads(record.pop("actors_json")))
+            record["resolved_options"] = json.loads(record.pop("resolved_options_json"))
+            spawn_json = record.pop("spawn_validation_json")
+            record["spawn_validation"] = json.loads(spawn_json) if spawn_json is not None else None
+        except (ValueError, TypeError, KeyError) as exc:
+            raise SceneLibraryInvalidEntryError(str(record["scene_key"]), f"unreadable scene record ({exc})") from exc
         return record

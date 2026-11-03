@@ -11,7 +11,7 @@ A lightweight bird’s-eye-view driving simulator for reinforcement-learning res
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone --branch alignerr https://github.com/danielmtzbarba/carlabev-env.git
+git clone https://github.com/danielmtzbarba/carlabev-env.git
 cd carlabev-env
 uv sync
 uv run carlabev run sim --size 512
@@ -89,4 +89,4 @@ The simulation advances on an explicit clock. Rendering observes its state and d
 
 [Documentation](CarlaBEV/docs/README.md) · [Python integration](CarlaBEV/docs/downstream_integration_api.md) · [Scenarios](CarlaBEV/docs/scenario_specifications.md) · [Diagnostics and validation](CarlaBEV/docs/debugging_and_diagnostics.md)
 
-Original software and documentation are licensed under [Apache-2.0](LICENSE.md).
+Original software and documentation are licensed under [Apache-2.0](LICENSE.md). Planning and control code adapted from [PythonRobotics](https://github.com/AtsushiSakai/PythonRobotics) retains its [MIT notice](LICENSES/PythonRobotics-MIT.txt). CARLA-derived Town01 maps retain their [asset attribution and upstream terms](CarlaBEV/assets/Town01/NOTICE).

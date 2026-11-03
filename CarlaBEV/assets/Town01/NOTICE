@@ -1,0 +1,26 @@
+CARLA-derived Town01 map assets
+
+Upstream work: CARLA Simulator, Town01 environment
+Upstream credit: CARLA Team and contributors; Computer Vision Center (CVC),
+Universitat Autonoma de Barcelona (UAB)
+Project: https://carla.org/
+Source: https://github.com/carla-simulator/carla
+Upstream licensing statement:
+https://github.com/carla-simulator/carla#licenses
+
+The CarlaBEV maintainer confirmed that the images and graph files in this
+directory were created by the maintainer and derived from CARLA. Local changes
+include exported/processed BEV RGB and semantic raster maps, multiple raster
+resolutions, extracted route graphs, and the canonical directed vehicle graph.
+These changes do not imply endorsement by the CARLA Team.
+
+CARLA distinguishes its MIT-licensed software from its CC-BY-licensed assets.
+The root Apache-2.0 license covers CarlaBEV's original software and
+documentation; it does not relicense CARLA-derived asset content.
+
+The precise upstream CARLA release and CC-BY version used for these asset
+exports have not been recorded in this repository. Retain CARLA attribution
+and the applicable upstream CC-BY terms. This notice does not assert a
+particular CC-BY version or replace its legal text. Before redistributing the
+asset bundle as a separately licensed dataset, recover the license supplied
+with the original CARLA asset release and include its exact version and text.
